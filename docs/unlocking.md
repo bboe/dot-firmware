@@ -2194,17 +2194,49 @@ against biscuit's and the radar one amonet-radar v1.0.0 writes.
 ### Echo Dot (3rd Generation)
 
 donut declares an unlock, kamakiri-donut v1.0.0, and no target, so no route
-here reaches it, exactly as crown's does. **Nothing in it has run on a donut.**
-Its parts are written from the kit's own Python, and the kit's own order, so
-they are a scaffold for the first donut to meet, not a proven route.
+here reaches it, exactly as crown's does. **No part of this unlock has run on a
+donut**, though a donut has now been read; its plan and its client are written
+from the kit's own Python, and the kit's own order, so they are a scaffold for
+the first donut to meet, not a proven route.
 
 It is the first unlock that is not amonet's, and the first that pyserial cannot
-carry: its payload goes in through USB control transfers, which a serial port
-does not send. So the bootrom step would reach it over libusb rather than a
-port, and `firebreak/mediatek/libusb.py` is a transport of the same shape the
-rest of the process already speaks. The readings behind that, and why macOS
-needs root for it, are in
-[measurements.md](measurements.md#what-libusb-can-do-on-macos).
+carry. Two separate reasons say so, and either alone would be enough. Its
+payload is set running by a USB control transfer, which a serial port does not
+send. And a donut's bootrom does not answer a plain word write through macOS's
+CDC driver at all, where it answers the same write over the bulk endpoints. So
+`firebreak/mediatek/libusb.py` is not a convenience: nothing else reaches that
+device. The readings behind both, and why macOS needs root for the control
+transfers alone, are in
+[measurements.md](measurements.md#what-libusb-can-do-on-macos) and
+[measurements.md](measurements.md#an-echo-dot-3rd-generation-in-its-bootrom).
+
+The exploit in `firebreak/mediatek/kamakiri.py` is mtkclient's, not the kit's,
+and the two are different attacks on the same bootrom. The kit's own loader
+overflows `SET_LINE_CODING` and then walks a pointer with command `0xDA`; it
+was run against a donut and it fails, so firebreak does not carry it. What is
+here instead is four steps: one word to the watchdog's `0x50`, holding the
+payload's load address **byte-reversed**; fifteen reads below that word, each
+starting one word higher and ending on it; command `0xE0` with a length, which
+answers whether the bootrom kept room and then takes the bytes; and a single
+control transfer, `0xA1` with `wIndex` `0xCC`, which returns into the payload.
+
+Two details of that last transfer are not free choices. `0xCC` is this chip's
+value, not a general one, and `0x8167` is the only MediaTek part firebreak
+sends it to. And because `0xA1` names an interface, pyusb tries to claim
+interface `0xCC`, which does not exist; the claim has to be suppressed, so
+`trigger` opens a handle of its own, blanks the claim on it, and throws it
+away. The transfer itself raises once the payload is running, which is why the
+error is swallowed rather than reported.
+
+The one assumption left is the join: the exploit is mtkclient's and the payload
+is the kit's, and no one has sent the kit's stage1 through `0xE0`. Both expect
+the same `0xa1a2a3a4` when a payload is ready, which is the reason to think it
+holds, and the reason it is only a reason.
+
+Nor is the engine a way around the exploit. A donut refuses writes to the
+GCPU's own registers, where a Dot allows them, so the range-check defeat in
+`Unlock: amonet v2` cannot bootstrap this device and a second payload client
+alone would never have been enough.
 
 Its payload is two stages, and the second is the surprise: stage1 is only a
 loader, taking `0x4000` to place stage2 and `0x4001` to jump to it, and stage2
