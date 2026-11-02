@@ -19,6 +19,7 @@ JUMP_REGISTER = 0x1028A8
 MEDIATEK_VENDOR_ID = 0x0E8D
 MESSAGE_LIMIT = 64
 PAYLOAD_LOAD_ADDRESS = 0x201000
+PAYLOAD_STATUS = b"\0\0"
 PORT_POLL_INTERVAL = 0.25
 READ_STATUS = b"\x00\x00"
 READ_TIMEOUT = 5
@@ -33,6 +34,7 @@ class BootromCommand(enum.IntEnum):
     EXTENDED = 0xC8
     READ_WORDS = 0xD1
     WRITE_WORDS = 0xD4
+    SEND_PAYLOAD = 0xE0
 
 
 class Connection:
@@ -137,6 +139,21 @@ class Bootrom(Connection):
         self.read_exactly(label=label, length=1)
         self.read_exactly(label=label, length=2)
 
+    def send_payload(self, *, payload: bytes) -> None:
+        label = f"payload of {len(payload)} bytes"
+        self._echo(data=bytes([BootromCommand.SEND_PAYLOAD]), label=label)
+        self._echo(data=struct.pack(">I", len(payload)), label=f"{label}: length")
+        room = self.read_exactly(label=f"{label}: room", length=len(PAYLOAD_STATUS))
+        if room != PAYLOAD_STATUS:
+            message = (
+                f"{label}: the bootrom kept no room for a payload that long,"
+                f" answering {room!r}"
+            )
+            raise PayloadTooLargeError(message)
+        self.port.write(data=payload)
+        self.read_exactly(label=f"{label}: upload status", length=len(PAYLOAD_STATUS))
+        self.read_exactly(label=f"{label}: end status", length=len(PAYLOAD_STATUS))
+
     def write_words(
         self, *, address: int, read_status: bool = True, words: Sequence[int]
     ) -> None:
@@ -177,6 +194,10 @@ class UsbdlError(Exception):
 
 
 class HandshakeTimeoutError(UsbdlError):
+    pass
+
+
+class PayloadTooLargeError(UsbdlError):
     pass
 
 

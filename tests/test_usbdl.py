@@ -6,7 +6,16 @@ import sys
 import types
 
 import pytest
-from conftest import FakePort, reply_read, reply_write, sent_read, sent_write, shook
+from conftest import (
+    FakePort,
+    reply_payload,
+    reply_read,
+    reply_write,
+    sent_payload,
+    sent_read,
+    sent_write,
+    shook,
+)
 
 from firebreak.mediatek import usbdl
 from firebreak.sizes import padded
@@ -21,6 +30,7 @@ MEASURED = {
     "MEDIATEK_VENDOR_ID": 0x0E8D,
     "MESSAGE_LIMIT": 64,
     "PAYLOAD_LOAD_ADDRESS": 0x201000,
+    "PAYLOAD_STATUS": b"\x00\x00",
     "PORT_POLL_INTERVAL": 0.25,
     "READ_STATUS": b"\x00\x00",
     "READ_TIMEOUT": 5,
@@ -35,6 +45,7 @@ MEASURED_ENUMS = {
         ("EXTENDED", 0xC8),
         ("READ_WORDS", 0xD1),
         ("WRITE_WORDS", 0xD4),
+        ("SEND_PAYLOAD", 0xE0),
     ],
     "ProductId": [("BOOTROM", 0x0003), ("PRELOADER", 0x2000)],
 }
@@ -265,6 +276,19 @@ def test_send_extended_discards_three_bytes() -> None:
         usbdl.BootromCommand.EXTENDED,
         usbdl.CACHE_DISABLE_SUBCOMMAND,
     ])
+    assert port.replies == bytearray()
+
+
+def test_send_payload_refuses_a_payload_the_bootrom_has_no_room_for() -> None:
+    bootrom, _ = shook(replies=reply_payload(length=3, room=b"\x00\x01"))
+    with pytest.raises(expected_exception=usbdl.PayloadTooLargeError, match="no room"):
+        bootrom.send_payload(payload=b"big")
+
+
+def test_send_payload_uploads_it_after_the_room_status() -> None:
+    bootrom, port = shook(replies=reply_payload(length=8))
+    bootrom.send_payload(payload=b"stage1!!")
+    assert bytes(port.written) == sent_payload(payload=b"stage1!!")
     assert port.replies == bytearray()
 
 

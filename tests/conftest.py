@@ -246,6 +246,15 @@ def real_browser() -> types.SimpleNamespace:
     return types.SimpleNamespace(name="real-browser", open=opened_a_browser)
 
 
+def reply_payload(*, length: int, room: bytes = usbdl.PAYLOAD_STATUS) -> bytes:
+    return (
+        bytes([usbdl.BootromCommand.SEND_PAYLOAD])
+        + struct.pack(">I", length)
+        + room
+        + (usbdl.PAYLOAD_STATUS * 2 if room == usbdl.PAYLOAD_STATUS else b"")
+    )
+
+
 def reply_read(*, address: int, values: tuple[int, ...]) -> bytes:
     return (
         bytes([usbdl.BootromCommand.READ_WORDS])
@@ -263,6 +272,14 @@ def reply_write(*, address: int, end: bool = True, words: tuple[int, ...]) -> by
         + usbdl.WRITE_STATUS
         + b"".join(struct.pack(">I", word) for word in words)
         + (usbdl.WRITE_STATUS if end else b"")
+    )
+
+
+def sent_payload(*, payload: bytes) -> bytes:
+    return (
+        bytes([usbdl.BootromCommand.SEND_PAYLOAD])
+        + struct.pack(">I", len(payload))
+        + payload
     )
 
 
