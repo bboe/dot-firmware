@@ -299,9 +299,9 @@ def test_the_pattern_differs_per_size_and_is_not_zeros() -> None:
 
 
 def test_the_test_reboots_the_dot_and_says_so(
-    *, stubbed: types.SimpleNamespace, tmp_path: pathlib.Path
+    *, stubbed: types.SimpleNamespace
 ) -> None:
-    write_test(rig=stubbed, wheel=tmp_path)
+    write_test(rig=stubbed)
     assert stubbed.emmc.rebooted
     assert stubbed.shown == ["\n" + bootrom_write_test.LEFT]
     assert "neither the card nor the cable" in str(stubbed.said["verdict"])
@@ -324,11 +324,8 @@ def test_writes_that_read_back_pass_and_put_cache_back() -> None:
     assert emmc.read_blocks(count=64, index=REGION) == held
 
 
-def write_test(
-    *, rig: types.SimpleNamespace, wheel: pathlib.Path | None = None
-) -> None:
+def write_test(*, rig: types.SimpleNamespace) -> None:
     bootrom_write_test.bootrom_write_test(
         line=lambda label, value: rig.said.setdefault(label, []).append(value),
         payload=pathlib.Path("payload.bin"),
-        wheel=wheel,
     )

@@ -80,7 +80,6 @@ def ran(*, monkeypatch: pytest.MonkeyPatch, stdout: str) -> list[dict[str, objec
         calls.append(options)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout=stdout)
 
-    monkeypatch.setattr(name="pyserial_wheel", target=emos, value=lambda: None)
     monkeypatch.setattr(name="run", target=emos.subprocess, value=run)
     return calls
 

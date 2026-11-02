@@ -38,7 +38,7 @@ from firebreak.fireos import (
     stage_swap_twrp,
     system_image,
 )
-from firebreak.host import adb_shell, pyserial_wheel, run
+from firebreak.host import adb_shell, run
 from firebreak.identify import check_target, fastboot_driver_missing
 from firebreak.plugin import FireOs5, FireOs6
 from firebreak.probe import state
@@ -143,11 +143,7 @@ def bootrom_chain() -> Chain:
 
 
 def bootrom_needs(*, unlock: Unlock) -> tuple[Need, ...]:
-    return (
-        unlock.source,
-        pyserial_wheel,
-        FASTBRICKS[ARGUMENTS.target.device].source,
-    )
+    return (unlock.source, FASTBRICKS[ARGUMENTS.target.device].source)
 
 
 def fireos5_stages() -> dict[State, Stage]:
@@ -347,7 +343,7 @@ def restore_stages() -> dict[State, Stage]:
     return {
         twrp: Stage(
             needs=(
-                (ota_build, FASTBRICKS[ARGUMENTS.target.device].source, pyserial_wheel)
+                (ota_build, FASTBRICKS[ARGUMENTS.target.device].source)
                 if bootrom
                 else (ota_build,)
             ),
@@ -446,7 +442,6 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 payload=amonet_payload(),
                 tail=remaining(start=chain.then, table=table),
                 unlock=chain.unlock,
-                wheel=pyserial_wheel(),
             ):
                 chain.after()
             else:
@@ -678,7 +673,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
 def stages() -> dict[State, Stage]:
     chain = FIREOS5_CHAINS.get(ARGUMENTS.target.device)
     table = {
-        State.EMOS: Stage(needs=(pyserial_wheel,), run=stage_emos, steps=1, then=None),
+        State.EMOS: Stage(needs=(), run=stage_emos, steps=1, then=None),
         State.NO_SYSTEM: reboot_stages()[State.BOOTED],
         State.AMONET_FASTBOOT: Stage(
             needs=(FASTBRICKS[ARGUMENTS.target.device].source,),

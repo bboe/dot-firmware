@@ -21,7 +21,6 @@ from firebreak.host import (
     in_fastboot,
     last_line,
     md5_mismatch,
-    pyserial_wheel,
     run,
 )
 from firebreak.plan import (
@@ -383,7 +382,6 @@ def restore(  # ruff: ignore[complex-structure]
             build=build,
             payload=amonet_payload(),
             preloader=(work / "preloader.img").read_bytes(),
-            wheel=pyserial_wheel(),
         )
         return
 

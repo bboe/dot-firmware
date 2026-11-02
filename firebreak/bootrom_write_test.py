@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import enum
-import sys
 import time
 from typing import TYPE_CHECKING
 
@@ -59,10 +58,7 @@ def bootrom_write_test(
     *,
     line: Callable[[str, object], None],
     payload: pathlib.Path,
-    wheel: pathlib.Path | None,
 ) -> None:
-    if wheel is not None and str(wheel) not in sys.path:
-        sys.path.insert(0, str(wheel))
     live = answering_payload()
     joined = live is not None
     if live is None:

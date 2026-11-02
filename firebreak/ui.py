@@ -146,7 +146,6 @@ class Session:
     no_wait: bool = False
     probing: bool = False
     read_flash: bool = False
-    serial_ready: bool | None = None
     short: bool = False
     shown: Kind | None = None
     system_lock: threading.Lock = dataclasses.field(default_factory=threading.Lock)
@@ -236,7 +235,7 @@ def filled(*, text: str) -> str:
 
 def invocation(*, options: list[str]) -> str:
     command = [pathlib.Path(word).name for word in program()]
-    if command[1:2] != ["-m"] and pathlib.Path(command[-1]).suffix != ".pyz":
+    if command[1:2] != ["-m"]:
         command = command[1:]
     if command == ["firebreak"] and any(
         part.startswith("archive-v") for part in pathlib.Path(sys.prefix).parts
@@ -326,8 +325,6 @@ def title() -> str:
 
 
 def upgrade() -> tuple[str, str]:
-    if invocation(options=[]).endswith(".pyz"):
-        return "download firebreak.pyz from", RELEASES
     return "run", shlex.join(split_command=UVX)
 
 

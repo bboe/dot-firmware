@@ -127,7 +127,6 @@ def test_a_downgrade_checks_the_dot_before_it_erases_boot0(
     tmp_path: pathlib.Path,
 ) -> None:
     monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
-    monkeypatch.setattr(name="pyserial_wheel", target=unlock, value=lambda: None)
     monkeypatch.setattr(
         name="getvar", target=unlock, value=lambda **o: answers.get(o["name"], "")
     )
@@ -148,7 +147,6 @@ def test_a_downgrade_erases_boot0_through_fastboot(
         "unlock_status": "true",
     }
     monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
-    monkeypatch.setattr(name="pyserial_wheel", target=unlock, value=lambda: None)
     monkeypatch.setattr(
         name="getvar", target=unlock, value=lambda **o: answers[o["name"]]
     )
@@ -173,7 +171,6 @@ def test_a_downgrade_from_amonet_s_own_bootloader_takes_the_twrp_route(
         "unlock_status": "true",
     }
     monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
-    monkeypatch.setattr(name="pyserial_wheel", target=unlock, value=lambda: None)
     monkeypatch.setattr(
         name="getvar", target=unlock, value=lambda **o: answers[o["name"]]
     )
@@ -198,7 +195,6 @@ def test_a_downgrade_that_meets_a_locked_fastboot_returns_false(
         "unlock_status": "true",
     }
     monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
-    monkeypatch.setattr(name="pyserial_wheel", target=unlock, value=lambda: None)
     monkeypatch.setattr(
         name="getvar", target=unlock, value=lambda **o: answers[o["name"]]
     )

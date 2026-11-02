@@ -176,7 +176,6 @@ def test_every_need_a_stage_declares_can_be_called(
     monkeypatch.setattr(name="download", target=route.updates, value=lambda **_: None)
     monkeypatch.setattr(name="fetch", target=cache, value=lambda **_: None)
     monkeypatch.setattr(name="unpack", target=route, value=lambda **_: None)
-    monkeypatch.setattr(name="pyserial_wheel", target=route, value=lambda: None)
     for state, stage in route.stages().items():
         for need in stage.needs:
             if not isinstance(need, cache.Download):

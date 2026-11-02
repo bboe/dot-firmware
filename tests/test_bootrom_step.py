@@ -263,14 +263,13 @@ def started(*, bootrom: Client, client: type, payload: bytes) -> Live:
     return bootrom.start_payload(payload=payload)
 
 
-def step(  # ruff: ignore[too-many-arguments]
+def step(
     *,
     erase: object = None,
     little_kernel: str = AMONET_V1_1_0_LK,
     rig: Rig,
     tail: int | None = None,
     unlock: object = UNLOCK_FROM_BOOTROM,
-    wheel: pathlib.Path | None = None,
 ) -> bool:
     return bootrom_step.bootrom_step(
         amonet=rig.amonet,
@@ -279,7 +278,6 @@ def step(  # ruff: ignore[too-many-arguments]
         payload=rig.payload,
         tail=tail,
         unlock=unlock,
-        wheel=wheel,
     )
 
 
@@ -657,15 +655,13 @@ def test_a_port_that_will_not_open_is_named_once_after_a_second(
 
 
 def test_a_preloader_means_boot0_is_intact_and_needs_no_bootrom_step(
-    *, capsys: pytest.CaptureFixture[str], rig: Rig, tmp_path: pathlib.Path
+    *, capsys: pytest.CaptureFixture[str], rig: Rig
 ) -> None:
     bootrom_step.SESSION.boot0_erased = True
     rig.ports = [{}, {}, {}, PRELOADER]
-    wheel = tmp_path / "pyserial.whl"
-    assert step(rig=rig, wheel=wheel) is False
+    assert step(rig=rig) is False
     assert bootrom_step.SESSION.boot0_erased is False
     assert rig.written == []
-    assert str(wheel) in bootrom_step.sys.path
     assert "boot0 is intact" in capsys.readouterr().out
 
 
@@ -738,7 +734,7 @@ def test_a_stock_preloader_step_held_in_the_bootrom_sends_no_reboot(
     bootrom_step.SESSION.fastboot = True
     bootrom_step.SESSION.boot0_erased = True
     bootrom_step.stock_preloader(
-        build="5.5.0.3", payload=rig.payload, preloader=b"P" * 1024, wheel=None
+        build="5.5.0.3", payload=rig.payload, preloader=b"P" * 1024
     )
     assert [action.kind for action in carried[0]] == ["ZeroRpmb", "Write"]
     assert bootrom_step.SESSION.boot0_erased is False
@@ -752,14 +748,14 @@ def test_a_stock_preloader_step_that_meets_a_preloader_stops_the_run(
     rig.ports = [{}, {}, PRELOADER]
     with pytest.raises(FatalError, match="boot0 was not clear"):
         bootrom_step.stock_preloader(
-            build="5.5.0.3", payload=rig.payload, preloader=b"P" * 512, wheel=None
+            build="5.5.0.3", payload=rig.payload, preloader=b"P" * 512
         )
     assert rig.written == []
     assert bootrom_step.SESSION.boot0_erased is True
 
 
 def test_a_stock_preloader_step_zeroes_the_rpmb_and_writes_boot0(
-    *, monkeypatch: pytest.MonkeyPatch, rig: Rig, tmp_path: pathlib.Path
+    *, monkeypatch: pytest.MonkeyPatch, rig: Rig
 ) -> None:
     carried: list[tuple[Action, ...]] = []
     monkeypatch.setattr(
@@ -768,9 +764,8 @@ def test_a_stock_preloader_step_zeroes_the_rpmb_and_writes_boot0(
         value=lambda *, actions, **_: carried.append(actions),
     )
     bootrom_step.SESSION.boot0_erased = True
-    wheel = tmp_path / "pyserial.whl"
     bootrom_step.stock_preloader(
-        build="5.5.0.3", payload=rig.payload, preloader=b"P" * 1024, wheel=wheel
+        build="5.5.0.3", payload=rig.payload, preloader=b"P" * 1024
     )
     assert rig.steps == [
         "handshake",
@@ -796,7 +791,6 @@ def test_a_stock_preloader_step_zeroes_the_rpmb_and_writes_boot0(
     ]
     assert rig.clients[0].port.closed
     assert bootrom_step.SESSION.boot0_erased is False
-    assert str(wheel) in bootrom_step.sys.path
 
 
 def test_a_table_that_cannot_be_read_stops_the_run(

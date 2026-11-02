@@ -77,25 +77,7 @@ requires = ["tox>=4.21", "tox-uv"]
 
 [tool.tox.env.build]
 allowlist_externals = ["rm", "uv"]
-commands = [
-    ["rm", "-rf", "build", "dist"],
-    ["uv", "build", "--quiet"],
-    [
-        "uv",
-        "pip",
-        "install",
-        "--quiet",
-        "--requirements",
-        "pyproject.toml",
-        "--target",
-        "build/bundle",
-    ],
-    [
-        "python",
-        "-c",
-        "import shutil, zipapp; shutil.copytree('firebreak', 'build/bundle/firebreak', ignore=shutil.ignore_patterns('__pycache__')); zipapp.create_archive('build/bundle', 'build/firebreak.pyz', '/usr/bin/env python3', 'firebreak.__main__:main', lambda p: p.parts[0].startswith(('firebreak', 'update_checker')) and '__pycache__' not in p.parts, True)",
-    ],
-]
+commands = [["rm", "-rf", "build", "dist"], ["uv", "build", "--quiet"]]
 skip_install = true
 
 [tool.tox.env.floor]

@@ -56,12 +56,6 @@ MAGISK = Download(
     sha256="18e46b16b25ebe691c282fe311beccd4811cd533848a64e2efbd754fb85efde7",
     url="https://github.com/topjohnwu/Magisk/releases/download/v17.3/Magisk-v17.3.zip",
 )
-PYSERIAL = Download(
-    name="pyserial-3.5-py2.py3-none-any.whl",
-    sha256="c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0",
-    url="https://files.pythonhosted.org/packages/07/bc/"
-    "587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl",
-)
 
 
 def browser_fetch(*, download: Download, path: pathlib.Path) -> None:

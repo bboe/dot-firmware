@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import sys
 import time
 from typing import TYPE_CHECKING
 
@@ -15,7 +14,7 @@ from firebreak.bootrom_step import (
     unwritten,
 )
 from firebreak.devices import BOOTROM_UNLOCKS, FASTBRICKS, FIREOS5_CHAINS
-from firebreak.host import pyserial_wheel, run
+from firebreak.host import run
 from firebreak.identify import POLL, identify
 from firebreak.probe import state
 from firebreak.route import TWRPS
@@ -103,7 +102,6 @@ def already_held() -> bool:
 
 
 def answering() -> Client | None:
-    with_pyserial()
     return answering_payload()
 
 
@@ -179,7 +177,6 @@ def bootrom_entry(*, force: bool) -> None:
             what=f"clearing boot0's header leaves the {device.title} able to start"
             " from its bootrom alone, until something writes a preloader back",
         )
-        with_pyserial()
         amonet_payload()
         SESSION.boot0_erased = True
         clear_boot0()
@@ -297,7 +294,6 @@ def parked(*, live: Client) -> None:
 
 
 def reached(*, erase: Callable[[], str] | None) -> Client:
-    with_pyserial()
     payload = amonet_payload()
     if SESSION.short:
         ask_for_short()
@@ -482,9 +478,3 @@ def walk(
                 + WAYS_OUT.get(current, "")
             )
         time.sleep(POLL)
-
-
-def with_pyserial() -> None:
-    wheel = pyserial_wheel()
-    if wheel is not None and str(wheel) not in sys.path:
-        sys.path.insert(0, str(wheel))

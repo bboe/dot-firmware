@@ -8,7 +8,6 @@ import io
 import os
 import pathlib
 import plistlib
-import re
 import subprocess
 import sys
 import threading
@@ -1025,19 +1024,6 @@ def test_portions_cut_at_the_slice_size(*, monkeypatch: pytest.MonkeyPatch) -> N
     assert cut == [b"abcd", b"efgh", b"ij"]
     assert list(cache.portions(chunks=iter([b"abcd"]))) == [[b"abcd"]]
     assert list(cache.portions(chunks=iter([]))) == []
-
-
-def test_pyserial_pin_matches_the_download() -> None:
-    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    pinned = re.search(
-        flags=re.MULTILINE,
-        pattern=r'^dependencies = \["pyserial==([^"]+)", "update_checker==1\.0\.1"\]$',
-        string=pyproject,
-    )
-    assert pinned, "pyproject.toml does not pin pyserial"
-    wheel = f"pyserial-{pinned[1]}-py2.py3-none-any.whl"
-    assert cache.PYSERIAL.name == wheel
-    assert cache.PYSERIAL.url.endswith("/" + wheel)
 
 
 @pytest.mark.parametrize(

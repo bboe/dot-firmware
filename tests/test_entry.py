@@ -11,7 +11,6 @@ from firebreak.states import State
 from firebreak.ui import ARGUMENTS, SESSION, FatalError
 
 if TYPE_CHECKING:
-    import pathlib
     from collections.abc import Iterable
 
 
@@ -23,7 +22,6 @@ def bootrom(*, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]) -> list
     monkeypatch.setattr(
         name="amonet_payload", target=entry, value=lambda: "payload.bin"
     )
-    monkeypatch.setattr(name="pyserial_wheel", target=entry, value=lambda: None)
     monkeypatch.setattr(name="ask_for_short", target=entry, value=lambda: None)
     monkeypatch.setattr(
         name="clear_boot0", target=entry, value=lambda: done.append("cleared")
@@ -428,22 +426,6 @@ def test_a_fastboot_entry_waits_for_the_gesture_without_a_limit(
     assert "Start the Echo Dot (2nd Generation)'s fastboot" in done[0]
 
 
-def test_a_join_puts_pyserial_on_the_path_before_it_probes(
-    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    seen: list[list[str]] = []
-    bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
-    monkeypatch.setattr(name="path", target=entry.sys, value=[])
-    monkeypatch.setattr(name="pyserial_wheel", target=entry, value=lambda: tmp_path)
-    monkeypatch.setattr(
-        name="answering_payload",
-        target=entry,
-        value=lambda: seen.append(list(entry.sys.path)) and None,
-    )
-    assert entry.bootrom_device() is BISCUIT
-    assert seen == [[str(tmp_path)]]
-
-
 def test_a_marker_from_another_echo_is_corrected_not_obeyed(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -677,17 +659,6 @@ def test_a_walk_stops_waiting_for_an_echo_that_never_comes(
     monkeypatch.setattr(name="monotonic", target=entry.time, value=monotonic)
     with pytest.raises(FatalError, match="firebreak short` reaches that one"):
         entry.fastboot_entry()
-
-
-def test_a_wheel_goes_on_the_import_path_once(
-    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    wheel = tmp_path / "pyserial.whl"
-    bootrom(monkeypatch=monkeypatch, states=[])
-    monkeypatch.setattr(name="pyserial_wheel", target=entry, value=lambda: wheel)
-    monkeypatch.setattr(name="path", target=entry.sys, value=["."])
-    entry.short_entry()
-    assert entry.sys.path[0] == str(wheel)
 
 
 def test_an_entry_gives_up_on_a_state_that_will_not_move(

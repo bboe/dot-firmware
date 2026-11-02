@@ -20,7 +20,6 @@ from firebreak.host import (
     getvar,
     in_fastboot,
     last_line,
-    pyserial_wheel,
     reconnect,
     run,
 )
@@ -234,7 +233,6 @@ def stage_amonet_recovery(*, carries_twrp: bool = True) -> bool:
 def stage_downgrade() -> bool:
     chain = FIREOS5_CHAINS[current_device()]
     amonet = unpack(download=chain.unlock.source)
-    wheel = pyserial_wheel()
     if getvar(name="unlock_status").lower() != "true":
         raise FatalError(message="not in amonet's fastboot")
     check_product()
@@ -260,7 +258,6 @@ def stage_downgrade() -> bool:
         payload=amonet_payload(),
         tail=None,
         unlock=chain.unlock,
-        wheel=wheel,
     )
     return stage_fireos5_recovery()
 

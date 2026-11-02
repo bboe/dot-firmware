@@ -70,7 +70,6 @@ class Run:
         )
         monkeypatch.setattr(name="bootrom_step", target=route, value=self.bootrom_step)
         monkeypatch.setattr(name="unpack", target=route, value=lambda **_: None)
-        monkeypatch.setattr(name="pyserial_wheel", target=route, value=lambda: None)
         monkeypatch.setattr(name="amonet_payload", target=route, value=lambda: None)
         monkeypatch.setattr(
             name="stage_fireos5_recovery",
@@ -148,14 +147,14 @@ def test_a_background_failure_is_left_for_the_run_to_meet(
 
 @pytest.mark.parametrize(
     ("build", "extra", "steps"),
-    [("5.5.0.3", 2, route.STOCK_STEPS + 2), ("5.5.3.1", 0, route.STOCK_STEPS)],
+    [("5.5.0.3", 1, route.STOCK_STEPS + 2), ("5.5.3.1", 0, route.STOCK_STEPS)],
 )
 def test_a_bootrom_build_restores_with_the_bootrom_s_downloads_and_steps(
     *, build: str, extra: int, monkeypatch: pytest.MonkeyPatch, steps: int
 ) -> None:
     monkeypatch.setattr(name="build", target=route.ARGUMENTS, value=build)
     stage = route.restore_stages()[route.State.AMONET_TWRP]
-    assert stage.needs[1:] == ((biscuit.V2_0_1_SOURCE, route.pyserial_wheel)[:extra])
+    assert stage.needs[1:] == (biscuit.V2_0_1_SOURCE,)[:extra]
     assert stage.steps == steps
 
 
@@ -498,7 +497,6 @@ def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
             route.State.AMONET_FASTBOOT,
             [
                 biscuit.V1_1_0_SOURCE,
-                route.pyserial_wheel,
                 biscuit.V2_0_1_SOURCE,
                 route.TWRP,
                 BUILDS["5.5.5.4"],
@@ -507,7 +505,7 @@ def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
             ],
         ),
         ("fireos5", route.State.ROOTED, [route.TWRP]),
-        ("fireos5", route.State.EMOS, [route.pyserial_wheel]),
+        ("fireos5", route.State.EMOS, []),
         (
             "fireos6",
             route.State.AMONET_FIREOS5_TWRP,

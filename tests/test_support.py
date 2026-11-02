@@ -480,12 +480,10 @@ def test_the_write_test_on_a_held_echo_goes_through_the_bootrom(
     monkeypatch.setattr(
         name="bootrom_write_test", target=support, value=lambda **said: ran.append(said)
     )
-    monkeypatch.setattr(name="pyserial_wheel", target=support, value=lambda: None)
     monkeypatch.setattr(name="state", target=support, value=lambda: State.BOOTROM)
     support.write_test()
     assert legs == []
     assert ran[0]["payload"] == "payload.bin"
-    assert ran[0]["wheel"] is None
 
 
 def test_the_write_test_runs_both_legs_and_cleans_up(

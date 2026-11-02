@@ -14,7 +14,6 @@ from firebreak.host import (
     USER_SERIAL,
     child,
     child_path,
-    pyserial_wheel,
     rerun,
 )
 from firebreak.ui import ARGUMENTS, PROGRESS, FatalError, clock, show
@@ -70,7 +69,7 @@ def emos(*, action: str) -> str:
         capture_output=True,
         check=False,
         cwd=CACHE,
-        env=dict(os.environ, PYTHONPATH=child_path(wheel=pyserial_wheel())),
+        env=dict(os.environ, PYTHONPATH=child_path()),
         text=True,
         timeout=30,
     ).stdout.strip()

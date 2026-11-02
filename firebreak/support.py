@@ -17,7 +17,6 @@ from firebreak.host import (
     adb_state,
     getvar,
     in_fastboot,
-    pyserial_wheel,
     run,
 )
 from firebreak.identify import identity_lines
@@ -306,7 +305,7 @@ def write_test() -> None:
     about_host()
     current = reachable()
     if current == State.BOOTROM:
-        bootrom_write_test(line=line, payload=amonet_payload(), wheel=pyserial_wheel())
+        bootrom_write_test(line=line, payload=amonet_payload())
         return
     line("state", probed() if current is None else current.value)
     show(text="\n".join(identity_lines()))

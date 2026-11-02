@@ -838,9 +838,8 @@ testing a single stage mean reaching its state by hand first.
   cache, which fits one user's run on that Python: each of its 10 flashes
   exited 1 at once.
   The run stops when its Python, or the one its environment was made from,
-  is under `WindowsApps`. It names `uvx --managed-python`, or for a pyz, a
-  python.org `python.exe` by its full path or `uv run --managed-python
-  --no-project python`. It does not name `py`: the launcher lists the Store
+  is under `WindowsApps`. It names `uvx --managed-python` or a python.org
+  install. It does not name `py`: the launcher lists the Store
   Python too, and `py -3.13` ran it on that host.
 - Do not pipe a `fastboot` read into `head`. The closed pipe stops the host
   part way through the transfer and leaves the rest of the device's answers
@@ -953,21 +952,15 @@ testing a single stage mean reaching its state by hand first.
   downloads would only delay that zip.
 - Nothing deletes a download, so a later run downloads nothing. A rooted run
   prints the cache's path and size and says it is safe to delete.
-- The emOS probe and the bootrom step need pyserial, which a wheel or source
-  install declares as a dependency, pinned to the same version the download
-  holds. A test reads the pin out of `pyproject.toml` and checks it names that
-  wheel, so the two cannot drift.
-- A pyz carries no pyserial, so the run fetches the pinned pure wheel from
-  PyPI when the host has none and imports pyserial from that zip: on this
-  process's `sys.path` for the bootrom, on the emOS child's `PYTHONPATH`. A
-  host with pyserial fetches nothing.
+- The emOS probe and the bootrom step need pyserial, which the wheel and the
+  source install both declare as a pinned dependency. Nothing downloads it: a
+  run that cannot import it is a broken install, not a case to recover from.
 - A run asks PyPI once whether a newer firebreak exists, through
   update_checker, after it refuses root and before it starts adb, so a root
   run cannot leave a root-owned `~/.cache`. It prints a notice only when one
-  does, with the way to upgrade: the latest release's `firebreak.pyz` for a
-  pyz, and `uvx firebreak@latest` for any other run, as the README gives
-  both. The command or link goes on a line of its own, outside the 79-column
-  wrap, so a copied line holds all of it.
+  does, with the way to upgrade, `uvx firebreak@latest`, as the README gives
+  it. The command goes on a line of its own, outside the 79-column wrap, so a
+  copied line holds all of it.
 - The check keeps each answer for an hour. `--no-update-check` skips it. A
   child never checks.
 - Each request has a 1 s timeout: with PyPI unreachable through a dead proxy,
@@ -975,16 +968,11 @@ testing a single stage mean reaching its state by hand first.
   DNS: with a resolver that never answers, the same run took 8.8 s. A failed
   check is also kept for an hour. The check catches every exception, so it
   cannot stop a run.
-- The pyz bundles update_checker: its 2 modules and its `dist-info`, which
-  holds the BSD-2-Clause notice. The build installs the pinned dependencies
-  from `pyproject.toml` into `build/bundle` and zips `firebreak` and
-  `update_checker*` from there. The bundled version is the pin, and a test
-  checks the pyz holds it and no pyserial.
-- The pyz has no `dist-info` for firebreak, so firebreak's version is
-  `__version__` in `firebreak/__init__.py`. hatchling reads the package's
-  version from there too, and a test checks the installed one equals it.
-- The one child left is emOS's, `python -m firebreak _child emos`, with the pyz
-  or `site-packages` on its `PYTHONPATH`. A path to re-run would not do: the
+- firebreak's version is `__version__` in `firebreak/__init__.py`. hatchling
+  reads the package's version from there too, and a test checks the installed
+  one equals it.
+- The one child left is emOS's, `python -m firebreak _child emos`, with
+  `site-packages` on its `PYTHONPATH`. A path to re-run would not do: the
   wheel's Windows launcher is an `.exe`.
 - `-m` puts a child's working directory first on its import path, so a child
   runs in the cache or amonet's `modules`, never where the run started. A
@@ -1091,8 +1079,8 @@ testing a single stage mean reaching its state by hand first.
   gets the rules and the commands to add them, starting with `groupadd -f
   plugdev` because Fedora and Arch have no such group. A user in `/etc/group`
   whose shell predates that gets `adb kill-server` and the `sg` line. The `sg`
-  line repeats the command as run, interpreter, path and flags included, because
-  `./firebreak.pyz` is wrong from another directory.
+  line repeats the command as run, interpreter, path and flags included,
+  because a bare relative path is wrong from another directory.
 - Without the rules adb lists the Echo as `no permissions`. When that lasts 5
   seconds and nothing else listed is usable, the run stops and prints
   the same rules and commands. A shorter spell is udev still setting

@@ -5,7 +5,6 @@ import pathlib
 import re
 import subprocess
 import sys
-import zipfile
 
 import pytest
 
@@ -13,7 +12,6 @@ from firebreak import __version__
 from firebreak.devices import BUILDS
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-ZIPAPP = ROOT / "build" / "firebreak.pyz"
 
 
 def test_credits_name_every_link_the_readme_credits() -> None:
@@ -35,9 +33,8 @@ def test_credits_name_every_link_the_readme_credits() -> None:
     argvalues=[
         ["firebreak"],
         [sys.executable, "-m", "firebreak"],
-        [sys.executable, str(ZIPAPP)],
     ],
-    ids=["wheel", "module", "pyz"],
+    ids=["wheel", "module"],
 )
 def test_help(*, command: list[str]) -> None:
     output = subprocess.run(
@@ -104,29 +101,6 @@ def test_the_positional_arguments_are_checked(
     )
     assert finished.returncode == 2
     assert message in finished.stderr
-
-
-def test_the_pyz_holds_the_pinned_update_checker() -> None:
-    with zipfile.ZipFile(file=ZIPAPP) as archive:
-        names = set(archive.namelist())
-    assert "update_checker/core.py" in names
-    assert "update_checker-1.0.1.dist-info/licenses/LICENSE.txt" in names
-    assert not any(name.startswith("serial") for name in names)
-
-
-def test_the_pyz_imports_its_update_checker() -> None:
-    script = (
-        "import sys; sys.path.insert(0, sys.argv[1]); import update_checker;"
-        " print(update_checker.__file__.startswith(sys.argv[1]),"
-        " update_checker.__version__)"
-    )
-    said = subprocess.run(
-        [sys.executable, "-I", "-S", "-c", script, str(ZIPAPP)],
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    assert said.stdout == "True 1.0.1\n"
 
 
 def test_the_wheel_takes_its_version_from_the_package() -> None:

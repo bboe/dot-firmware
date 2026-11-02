@@ -117,7 +117,6 @@ def test_a_bootrom_build_writes_its_preloader_through_the_bootrom(
         target=stock,
         value=lambda: tmp_path / "payload.bin",
     )
-    monkeypatch.setattr(name="pyserial_wheel", target=stock, value=lambda: None)
     monkeypatch.setattr(
         name="stock_preloader",
         target=stock,
@@ -137,7 +136,6 @@ def test_a_bootrom_build_writes_its_preloader_through_the_bootrom(
             "build": "5.5.0.3",
             "payload": tmp_path / "payload.bin",
             "preloader": b"P" * 1024,
-            "wheel": None,
         }
     ]
     assert writes[-1][0] == "write TEE image to tee1 (primary)"

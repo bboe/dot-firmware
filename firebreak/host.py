@@ -10,7 +10,7 @@ import threading
 import time
 from typing import BinaryIO
 
-from firebreak.cache import PYSERIAL, digest, fetch
+from firebreak.cache import digest
 from firebreak.ui import (
     ARGUMENTS,
     PROGRESS,
@@ -19,7 +19,6 @@ from firebreak.ui import (
     again,
     asked_for,
     clock,
-    invocation,
     program,
     show,
     title,
@@ -60,7 +59,6 @@ Then run it again with the new group, which a new login also has:
 
 """  # ruff: ignore[line-too-long]
 PUSH_TRIES = 3
-SERIAL_PROBE = "import sys; sys.path.pop(0); import serial"
 STORE_PYTHON = (
     "this Python is the Microsoft Store's. Windows keeps the files it writes"
     " under AppData in a private folder that adb and fastboot cannot see, so"
@@ -110,18 +108,10 @@ def check_adb() -> None:
 def check_python() -> None:
     base = pathlib.Path(getattr(sys, "_base_executable", "") or sys.executable)
     if "windowsapps" in (part.lower() for part in base.parts):
-        pyz = shlex.split(invocation(options=[]))[-1]
-        named = pyz if shlex.quote(pyz) == pyz else f'"{pyz}"'
         raise FatalError(
             message=STORE_PYTHON
-            + (
-                f"Install Python from python.org and run {named} with that"
-                " python.exe by its full path, or run uv run --managed-python"
-                f" --no-project python {named}"
-                if pyz.endswith(".pyz")
-                else "Run uvx --managed-python firebreak@latest, which uses uv's"
-                " own Python, or install Python from python.org"
-            )
+            + "Run uvx --managed-python firebreak@latest, which uses uv's"
+            " own Python, or install Python from python.org"
         )
 
 
@@ -159,11 +149,8 @@ def child(*, arguments: list[str] | None = None, name: str) -> list[str]:
     ]
 
 
-def child_path(*, wheel: pathlib.Path | None) -> str:
-    package = str(pathlib.Path(__file__).resolve().parents[1])
-    if wheel is None:
-        return package
-    return os.pathsep.join((str(wheel), package))
+def child_path() -> str:
+    return str(pathlib.Path(__file__).resolve().parents[1])
 
 
 def command(  # ruff: ignore[too-many-arguments]
@@ -273,20 +260,6 @@ def on_usb(*, line: str) -> bool:
     )
 
 
-def probe_serial() -> bool:
-    try:
-        result = command(
-            arguments=[sys.executable, "-c", SERIAL_PROBE],
-            environment=dict(os.environ, PYTHONPATH=child_path(wheel=None)),
-            standard_error=subprocess.DEVNULL,
-            standard_output=subprocess.DEVNULL,
-            timeout=60,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return result.returncode == 0
-
-
 def push_checked(
     *, advice: str = "", local: pathlib.Path, remote: str | pathlib.PurePosixPath
 ) -> None:
@@ -312,12 +285,6 @@ def push_checked(
         message=f"{remote} did not arrive intact after {PUSH_TRIES} tries;"
         f" the last: {said}. {advice}" + asked_for()
     )
-
-
-def pyserial_wheel() -> pathlib.Path | None:
-    if SESSION.serial_ready is None:
-        SESSION.serial_ready = probe_serial()
-    return None if SESSION.serial_ready else fetch(download=PYSERIAL)
 
 
 def reconnect(*, remote: str | pathlib.PurePosixPath) -> None:

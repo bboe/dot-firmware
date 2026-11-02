@@ -160,7 +160,6 @@ def test_check_python_refuses_a_store_python(
     monkeypatch.setattr(
         name="_base_executable", raising=False, target=host.sys, value=base
     )
-    monkeypatch.setattr(name="invocation", target=host, value=lambda **_: "uvx")
     if refused:
         with pytest.raises(
             expected_exception=FatalError, match="Run uvx --managed-python"
@@ -168,29 +167,6 @@ def test_check_python_refuses_a_store_python(
             host.check_python()
     else:
         host.check_python()
-
-
-@pytest.mark.parametrize(
-    argnames=("said", "named"),
-    argvalues=[
-        ("python3 fb.pyz", "fb.pyz"),
-        ("python.exe 'firebreak (1).pyz'", '"firebreak (1).pyz"'),
-    ],
-)
-def test_check_python_tells_a_pyz_how_to_run_another_python(
-    *, monkeypatch: pytest.MonkeyPatch, named: str, said: str
-) -> None:
-    monkeypatch.setattr(name="executable", target=host.sys, value=STORE)
-    monkeypatch.setattr(
-        name="_base_executable", raising=False, target=host.sys, value=STORE
-    )
-    monkeypatch.setattr(name="invocation", target=host, value=lambda **_: said)
-    with pytest.raises(expected_exception=FatalError) as raised:
-        host.check_python()
-    assert str(raised.value).endswith(
-        f"run {named} with that python.exe by its full path, or run uv run"
-        f" --managed-python --no-project python {named}"
-    )
 
 
 def test_check_user(*, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -244,11 +220,8 @@ def test_child() -> None:
     ]
 
 
-def test_child_path_finds_the_package(*, tmp_path: pathlib.Path) -> None:
-    wheel, package = host.child_path(wheel=tmp_path).split(sep=os.pathsep)
-    assert wheel == str(tmp_path)
-    assert (pathlib.Path(package) / "firebreak" / "__main__.py").is_file()
-    assert host.child_path(wheel=None) == package
+def test_child_path_finds_the_package() -> None:
+    assert (pathlib.Path(host.child_path()) / "firebreak" / "__main__.py").is_file()
 
 
 def test_command(*, capsys: pytest.CaptureFixture[str]) -> None:
@@ -356,13 +329,6 @@ def test_on_usb(
     assert host.on_usb(line=line) is want
 
 
-def test_probe_serial_asks_for_the_module_the_child_imports() -> None:
-    assert host.SERIAL_PROBE.endswith("import serial")
-    assert host.probe_serial() is True
-    renamed = host.SERIAL_PROBE.replace("import serial", "import pyserial")
-    assert host.command(arguments=[sys.executable, "-c", renamed]).returncode != 0
-
-
 def test_push_checked(
     *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
@@ -422,33 +388,6 @@ def test_push_checked_fails_with_its_advice(
         host.push_checked(advice="Reseat it. ", local=local, remote="/tmp/x")
 
 
-def test_pyserial_wheel_gives_the_wheel_when_the_child_cannot_import(
-    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    wheel = tmp_path / "pyserial.whl"
-    fetched, probes = [], []
-
-    def fetch(*, download: object) -> pathlib.Path:
-        fetched.append(download)
-        return wheel
-
-    def missing() -> bool:
-        probes.append(False)
-        return False
-
-    monkeypatch.setattr(name="fetch", target=host, value=fetch)
-    monkeypatch.setattr(name="probe_serial", target=host, value=missing)
-    assert host.pyserial_wheel() == wheel
-    assert host.pyserial_wheel() == wheel
-    assert fetched == [host.PYSERIAL, host.PYSERIAL]
-    assert len(probes) == 1
-
-    host.SESSION.serial_ready = None
-    monkeypatch.setattr(name="probe_serial", target=host, value=lambda: True)
-    assert host.pyserial_wheel() is None
-    assert fetched == [host.PYSERIAL, host.PYSERIAL]
-
-
 def test_reconnect(
     *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -474,7 +413,7 @@ def test_rerun(*, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_rerun_quotes_a_path_with_spaces(*, monkeypatch: pytest.MonkeyPatch) -> None:
-    argv = ["/My Files/firebreak.pyz", "stock", "it's"]
+    argv = ["/My Files/firebreak", "stock", "it's"]
     monkeypatch.setattr(name="argv", target=sys, value=argv)
     monkeypatch.setattr(name="executable", target=sys, value="/usr/bin/python3")
     command = shlex.split(s=host.rerun())

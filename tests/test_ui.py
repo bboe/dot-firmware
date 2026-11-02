@@ -76,7 +76,6 @@ def test_a_write_with_no_terminal_to_ask_at_names_force(
     argnames=("program_path", "want"),
     argvalues=[
         ("/src/firebreak/__main__.py", "Run python3 -m firebreak stock again."),
-        ("/home/me/firebreak.pyz", "Run python3 firebreak.pyz stock again."),
         ("/home/me/.local/bin/firebreak", "Run firebreak stock again."),
     ],
 )
@@ -91,12 +90,12 @@ def test_again(
 def test_asked_for_names_the_report_as_this_run_was_started(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(name="argv", target=sys, value=["/home/me/firebreak.pyz"])
+    monkeypatch.setattr(name="argv", target=sys, value=["/src/firebreak/__main__.py"])
     monkeypatch.setattr(name="executable", target=sys, value="/usr/bin/python3")
     said = ui.asked_for()
-    assert "run python3 firebreak.pyz report and paste" in said
+    assert "run python3 -m firebreak report and paste" in said
     assert "#support-device-unlocking in the EchoMuse Discord" in said
-    assert "python3 firebreak.pyz write-test then tells" in said
+    assert "python3 -m firebreak write-test then tells" in said
 
 
 def test_clock() -> None:
@@ -391,14 +390,6 @@ def test_title_names_the_target_s_device(
             ("run", "uvx firebreak@latest"),
         ),
         (
-            "/home/me/firebreak.pyz",
-            "/usr",
-            (
-                "download firebreak.pyz from",
-                "https://github.com/bboe/firebreak/releases/latest",
-            ),
-        ),
-        (
             "/home/me/.venv/bin/firebreak",
             "/home/me/.venv",
             ("run", "uvx firebreak@latest"),
@@ -406,7 +397,7 @@ def test_title_names_the_target_s_device(
         ("/home/me/src/firebreak/__main__.py", "/usr", ("run", "uvx firebreak@latest")),
     ],
 )
-def test_upgrade_offers_the_pyz_or_uvx(
+def test_upgrade_always_offers_uvx(
     *, argv: str, monkeypatch: pytest.MonkeyPatch, prefix: str, said: tuple[str, str]
 ) -> None:
     monkeypatch.setattr(name="argv", target=sys, value=[argv])

@@ -32,9 +32,7 @@ goes away then too.
 
 It needs `adb` and `fastboot` from Android platform-tools, and
 [uv](https://docs.astral.sh/uv/), which runs firebreak from PyPI and fetches a
-Python for it when needed. Each
-[release](https://github.com/bboe/firebreak/releases) also has `firebreak.pyz`,
-which runs as `python3 firebreak.pyz` on Python 3.9 or later.
+Python for it when needed.
 
 `uvx firebreak@latest` asks PyPI for the newest release on each run. Without a
 network it fails, and `uvx firebreak` runs the copy uv already has.

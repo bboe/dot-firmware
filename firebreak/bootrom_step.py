@@ -225,10 +225,7 @@ def bootrom_step(  # ruff: ignore[too-many-arguments]
     payload: pathlib.Path,
     tail: int | None,
     unlock: Unlock,
-    wheel: pathlib.Path | None,
 ) -> bool:
-    if wheel is not None and str(wheel) not in sys.path:
-        sys.path.insert(0, str(wheel))
     live = None if erase else answering_payload()
     if live is None:
         live = started_payload(erase=erase, payload=payload)
@@ -459,11 +456,7 @@ def started_payload(
     return exploit(client=client, payload=payload)
 
 
-def stock_preloader(
-    *, build: str, payload: pathlib.Path, preloader: bytes, wheel: pathlib.Path | None
-) -> None:
-    if wheel is not None and str(wheel) not in sys.path:
-        sys.path.insert(0, str(wheel))
+def stock_preloader(*, build: str, payload: pathlib.Path, preloader: bytes) -> None:
     PROGRESS.begin(estimate="10 s", label="waiting for the bootrom")
     client, joined = bootrom_client(deadline=time.monotonic() + MINUTE, erase=None)
     if client is None and joined is None:

@@ -15,21 +15,19 @@ unlocks and their plans.
 ```sh
 uvx --with tox-uv tox            # lint, build, then floor, as CI runs them
 uvx --with tox-uv tox -e lint    # pre-commit-hooks, CodeSorter, markdownlint, ruff, toml-sort
-uvx --with tox-uv tox -e build   # dist/: wheel and sdist; build/firebreak.pyz
+uvx --with tox-uv tox -e build   # dist/: wheel and sdist
 uvx --with tox-uv tox -e build,floor   # macOS only: pytest and coverage on Apple's 3.9.6
 ```
 
 ## Rules
 
-- Python 3.9 or later. There are two dependencies, each pinned exactly. pyserial
-  is pinned to the version a pyz run downloads. update_checker tells a run that
-  PyPI has a newer firebreak; the pyz bundles it. Everything else is the
-  standard library. Users run it with `uvx firebreak@latest` from PyPI, or as
-  `firebreak.pyz` from a GitHub release.
+- Python 3.9 or later. There are two dependencies, each pinned exactly.
+  update_checker tells a run that PyPI has a newer firebreak. Everything else is
+  the standard library. Users run it with `uvx firebreak@latest` from PyPI.
 - A release is a `v` tag matching `__version__` in `firebreak/__init__.py`,
   which hatchling also reads for the package. `release.yml` publishes the
-  wheel to PyPI by trusted publishing and attaches the pyz to a GitHub release.
-  Each release adds its dated section to `CHANGELOG.md` first.
+  wheel to PyPI by trusted publishing and attaches the sdist and wheel to a
+  GitHub release. Each release adds its dated section to `CHANGELOG.md` first.
 - The floor is Apple's `/usr/bin/python3`, 3.9.6, not the newest 3.9. Later 3.9
   releases added APIs it lacks. `tests/test_python_floor.py` fails on any
   import, or any attribute reached through a module's name, that 3.9.6 lacks,
