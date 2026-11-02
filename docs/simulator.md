@@ -475,8 +475,6 @@ The simulator accepts these, where a real Dot may not:
   settling on every poll spends the speed on starting Python. It takes a
   timeout as well, and reports a child that fails, because a listing could not
   block before this and now can.
-- Under Python 3.9, pyserial from the wheel loads through `zipimporter`, which
-  has no `exec_module`. So the hook runs the module's code from `get_code`.
 - The bootrom keeps the pseudo-terminal's other end open, so a tool can close
   and reopen the port.
 

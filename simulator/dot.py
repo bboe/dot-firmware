@@ -78,7 +78,7 @@ DEVICES = {
     },
 }
 DISK_BYTES = 3917479936
-DOWNLOAD_SUFFIXES = frozenset({".bin", ".img", ".whl", ".zip"})
+DOWNLOAD_SUFFIXES = frozenset({".bin", ".img", ".zip"})
 FASTBOOT_FLAGS = frozenset({"-S", "-s"})
 FASTBOOT_INTO = frozenset({"bootloader", "fastboot"})
 FASTBOOT_REBOOTS = {

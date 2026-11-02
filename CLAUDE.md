@@ -21,9 +21,11 @@ uvx --with tox-uv tox -e build,floor   # macOS only: pytest and coverage on Appl
 
 ## Rules
 
-- Python 3.9 or later. There are two dependencies, each pinned exactly.
-  update_checker tells a run that PyPI has a newer firebreak. Everything else is
-  the standard library. Users run it with `uvx firebreak@latest` from PyPI.
+- Python 3.9 or later. There are two dependencies, each pinned exactly:
+  pyserial, which the emOS probe and the bootrom step open a port with, and
+  update_checker, which tells a run that PyPI has a newer firebreak. Everything
+  else is the standard library. Users run it with `uvx firebreak@latest` from
+  PyPI.
 - A release is a `v` tag matching `__version__` in `firebreak/__init__.py`,
   which hatchling also reads for the package. `release.yml` publishes the
   wheel to PyPI by trusted publishing and attaches the sdist and wheel to a

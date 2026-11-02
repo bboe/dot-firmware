@@ -151,13 +151,11 @@ class Finder(importlib.abc.MetaPathFinder):
 
 
 class Loader(importlib.abc.Loader):
-    def __init__(self, *, inner: importlib.abc.InspectLoader) -> None:
+    def __init__(self, *, inner: importlib.abc.Loader) -> None:
         self.inner = inner
 
     def exec_module(self, module: ModuleType) -> None:
-        exec(  # ruff: ignore[exec-builtin]
-            self.inner.get_code(module.__name__), module.__dict__
-        )
+        self.inner.exec_module(module)
         if module.__name__ == "firebreak.cache":
             module.downloads_dir = downloads_dir
         elif module.__name__ == "firebreak.identify":

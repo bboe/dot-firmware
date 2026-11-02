@@ -4,18 +4,6 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
-### Removed
-
-- `firebreak.pyz`. A release now carries the wheel and the sdist alone, and
-  `uvx firebreak@latest` is the one way to run it. Nothing is known to have
-  used the pyz, and it cost more than it paid for: because a zipapp carries no
-  dependencies, a run had to decide at runtime whether its own child could
-  `import serial`, download pyserial's wheel from PyPI when it could not, and
-  thread that path through `sys.path` and every child's `PYTHONPATH`. That
-  machinery is gone with it, so pyserial is now an ordinary pinned dependency
-  and a run that cannot import it is a broken install rather than a case to
-  recover from.
-
 ### Changed
 
 - No error message calls an unlock a payload any more, which is this project's
@@ -39,6 +27,18 @@ This project adheres to [Semantic Versioning](https://semver.org).
   where it waited a minute before saying anything. The longer note, which says
   that a fastboot and a recovery both answer and that an Echo showing no light
   never does, still follows after 30 polls.
+
+### Removed
+
+- `firebreak.pyz`. A release now carries the wheel and the sdist alone, and
+  `uvx firebreak@latest` is the one way to run it. Nothing is known to have
+  used the pyz, and it cost more than it paid for: because a zipapp carries no
+  dependencies, a run had to decide at runtime whether its own child could
+  `import serial`, download pyserial's wheel from PyPI when it could not, and
+  thread that path through `sys.path` and every child's `PYTHONPATH`. That
+  machinery is gone with it, so pyserial is now an ordinary pinned dependency
+  and a run that cannot import it is a broken install rather than a case to
+  recover from.
 
 ### Fixed
 
