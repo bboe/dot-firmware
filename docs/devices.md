@@ -1,7 +1,11 @@
 # Devices
 
 The firmware each supported device's OTAs ship. radar has a `stock` target and
-an unlock, both on 8149, and crown and donut have neither yet.
+an unlock, both on 8149. donut declares an unlock and a `fireos6` target, and
+is named by the hardware code its bootrom reports rather than by a bootloader;
+the whole route has run on a donut, three times, including with
+`--factory-reset`. crown declares
+an unlock and no target, so no route reaches it, and that unlock has never run.
 
 `firebreak survey OTA` prints, from one OTA zip and nothing else, what its
 row in a Builds table and its rows in a partition hash CSV say: the build
@@ -412,9 +416,9 @@ partitions each OTA writes, for every build above, read as biscuit's are.
   erased block.
 - `/system` is 1073741824 bytes in every build. Every build has its own boot
   and `/system` hash.
-- Nothing here has looked inside a donut `/system`, and nothing has run
-  `boot-root.zip` on one. Whether it roots a donut in place, as it does a
-  biscuit and a radar, is unread.
+- Nothing here has looked inside a donut `/system`. `boot-root.zip` does root
+  a donut in place, as it does a biscuit and a radar, read on three runs to
+  8349, and the step after it needs a power cycle on two of the three.
 
 ### eMMC chips
 

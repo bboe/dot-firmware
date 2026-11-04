@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import subprocess
+import tempfile
 import time
 from typing import TYPE_CHECKING
 
+from firebreak.android.gpt import ENTRIES_SIZE, SECTOR_SIZE, partition_map
 from firebreak.cache import CACHE, SYSTEM_SLICE_BYTES, digest, gzip_intact
 from firebreak.host import (
     DOT_TEMPORARY_DIRECTORY,
@@ -18,6 +21,7 @@ from firebreak.host import (
     run,
     stream,
 )
+from firebreak.plan import TABLE_SECTORS
 from firebreak.ui import (
     PROGRESS,
     SESSION,
@@ -30,9 +34,10 @@ from firebreak.ui import (
 )
 
 if TYPE_CHECKING:
-    import pathlib
     from collections.abc import Callable
 
+BCB = "misc"
+BCB_COMMAND_SIZE = 32
 CLEAR_BOOT0 = (
     "d=dd; toybox dd --help >/dev/null 2>&1 && d='toybox dd'; "
     "echo 0 > /sys/block/mmcblk0boot0/force_ro; "
@@ -79,6 +84,30 @@ UNMOUNT = (
     ' done; echo "left:$(grep "^/dev/block" /proc/mounts | cut -d" " -f2'
     ' | tr "\\n" " ")"'
 )
+
+
+def ask_fastboot(*, command: bytes) -> None:
+    raw = read_sectors(count=TABLE_SECTORS, start=0)
+    partition = partition_map(entries=raw[2 * SECTOR_SIZE :][:ENTRIES_SIZE]).get(BCB)
+    if partition is None:
+        raise FatalError(
+            message=f"the {title()}'s partition table has no {BCB}, so nothing here"
+            f" can ask its bootloader for fastboot. Start the {title()}'s fastboot"
+            " by hand."
+        )
+    held = read_sectors(count=1, start=partition.first)
+    with tempfile.TemporaryDirectory(dir=CACHE) as temporary:
+        staged = pathlib.Path(temporary) / f"{BCB}.img"
+        staged.write_bytes(
+            command.ljust(BCB_COMMAND_SIZE, b"\0") + held[BCB_COMMAND_SIZE:]
+        )
+        write(
+            estimate="5 s",
+            label="asking the bootloader for fastboot",
+            number=partition.number,
+            path=staged,
+            sector=partition.first,
+        )
 
 
 def check_nodes(*, want: dict[str, int]) -> str:
@@ -166,8 +195,8 @@ def read_sectors(*, count: int, start: int) -> bytes:
     ).stdout
     if len(raw) != count * 512:
         raise FatalError(
-            message=f"read {len(raw)} bytes of the {title()}'s partition table,"
-            f" not {count * 512}"
+            message=f"read {len(raw)} bytes from the {title()}'s eMMC, not"
+            f" {count * 512}"
         )
     return raw
 

@@ -21,9 +21,10 @@ uvx --with tox-uv tox -e build,floor   # macOS only: pytest and coverage on Appl
 
 ## Rules
 
-- Python 3.9 or later. There are two dependencies, each pinned exactly:
-  pyserial, which the emOS probe and the bootrom step open a port with, and
-  update_checker, which tells a run that PyPI has a newer firebreak. Everything
+- Python 3.9 or later. There are three dependencies, each pinned exactly:
+  pyserial, which the emOS probe and the bootrom step open a port with, pyusb,
+  which a donut's bootrom is driven over because a serial port cannot reach it,
+  and update_checker, which tells a run that PyPI has a newer firebreak. Everything
   else is the standard library. Users run it with `uvx firebreak@latest` from
   PyPI.
 - A release is a `v` tag matching `__version__` in `firebreak/__init__.py`,

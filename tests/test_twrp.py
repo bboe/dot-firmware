@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import os
+import struct
 import subprocess
 import time
 from typing import TYPE_CHECKING
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from firebreak import twrp
+from firebreak.android import gpt
 from firebreak.ui import FatalError, explained
 
 if TYPE_CHECKING:
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
 
     from conftest import FakeAdb
 
+BCB_FIRST = 1024
 TABLE = """\
 Number  Start (sector)    End (sector)  Size       Code  Name
    1            1024            2047   512.0 KiB   0700  boot_a
@@ -47,6 +50,21 @@ def slices(*, tmp_path: pathlib.Path) -> list[pathlib.Path]:
     for index, path in enumerate(paths):
         path.write_bytes(gzip.compress(data=bytes([index]) * 64))
     return paths
+
+
+def bcb_table(*, name: str = twrp.BCB) -> bytes:
+    entries = (
+        b"T" * 16
+        + b"U" * 16
+        + struct.pack("<QQ", BCB_FIRST, BCB_FIRST + 1023)
+        + bytes(8)
+        + name.encode(encoding="utf-16le").ljust(72, b"\0")
+    ).ljust(gpt.ENTRIES_SIZE, b"\0")
+    header = bytearray(92)
+    header[:16] = b"EFI PART" + b"\0\0\1\0" + struct.pack("<I", 92)
+    header[24:56] = struct.pack("<QQQQ", 1, 1000033, 34, 1000000)
+    header[80:88] = struct.pack("<II", 128, 128)
+    return gpt.rebuilt_gpt(entries=entries, raw=b"M" * 512 + bytes(header)).primary
 
 
 def md5(*, data: bytes) -> str:
@@ -92,6 +110,26 @@ def test_a_cleared_boot0_goes_on(*, adb: FakeAdb) -> None:
     adb.answers["force_ro"] = ["4096 0"]
     twrp.clear_boot0()
     assert twrp.SESSION.boot0_erased is True
+
+
+def test_a_fastboot_request_keeps_the_rest_of_the_sector(*, adb: FakeAdb) -> None:
+    held = b"\0" * twrp.BCB_COMMAND_SIZE + b"H" * (512 - twrp.BCB_COMMAND_SIZE)
+    want = b"bootonce-bootloader".ljust(twrp.BCB_COMMAND_SIZE, b"\0") + held[32:]
+    adb.raws = [bcb_table(), held]
+    adb.answers["md5sum"] = [md5(data=b"old"), md5(data=want)]
+    adb.answers["/start"] = [str(BCB_FIRST)]
+    adb.answers["flushed"] = ["flushed"]
+    twrp.ask_fastboot(command=b"bootonce-bootloader")
+    assert [words[-1] for words in adb.asked if words[1] == "push"] == [
+        f"{twrp.DISK}p1"
+    ]
+
+
+def test_a_fastboot_request_without_a_misc_partition_stops_it(*, adb: FakeAdb) -> None:
+    adb.raws = [bcb_table(name="expdb")]
+    with pytest.raises(FatalError, match=f"table has no {twrp.BCB}"):
+        twrp.ask_fastboot(command=b"bootonce-bootloader")
+    assert [words for words in adb.asked if words[1] == "push"] == []
 
 
 @pytest.mark.parametrize(

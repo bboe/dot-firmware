@@ -6,7 +6,7 @@ import types
 import pytest
 
 from firebreak import route, twrp, unlock
-from firebreak.devices import BISCUIT, RADAR, TARGETS, biscuit, radar
+from firebreak.devices import BISCUIT, DONUT, RADAR, TARGETS, biscuit, radar
 from firebreak.devices.biscuit import BUILDS
 from firebreak.plugin import ClearBoot0Header
 
@@ -242,6 +242,30 @@ def test_a_browser_download_comes_first(*, monkeypatch: pytest.MonkeyPatch) -> N
         biscuit.V2_0_1_SOURCE.name,
         biscuit.BBOE_RECOVERY.name,
     ]
+
+
+def test_a_donut_is_asked_for_its_bootrom_and_for_the_password_first(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[int] = []
+    monkeypatch.setattr(name="ELEVATES", target=route, value=True)
+    monkeypatch.setattr(name="authorized", target=route, value=lambda: asked.append(1))
+    monkeypatch.setattr(
+        name="target", target=route.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
+    )
+    for text in (
+        route.unlock_ask(device=DONUT),
+        route.usb_ask(device=DONUT),
+    ):
+        assert "bootrom" in text
+        assert "fastboot mode" not in text
+        assert DONUT.short_gesture in text
+    assert asked == []
+    route.password_first(device=DONUT)
+    route.password_first(device=BISCUIT)
+    assert asked == [1]
+    assert route.waiting_line(device=DONUT) == ""
+    assert "green ring" in route.waiting_line(device=BISCUIT)
 
 
 def test_a_dot_at_its_goal_has_its_updater_hidden(
@@ -950,7 +974,7 @@ def test_a_v2_0_0_dot_is_restarted_into_its_own_twrp(
     with pytest.raises(RanOutError):
         route.root()
     out = said(capsys=capsys)
-    assert "is in amonet's fastboot. Starting its recovery." in out
+    assert "is in its unlocked fastboot. Starting its recovery." in out
     assert "Rebooting it into TWRP." in out
     assert "hold the + button" not in out
 

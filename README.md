@@ -53,10 +53,19 @@ uvx firebreak@latest stock        # 8149, or name 8344, 8338, 8146, 8142, 8138, 
 These commands are for Debian and Ubuntu. Run firebreak without `sudo`.
 
 ```sh
-sudo apt install adb fastboot curl
+sudo apt install adb fastboot curl libusb-1.0-0
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uvx firebreak@latest
 ```
+
+**firebreak unlocks an Echo Dot (3rd Generation) from macOS only.** The
+exploit it carries needs one control transfer naming a table index where a
+Linux kernel expects an interface, and usbfs answers `EINVAL` rather than
+sending it. This is a limit of the attack firebreak chose, not of the Echo:
+kamakiri's own kit reaches the same bootrom another way, built from requests a
+kernel will send, and that one has been run on Linux against the same Echo.
+Everything else here reaches that Echo on Linux: `stock`, `fastboot`, `twrp`
+and the whole restore are measured there.
 
 ### Windows
 

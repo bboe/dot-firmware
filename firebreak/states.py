@@ -23,3 +23,19 @@ class State(enum.Enum):
     STOCK_BOOTED = "stock-booted"
     STOCK_FASTBOOT = "stock-fastboot"
     STOCK_FIREOS5_FASTBOOT = "stock-fireos5-fastboot"
+
+
+SHOWN = {
+    State.AMONET_FASTBOOT: "unlocked fastboot",
+    State.AMONET_FIREOS5_FASTBOOT: "unlocked fastboot",
+    State.AMONET_FIREOS5_BBOE_TWRP: "TWRP",
+    State.AMONET_FIREOS5_TWRP: "TWRP",
+    State.AMONET_TWRP: "TWRP",
+    State.AMONET_TWRP_BOOT_MOVED: "TWRP",
+    State.STOCK_FASTBOOT: "stock fastboot",
+    State.STOCK_FIREOS5_FASTBOOT: "stock fastboot",
+}
+
+
+def shown(*, current: State) -> str:
+    return SHOWN.get(current, current.value)

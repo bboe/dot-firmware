@@ -71,6 +71,9 @@ class FakePayload:
     def reboot(self) -> None:
         self.asked.append("reboot")
 
+    def send_command(self, *, command: int) -> None:
+        self.asked.append(f"command {command:#06x}")
+
     def switch_partition(self, *, partition: int) -> None:
         self.asked.append(f"switch {partition}")
         if not self.stuck:
@@ -230,6 +233,27 @@ def test_a_patch_that_differs_past_its_first_sector_is_written(
     bootrom.execute(actions=(action,), payload=payload)
     assert "write 0:2+2" in payload.asked
     assert payload.blocks[0, 3] == b"\x11" * 88 + b"y" * 100 + b"\x11" * 324
+
+
+def test_a_payload_command_is_sent_and_settles_before_the_next_step(
+    *, monkeypatch: pytest.MonkeyPatch, payload: FakePayload
+) -> None:
+    slept: list[float] = []
+    monkeypatch.setattr(name="sleep", target=bootrom.time, value=slept.append)
+    bootrom.execute(
+        actions=(
+            Action(
+                command=0x6000,
+                kind="PayloadCommand",
+                label="set the fastboot flag",
+                settle=5.0,
+            ),
+            Action(kind="Reboot", label="reboot"),
+        ),
+        payload=payload,
+    )
+    assert payload.asked == ["command 0x6000", "reboot"]
+    assert slept == [5.0]
 
 
 def test_a_reboot_is_asked_of_the_payload(*, payload: FakePayload) -> None:

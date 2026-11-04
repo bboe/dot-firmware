@@ -214,6 +214,8 @@ def bootrom_client(
                 f" {unwritten()} Unplug the {title()}. " + again()
             ) from error
         else:
+            with contextlib.suppress(OSError, UsbdlError):
+                SESSION.hardware_code = client.hardware_code()
             return client, None
 
 
@@ -249,6 +251,8 @@ def bootrom_step(  # ruff: ignore[too-many-arguments]
 
 
 def check_bootloaders(*, entries: bytes, live: Emmc, unlock: Unlock) -> None:
+    if not unlock.device.named_by_bootloader:
+        return
     want = unlock.device.product
     named = lk_products(entries=entries, live=live)
     other = sorted(named - {want})

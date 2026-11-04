@@ -10,6 +10,7 @@ from firebreak.devices import (
     BISCUIT,
     FASTBRICKS,
     FIREOS5_CHAINS,
+    KAMAKIRI_UNLOCKS,
     LITTLE_KERNEL_DESCRIPTION,
     LK_VALUES,
     TARGETS,
@@ -23,6 +24,7 @@ from firebreak.host import (
     reconnect,
     run,
 )
+from firebreak.plugin import FastbootFlash, Write
 from firebreak.recovery import MD5_DIGITS
 from firebreak.twrp import DISK, partitions
 from firebreak.ui import (
@@ -41,6 +43,9 @@ if TYPE_CHECKING:
 
     from firebreak.cache import Download
     from firebreak.plugin import Device, Unlock
+
+
+KAERU_TARGET = "expdb"
 
 
 def amonet_chain() -> None:
@@ -62,29 +67,10 @@ def amonet_chain() -> None:
 
 
 def amonet_lk(*, node: str) -> bool:
-    for download in amonet_sources():
-        local = unpack(download=download) / "bin" / "lk.bin"
-        want = digest(kind="md5", path=local)
-        for attempt in range(PUSH_TRIES):
-            read = adb_shell(
-                command=f"[ -b {node} ] && dd if={node} bs={local.stat().st_size}"
-                " count=1 2>/dev/null | md5sum",
-                timeout=120,
-            )
-            held = last_line(said=read).split(sep=" ")[0]
-            if held == want:
-                return True
-            if len(held) == MD5_DIGITS:
-                break
-            if attempt + 1 < PUSH_TRIES:
-                reconnect(remote=DISK)
-        if len(held) != MD5_DIGITS:
-            raise FatalError(
-                message=f"{node} did not answer with an md5 of its first"
-                f" {local.stat().st_size} bytes: {held or 'nothing'}. Nothing"
-                " was written. " + again() + " " + asked_for()
-            )
-    return False
+    return any(
+        written_already(local=unpack(download=download) / "bin" / "lk.bin", node=node)
+        for download in amonet_sources()
+    )
 
 
 def amonet_payload() -> pathlib.Path:
@@ -150,6 +136,30 @@ def fastbrick_payload(
     held = unlock.payloads.get(little_kernel)
     archive = held or unlock.source
     return unpack(download=archive), image, archive.name.removesuffix(".zip")
+
+
+def kamakiri_chain() -> None:
+    unlock = KAMAKIRI_UNLOCKS[current_device()]
+    source = unpack(download=unlock.source)
+    part = partitions()
+    for step in unlock.plan:
+        if not isinstance(step, Write) or step.target != KAERU_TARGET:
+            continue
+        if step.target not in part:
+            raise FatalError(
+                message=f"the {title()}'s partition table has no {step.target}. "
+                + again()
+            )
+        if written_already(
+            local=source / step.image, node=f"{DISK}p{part[step.target][0]}"
+        ):
+            return
+    raise FatalError(
+        message=f"this {title()} is not unlocked: {KAERU_TARGET} does not hold"
+        f" {unlock.name}'s own bootloader, so the recovery it started is one the"
+        " unlock left behind. Nothing was written. Unplug it, hold the action"
+        " button, and plug it back in. " + again()
+    )
 
 
 def newer_than_known(*, little_kernel: str) -> None:
@@ -333,6 +343,29 @@ def stage_fireos5_recovery() -> bool:
     return True
 
 
+def stage_kamakiri_recovery() -> bool:
+    if not unlocked_fastboot():
+        return False
+    unlock = KAMAKIRI_UNLOCKS[current_device()]
+    flashed = next(
+        (step for step in unlock.plan if isinstance(step, FastbootFlash)), None
+    )
+    if flashed is None:
+        raise FatalError(
+            message=f"{unlock.name} declares no recovery to flash over fastboot. "
+            + again()
+        )
+    PROGRESS.begin(estimate="40 s", label="writing TWRP and waiting for it")
+    run(
+        arguments=["fastboot", "-S", "256M", "flash", flashed.target, flashed.image],
+        check=True,
+        directory=unpack(download=unlock.source),
+        timeout=120,
+    )
+    run(arguments=["fastboot", "reboot", "recovery"], check=True, timeout=60)
+    return True
+
+
 def unlocked_fastboot() -> bool:
     unlocked = ""
     for _ in range(PUSH_TRIES):
@@ -353,3 +386,26 @@ def unlocked_fastboot() -> bool:
             + again()
         )
     return True
+
+
+def written_already(*, local: pathlib.Path, node: str) -> bool:
+    want = digest(kind="md5", path=local)
+    held = ""
+    for attempt in range(PUSH_TRIES):
+        read = adb_shell(
+            command=f"[ -b {node} ] && dd if={node} bs={local.stat().st_size}"
+            " count=1 2>/dev/null | md5sum",
+            timeout=120,
+        )
+        held = last_line(said=read).split(sep=" ")[0]
+        if held == want:
+            return True
+        if len(held) == MD5_DIGITS:
+            return False
+        if attempt + 1 < PUSH_TRIES:
+            reconnect(remote=DISK)
+    raise FatalError(
+        message=f"{node} did not answer with an md5 of its first"
+        f" {local.stat().st_size} bytes: {held or 'nothing'}. Nothing"
+        " was written. " + again() + " " + asked_for()
+    )

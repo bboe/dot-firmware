@@ -15,13 +15,16 @@ BAUD_RATE = 115200
 CACHE_DISABLE_SUBCOMMAND = 0xB1
 HANDSHAKE = ((0xA0, 0x5F), (0x0A, 0xF5), (0x50, 0xAF), (0x05, 0xFA))
 HANDSHAKE_TIMEOUT = 10
+HARDWARE_CODE_SIZE = 4
 JUMP_REGISTER = 0x1028A8
 MEDIATEK_VENDOR_ID = 0x0E8D
 MESSAGE_LIMIT = 64
 PAYLOAD_LOAD_ADDRESS = 0x201000
+PAYLOAD_STATUS = b"\0\0"
 PORT_POLL_INTERVAL = 0.25
 READ_STATUS = b"\x00\x00"
 READ_TIMEOUT = 5
+STATUS_LIMIT = 0xFF
 WATCHDOG_DISABLE_ADDRESS = 0x10007000
 WATCHDOG_DISABLE_VALUE = 0x22000000
 WORD_MASK = 0xFFFFFFFF
@@ -33,6 +36,8 @@ class BootromCommand(enum.IntEnum):
     EXTENDED = 0xC8
     READ_WORDS = 0xD1
     WRITE_WORDS = 0xD4
+    SEND_PAYLOAD = 0xE0
+    HARDWARE_CODE = 0xFD
 
 
 class Connection:
@@ -73,6 +78,19 @@ class Bootrom(Connection):
         self._echo(data=struct.pack(">I", address), label=f"{label}: address")
         self._echo(data=struct.pack(">I", count), label=f"{label}: count")
 
+    def _read_status(self, *, label: str, strict: bool) -> None:
+        data = self.read_exactly(label=label, length=len(READ_STATUS))
+        if strict:
+            verify(expected=READ_STATUS, label=label, received=data)
+            return
+        (status,) = struct.unpack(">H", data)
+        if status > STATUS_LIMIT:
+            message = (
+                f"{label}: {status:#06x} is past {STATUS_LIMIT:#04x}, so the"
+                " bootrom refused the read rather than objecting to it"
+            )
+            raise ProtocolMismatchError(message)
+
     def _status(self, *, expected: bytes, label: str) -> None:
         verify(
             expected=expected,
@@ -112,14 +130,28 @@ class Bootrom(Connection):
                 sent=bytes([sent]),
             )
 
-    def read_words(self, *, address: int, count: int) -> tuple[int, ...]:
+    def hardware_code(self) -> int:
+        label = "hardware code"
+        self._echo(data=bytes([BootromCommand.HARDWARE_CODE]), label=label)
+        held = self.read_exactly(label=label, length=HARDWARE_CODE_SIZE)
+        code, _ = struct.unpack(">HH", held)
+        verify(
+            expected=READ_STATUS,
+            label=f"{label} status",
+            received=held[-len(READ_STATUS) :],
+        )
+        return code
+
+    def read_words(
+        self, *, address: int, count: int, strict: bool = True
+    ) -> tuple[int, ...]:
         label = f"read of {count} words at {address:#x}"
         self._header(
             address=address, command=BootromCommand.READ_WORDS, count=count, label=label
         )
-        self._status(expected=READ_STATUS, label=f"{label}: argument status")
+        self._read_status(label=f"{label}: argument status", strict=strict)
         data = self.read_exactly(label=label, length=count * WORD_SIZE)
-        self._status(expected=READ_STATUS, label=f"{label}: end status")
+        self._read_status(label=f"{label}: end status", strict=strict)
         return struct.unpack(f">{count}I", data)
 
     def run_payload(self, *, payload: bytes) -> None:
@@ -136,6 +168,21 @@ class Bootrom(Connection):
         self._echo(data=bytes([subcommand]), label=label)
         self.read_exactly(label=label, length=1)
         self.read_exactly(label=label, length=2)
+
+    def send_payload(self, *, payload: bytes) -> None:
+        label = f"payload of {len(payload)} bytes"
+        self._echo(data=bytes([BootromCommand.SEND_PAYLOAD]), label=label)
+        self._echo(data=struct.pack(">I", len(payload)), label=f"{label}: length")
+        room = self.read_exactly(label=f"{label}: room", length=len(PAYLOAD_STATUS))
+        if room != PAYLOAD_STATUS:
+            message = (
+                f"{label}: the bootrom kept no room for a payload that long,"
+                f" answering {room!r}"
+            )
+            raise PayloadTooLargeError(message)
+        self.port.write(data=payload)
+        self.read_exactly(label=f"{label}: upload status", length=len(PAYLOAD_STATUS))
+        self.read_exactly(label=f"{label}: end status", length=len(PAYLOAD_STATUS))
 
     def write_words(
         self, *, address: int, read_status: bool = True, words: Sequence[int]
@@ -177,6 +224,10 @@ class UsbdlError(Exception):
 
 
 class HandshakeTimeoutError(UsbdlError):
+    pass
+
+
+class PayloadTooLargeError(UsbdlError):
     pass
 
 

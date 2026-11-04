@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from firebreak import entry
-from firebreak.devices import BISCUIT, CROWN, RADAR
+from firebreak.devices import BISCUIT, CROWN, DONUT, RADAR
 from firebreak.states import State
 from firebreak.ui import ARGUMENTS, SESSION, FatalError
 
@@ -110,6 +110,18 @@ def test_a_bootrom_device_joins_a_payload_that_already_holds_one(
     monkeypatch.setattr(name="payload_device", target=entry, value=lambda **_: RADAR)
     assert entry.bootrom_device() is RADAR
     assert done == []
+
+
+def test_a_bootrom_device_names_a_donut_by_its_hardware_code(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(name="hardware_code", target=SESSION, value=DONUT.hardware_code)
+    monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
+    assert entry.bootrom_device() is DONUT
+    assert SESSION.device is DONUT
+    assert "ran the payload" not in done
 
 
 def test_a_bootrom_device_reads_nothing_in_another_state(
@@ -249,6 +261,17 @@ def test_a_bootrom_entry_reboots_a_booted_echo_into_its_twrp(
     assert done[2:4] == ["cleared", "rebooted"]
 
 
+def test_a_bootrom_entry_refuses_a_device_with_no_chain_before_it_reboots(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_BOOTED])
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
+    with pytest.raises(FatalError, match="no bootrom chain for the Echo Dot"):
+        entry.bootrom_entry(force=True)
+    assert done == []
+
+
 def test_a_bootrom_entry_refuses_a_held_echo_that_is_not_the_one_named(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -368,6 +391,20 @@ def test_a_bootrom_entry_with_no_bootrom_to_find(
         entry.short_entry()
 
 
+def test_a_bootrom_from_another_family_stops_an_amonet_run(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    monkeypatch.setattr(name="hardware_code", target=SESSION, value=DONUT.hardware_code)
+    monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
+    with pytest.raises(
+        expected_exception=entry.NotAmonetError, match="amonet does not unlock"
+    ) as caught:
+        entry.reached(erase=None)
+    assert caught.value.device is DONUT
+    assert "firebreak unlock fireos6" in caught.value.message
+
+
 def test_a_bootrom_is_read_once_however_often_it_is_asked_for(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -392,6 +429,24 @@ def test_a_device_the_run_was_given_is_not_corrected_but_refused(
     monkeypatch.setattr(name="payload_device", target=entry, value=lambda **_: RADAR)
     with pytest.raises(FatalError, match="names it an Echo \\(2nd Generation\\)"):
         entry.bootrom_entry(force=False)
+
+
+def test_a_fastboot_entry_asks_a_donuts_bootloader_through_its_misc(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = reads(
+        monkeypatch=monkeypatch,
+        states=[State.AMONET_BOOTED, State.STARTING, State.AMONET_FASTBOOT],
+    )
+    monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    monkeypatch.setattr(
+        name="ask_fastboot",
+        target=entry,
+        value=lambda **options: done.append("asked " + options["command"].decode()),
+    )
+    entry.fastboot_entry()
+    assert done == ["asked bootonce-bootloader", "reboot "]
 
 
 def test_a_fastboot_entry_reboots_an_echo_that_answers_adb(
@@ -682,7 +737,7 @@ def test_an_entry_names_the_echo_that_answers_it(
         value=lambda: types.SimpleNamespace(device=BISCUIT),
     )
     entry.twrp_entry(force=False)
-    assert "The Echo Dot (2nd Generation) is in amonet-twrp" in capsys.readouterr().out
+    assert "The Echo Dot (2nd Generation) is in TWRP" in capsys.readouterr().out
 
 
 def test_an_entry_refuses_a_state_it_cannot_reach_its_own_from(

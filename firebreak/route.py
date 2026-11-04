@@ -24,6 +24,7 @@ from firebreak.devices import (
     FASTBRICKS,
     FIREOS5_BUILDS,
     FIREOS5_CHAINS,
+    KAMAKIRI_UNLOCKS,
     biscuit,
 )
 from firebreak.emos import stage_emos
@@ -34,15 +35,18 @@ from firebreak.fireos import (
     hide_updater,
     stage_install_fireos,
     stage_install_fireos6,
+    stage_install_kamakiri,
     stage_replace_twrp,
     stage_swap_twrp,
     system_image,
 )
 from firebreak.host import adb_shell, run
 from firebreak.identify import check_target, fastboot_driver_missing
+from firebreak.kamakiri_step import authorized, kamakiri_step
+from firebreak.mediatek.libusb import ELEVATES
 from firebreak.plugin import FireOs5, FireOs6
 from firebreak.probe import state
-from firebreak.states import State
+from firebreak.states import State, shown
 from firebreak.stock import STOCK_STEPS, stage_restore
 from firebreak.twrp import reboot
 from firebreak.ui import (
@@ -70,12 +74,13 @@ from firebreak.unlock import (
     stage_downgrade,
     stage_fastbrick,
     stage_fireos5_recovery,
+    stage_kamakiri_recovery,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from firebreak.plugin import Unlock
+    from firebreak.plugin import Device, Unlock
 
     Need = Download | Callable[[], object]
 
@@ -89,6 +94,7 @@ FIREOS5_ROOTED = {
     State.ROOTED,
     State.AMONET_FIREOS5_BBOE_BOOTED,
 }
+KAMAKIRI_REBOOTS = frozenset({State.AMONET_BOOTED, State.BOOTED})
 NO_FASTBOOT_DRIVER = (
     "Windows sees an Echo in fastboot mode, but fastboot does not, so its driver"
     " is missing. Install the drivers from"
@@ -259,6 +265,34 @@ def in_browser(*, need: Need) -> bool:
     return isinstance(need, Download) and need.browser
 
 
+def kamakiri_stages() -> dict[State, Stage]:
+    unlock = KAMAKIRI_UNLOCKS[ARGUMENTS.target.device]
+    return {
+        State.BOOTROM: Stage(
+            needs=(unlock.source,),
+            run=stage_kamakiri,
+            steps=None,
+            then=State.AMONET_FASTBOOT,
+        ),
+        State.AMONET_FASTBOOT: Stage(
+            needs=(unlock.source,),
+            run=stage_kamakiri_recovery,
+            steps=1,
+            then=State.AMONET_TWRP,
+        ),
+        State.AMONET_TWRP: Stage(
+            needs=(unlock.source, ota_build, BOOT_ROOT),
+            run=stage_install_kamakiri,
+            steps=5 if ARGUMENTS.factory_reset else None,
+            then=State.AMONET_BOOTED,
+        ),
+    } | {
+        state: stage
+        for state, stage in reboot_stages().items()
+        if state in KAMAKIRI_REBOOTS
+    }
+
+
 def keeps_restarting() -> str:
     return (
         f"This {title()} keeps restarting rather than reaching TWRP: a blue"
@@ -280,6 +314,20 @@ def ota_build() -> None:
     build = ARGUMENTS.build or ARGUMENTS.target.installs.build
     with hold(lock=lock_for(key=build)):
         updates.download(build=build, builds=BUILDS[ARGUMENTS.target.device])
+
+
+def password_first(*, device: Device) -> None:
+    if device not in KAMAKIRI_UNLOCKS or not ELEVATES:
+        return
+    say(
+        text=f"Unlocking this {title()} needs one privileged USB call, the one"
+        " that starts its unlock running in its bootrom, so sudo asks for your"
+        " password here rather than while the button is held. Nothing is"
+        " written yet, and nothing else in the run asks again."
+    )
+    show(text="")
+    authorized()
+    show(text="")
 
 
 def power_cycle() -> str:
@@ -369,7 +417,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
     guided = False
     resumed = False
     seen = None
-    shown = None
+    printed = None
     awaiting = None
     deadline = None
     driver_check = 0.0
@@ -405,7 +453,12 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
         }:
             SESSION.boot0_erased = False
         parked = SESSION.boot0_erased or current == State.BOOTROM
-        if current in BOOTROMS and parked and not (resumed or SESSION.held):
+        if (
+            current in BOOTROMS
+            and parked
+            and not (resumed or SESSION.held)
+            and target.device not in KAMAKIRI_UNLOCKS
+        ):
             if target.device not in BOOTROM_UNLOCKS:
                 why = (
                     "has an erased boot0, which only its bootrom can start"
@@ -461,8 +514,8 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             )
             if restarts == RESTARTS and current == State.NONE and awaiting in TWRPS:
                 PROGRESS.note(message=keeps_restarting())
-            if ARGUMENTS.verbose and current != shown:
-                shown = current
+            if ARGUMENTS.verbose and current != printed:
+                printed = current
                 show(text=f"{clock()} state: {current.value}")
             if (
                 current not in done
@@ -483,16 +536,11 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 deadline = time.monotonic() + MINUTE
             elif current == State.STOCK_BOOTED and target.unlock is not None:
                 guided = True
+                password_first(device=target.device)
+                say(text=unlock_ask(device=target.device))
+            elif current == State.AMONET_FASTBOOT and not done:
                 say(
-                    text=f"This {title()} appears to be unmodified. To unlock and"
-                    " root it, start it in fastboot mode.\n\n"
-                    + target.device.fastboot_mode
-                    + "\n\n"
-                    + amonet_has_no_fastboot()
-                )
-            elif current == State.AMONET_FASTBOOT and current not in done:
-                say(
-                    text=f"This {title()} is in amonet's fastboot."
+                    text=f"This {title()} is in its unlocked fastboot."
                     " Starting its recovery."
                 )
             elif current == State.EMOS and current not in done:
@@ -515,22 +563,13 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     " Rebooting it into TWRP."
                 )
             elif current == State.NONE and not done and not PROGRESS.open and guided:
-                show(
-                    text="\n"
-                    + filled(
-                        text=f"Waiting for the {title()} in fastboot mode: a green"
-                        " ring on a stock Echo, every color turning on amonet's."
-                    )
-                )
+                line = waiting_line(device=target.device)
+                if line:
+                    show(text="\n" + filled(text=line))
             elif current == State.NONE and not done and not PROGRESS.open:
                 guided = True
-                say(
-                    text=f"Waiting for the {title()} on USB. Connect it with a USB"
-                    " cable. One that runs Amazon's own software needs fastboot"
-                    " mode.\n\n"
-                    + target.device.fastboot_mode
-                    + "\n\nCtrl-C stops the script."
-                )
+                password_first(device=target.device)
+                say(text=usb_ask(device=target.device))
         if current == State.AMONET_BOOTED == target.goal:
             version = adb_shell(command="getprop ro.build.version.name")
             warn(text=f"The {title()} is rooted: {version}, with root adb.")
@@ -632,7 +671,8 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                         " `firebreak short`."
                     )
                 raise FatalError(
-                    message=f"the {title()} has been {current.value} for"
+                    message=f"the {title()} has been"
+                    f" {shown(current=current)} for"
                     f" {WAIT // 60} minutes. " + again()
                 )
             if (
@@ -670,7 +710,14 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
         seen = None
 
 
+def stage_kamakiri() -> bool:
+    unlock = KAMAKIRI_UNLOCKS[ARGUMENTS.target.device]
+    return kamakiri_step(source=unpack(download=unlock.source), unlock=unlock)
+
+
 def stages() -> dict[State, Stage]:
+    if ARGUMENTS.target.device in KAMAKIRI_UNLOCKS:
+        return kamakiri_stages()
     chain = FIREOS5_CHAINS.get(ARGUMENTS.target.device)
     table = {
         State.EMOS: Stage(needs=(), run=stage_emos, steps=1, then=None),
@@ -707,6 +754,43 @@ def stages() -> dict[State, Stage]:
 def start_prebuild() -> None:
     with contextlib.suppress(RuntimeError):
         PREBUILDER.start()
+
+
+def unlock_ask(*, device: Device) -> str:
+    lead = f"This {title()} appears to be unmodified. To unlock and root it,"
+    if device not in KAMAKIRI_UNLOCKS:
+        return (
+            f"{lead} start it in fastboot mode.\n\n"
+            + device.fastboot_mode
+            + "\n\n"
+            + amonet_has_no_fastboot()
+        )
+    return f"{lead} start it in its bootrom.\n\n" + device.short_gesture
+
+
+def usb_ask(*, device: Device) -> str:
+    lead = f"Waiting for the {title()} on USB. Connect it with a USB cable."
+    tail = "\n\nCtrl-C stops the script."
+    if device not in KAMAKIRI_UNLOCKS:
+        return (
+            f"{lead} One that runs Amazon's own software needs fastboot mode.\n\n"
+            + device.fastboot_mode
+            + tail
+        )
+    return (
+        f"{lead} One that runs Amazon's own software needs its bootrom.\n\n"
+        + device.short_gesture
+        + tail
+    )
+
+
+def waiting_line(*, device: Device) -> str:
+    if device in KAMAKIRI_UNLOCKS:
+        return ""
+    return (
+        f"Waiting for the {title()} in fastboot mode: a green ring on a stock"
+        " Echo, every color turning on amonet's."
+    )
 
 
 def walked(*, start: State, table: dict[State, Stage]) -> tuple[list[Stage], bool]:

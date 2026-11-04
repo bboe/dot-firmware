@@ -83,6 +83,13 @@ def test_payload_reboots() -> None:
     assert port.replies == bytearray()
 
 
+def test_payload_sends_a_command_without_waiting_for_an_answer() -> None:
+    payload, port = payload_port()
+    payload.send_command(command=0x6000)
+    assert bytes(port.written) == framed(command=0x6000)
+    assert port.replies == bytearray()
+
+
 def test_payload_switch_partition() -> None:
     payload, port = payload_port()
     payload.switch_partition(partition=1)

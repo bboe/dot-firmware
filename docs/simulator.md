@@ -84,6 +84,19 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   stock fastboot or `START=no-light` and `stock` from `START=twrp`. A radar
   unlock takes amonet-radar v1.0.1's archive and its own fastbrick map, which
   the simulated radar checks the flashed payload against.
+- **There is no `DEVICE=donut`, and adding one is not a flavour file.** This
+  simulator fakes two things: the USB listing, by patching
+  `firebreak.identify.usb_devices`, and a serial port, as a PTY. A donut needs
+  neither. `open_bootrom` calls libusb, so `firebreak.mediatek.libusb` would
+  have to join the patched modules and hand back a PTY-backed object in place
+  of `Usb`, which is the tractable part, because `Usb` is already the shape a
+  PTY speaks. `trigger` starts its payload by spawning `sudo`, so it would have
+  to poke the simulated bootrom instead. `bootrom.py` would need `0xFD`, the
+  read ladder and `0xE0`, then stage1's `0x4000` and `0x4001` with both ready
+  patterns, then stage2 speaking the payload protocol including `0x6000`. And
+  the device would need donut's 16-partition table, boot0, RPMB and Fire OS 6
+  flavours. That route has since run on hardware, repeatedly, so what this
+  cannot exercise is the one device whose unlock is measured best.
 - `report` and `write-test` take any start, because `run.sh` passes the target
   through as a command. `write-test` takes the bootrom route where the Echo
   reads as a bootrom, so `short` first is the way here to reach the

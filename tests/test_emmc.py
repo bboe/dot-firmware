@@ -7,6 +7,7 @@ def test_areas_are_numbered_as_the_payload_switches_them() -> None:
     assert [(area.name, int(area)) for area in emmc.EmmcArea] == [
         ("USER", 0),
         ("BOOT0", 1),
+        ("BOOT1", 2),
     ]
 
 

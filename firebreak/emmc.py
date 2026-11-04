@@ -17,6 +17,8 @@ class Emmc(Protocol):
 
     def reboot(self) -> None: ...
 
+    def send_command(self, *, command: int) -> None: ...
+
     def switch_partition(self, *, partition: int) -> None: ...
 
     def write_blocks(self, *, data: bytes, index: int) -> None: ...
@@ -27,3 +29,4 @@ class Emmc(Protocol):
 class EmmcArea(enum.IntEnum):
     USER = 0
     BOOT0 = 1
+    BOOT1 = 2

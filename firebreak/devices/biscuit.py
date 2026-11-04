@@ -130,6 +130,7 @@ FLASH_AMONET_TWRP = FastbootFlash(
 FLASH_BBOE_TWRP = FastbootFlash(
     image="twrp", label="write TWRP " + BBOE_TWRP_VERSION, target="recovery"
 )
+KAMAKIRI_UNLOCK = None
 LK_VALUES = frozenset({
     "0e1d0d9-20161018_220224",
     AMONET_V1_1_0_LK,
@@ -146,6 +147,8 @@ SHORT_GESTURE = (
     " held. https://andygoetz.org/blog/2022/05/echo-dot-v2-dumping-emmc/"
 )
 STOCK_LAYOUT = StockLayout(partitions=16)
+
+
 BISCUIT = Device(
     fastboot_mode=FASTBOOT_MODE,
     features=frozenset({Feature.AB_SLOTS, Feature.BOOT0, Feature.RPMB}),
@@ -156,8 +159,6 @@ BISCUIT = Device(
     short_gesture=SHORT_GESTURE,
     title="Echo Dot (2nd Generation)",
 )
-
-
 V1_1_0_SOURCE = Download(
     browser=True,
     directory="v1",
@@ -243,9 +244,9 @@ V2_0_1_SOURCE = Download(
     size=73550504,
     url="https://xdaforums.com/attachments/amonet-biscuit-v2-0-1-zip.6400450/",
 )
+
+
 V2_0_1_TWRP_VERSION = "3.7.0"
-
-
 WAS_CALLED = {
     "amonet-biscuit-v1.1.0": Deprecated(
         device=BISCUIT,
@@ -261,6 +262,8 @@ WAS_CALLED = {
     ),
 }
 WRITE_KAERU = Write(image="bin/biscuit-kaeru.bin", label="write kaeru", target="expdb")
+
+
 UNLOCK_TO_FIREOS6 = Unlock(
     device=BISCUIT,
     family="amonet",
@@ -297,8 +300,6 @@ UNLOCK_TO_FIREOS6 = Unlock(
     source=V2_0_1_SOURCE,
     version="2.0.1",
 )
-
-
 FASTBRICK = UNLOCK_TO_FIREOS6
 
 

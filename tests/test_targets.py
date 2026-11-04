@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from firebreak.devices import BISCUIT, DEFAULTS, FASTBRICKS, TARGETS
+from firebreak.devices import BISCUIT, DEFAULTS, FASTBRICKS, KAMAKIRI_UNLOCKS, TARGETS
 from firebreak.devices.biscuit import (
     BUILDS,
     UNLOCK_TO_FIREOS5,
@@ -16,7 +16,7 @@ def test_each_device_s_default_is_one_of_its_targets() -> None:
 
 
 def test_each_device_with_a_target_names_the_unlock_its_fastbricks_are_in() -> None:
-    assert set(TARGETS) <= set(FASTBRICKS)
+    assert set(TARGETS) <= set(FASTBRICKS) | set(KAMAKIRI_UNLOCKS)
     assert all(FASTBRICKS[device].device == device for device in FASTBRICKS)
 
 

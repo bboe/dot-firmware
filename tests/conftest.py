@@ -28,6 +28,7 @@ class FakeAdb:
         ] = {}
         self.asked: list[list[str]] = []
         self.raw = b""
+        self.raws: list[bytes] = []
         self.sent: list[bytes] = []
 
     def answer(self, *, words: list[str]) -> tuple[int, str]:
@@ -52,7 +53,9 @@ class FakeAdb:
         self.asked.append(words)
         if words[1] == "exec-out":
             return subprocess.CompletedProcess(
-                args=words, returncode=0, stdout=self.raw
+                args=words,
+                returncode=0,
+                stdout=self.raws.pop(0) if self.raws else self.raw,
             )
         if hasattr(standard_input, "read"):
             self.sent.append(standard_input.read())
@@ -246,6 +249,15 @@ def real_browser() -> types.SimpleNamespace:
     return types.SimpleNamespace(name="real-browser", open=opened_a_browser)
 
 
+def reply_payload(*, length: int, room: bytes = usbdl.PAYLOAD_STATUS) -> bytes:
+    return (
+        bytes([usbdl.BootromCommand.SEND_PAYLOAD])
+        + struct.pack(">I", length)
+        + room
+        + (usbdl.PAYLOAD_STATUS * 2 if room == usbdl.PAYLOAD_STATUS else b"")
+    )
+
+
 def reply_read(*, address: int, values: tuple[int, ...]) -> bytes:
     return (
         bytes([usbdl.BootromCommand.READ_WORDS])
@@ -263,6 +275,14 @@ def reply_write(*, address: int, end: bool = True, words: tuple[int, ...]) -> by
         + usbdl.WRITE_STATUS
         + b"".join(struct.pack(">I", word) for word in words)
         + (usbdl.WRITE_STATUS if end else b"")
+    )
+
+
+def sent_payload(*, payload: bytes) -> bytes:
+    return (
+        bytes([usbdl.BootromCommand.SEND_PAYLOAD])
+        + struct.pack(">I", len(payload))
+        + payload
     )
 
 

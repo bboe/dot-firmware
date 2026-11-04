@@ -21,7 +21,15 @@ from firebreak.devices.biscuit import (
 )
 from firebreak.devices.crown import AMONET_V2_0_1
 from firebreak.devices.radar import AMONET_V1_0_1
-from firebreak.plugin import BOOT0, Device, ResetBcb, Unlock, Write
+from firebreak.plugin import (
+    BOOT0,
+    Device,
+    FastbootFlash,
+    PayloadCommand,
+    ResetBcb,
+    Unlock,
+    Write,
+)
 
 if TYPE_CHECKING:
     import pathlib
@@ -220,6 +228,23 @@ def test_a_device_without_a_needed_feature_is_refused(*, source: pathlib.Path) -
         plan.resolve(raw=b"", source=source, unlock=unlock)
 
 
+def test_a_fastboot_flash_resolves_without_the_partition_being_in_the_table(
+    *, source: pathlib.Path
+) -> None:
+    held = plan.action(
+        partitions={},
+        source=source,
+        step=FastbootFlash(image="bin/lk.bin", target="recovery"),
+        unlock=AMONET_V2_0_1,
+    )
+    assert held.kind == "FastbootFlash"
+    assert held.image is not None
+    assert held.image.is_file()
+    assert held.offset is None
+    assert held.partition is None
+    assert held.target == "recovery"
+
+
 def test_a_half_shuffled_table_is_refused(*, source: pathlib.Path) -> None:
     layout = tuple(
         ("boot_b", first, last) if name == "boot_b_x" else (name, first, last)
@@ -232,6 +257,21 @@ def test_a_half_shuffled_table_is_refused(*, source: pathlib.Path) -> None:
             source=source,
             unlock=UNLOCK_TO_FIREOS5,
         )
+
+
+def test_a_payload_command_carries_its_command_and_its_settle(
+    *, source: pathlib.Path
+) -> None:
+    held = plan.action(
+        partitions={},
+        source=source,
+        step=PayloadCommand(command=0x6000, label="set the fastboot flag", settle=5.0),
+        unlock=AMONET_V2_0_1,
+    )
+    assert held.kind == "PayloadCommand"
+    assert held.command == 0x6000
+    assert held.settle == pytest.approx(5.0)
+    assert held.target is None
 
 
 def test_a_repartition_without_a_layout_is_refused(*, source: pathlib.Path) -> None:

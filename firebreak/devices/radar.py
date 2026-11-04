@@ -83,12 +83,15 @@ DEFAULT_BUILD = "8149"
 DEFAULT_TARGET = FIREOS6
 FIREOS5_BUILDS = frozenset({"5.5.5.4"})
 FIREOS5_CHAIN = None
+KAMAKIRI_UNLOCK = None
 LK_VALUES = frozenset({
     "59779ca-20220524_183401",
     "63cb91b-20221007_073612",
     "41fb3ce-20221007_153017",
     "2c3569d-20260617_051433",
 })
+
+
 RADAR = dataclasses.replace(
     BISCUIT,
     models=frozenset({"AEORD", "Echo (2nd Gen)"}),
@@ -108,8 +111,6 @@ SOURCE = Download(
     size=94789047,
     url="https://xdaforums.com/attachments/amonet-radar-v1-0-1-zip.6403363/",
 )
-
-
 AMONET_V1_0_1 = dataclasses.replace(
     UNLOCK_TO_FIREOS6,
     device=RADAR,

@@ -16,6 +16,7 @@ from firebreak.plugin import (
     ClearBoot0Header,
     FastbootFlash,
     ForceFastboot,
+    PayloadCommand,
     Repartition,
     ResetBcb,
     Write,
@@ -42,12 +43,14 @@ TABLE_SECTORS = 34
 class Action:
     kind: str
     label: str
+    command: int | None = None
     data: bytes | None = None
     expect: bytes | None = None
     image: pathlib.Path | None = None
     length: int | None = None
     offset: int | None = None
     partition: Partition | None = None
+    settle: float = 0.0
     target: str | None = None
     unrecoverable: bool = False
 
@@ -63,11 +66,7 @@ def action(
     if isinstance(step, Write):
         return written(partitions=partitions, source=source, step=step, unlock=unlock)
     if isinstance(step, FastbootFlash):
-        flashed = Write(image=step.image, label=step.label, target=step.target)
-        return dataclasses.replace(
-            written(partitions=partitions, source=source, step=flashed, unlock=unlock),
-            kind=kind,
-        )
+        return flashed(partitions=partitions, source=source, step=step, unlock=unlock)
     if isinstance(step, (ForceFastboot, ResetBcb)):
         return patched(partitions=partitions, step=step, unlock=unlock)
     if isinstance(step, ClearBoot0Header):
@@ -79,8 +78,8 @@ def action(
             offset=0,
             target=BOOT0,
         )
-    if isinstance(step, ZeroRpmb):
-        return Action(expect=step.expect, kind=kind, label=step.label)
+    if isinstance(step, (PayloadCommand, ZeroRpmb)):
+        return unplaced(kind=kind, step=step)
     return Action(kind=kind, label=step.label, target=step.into)
 
 
@@ -92,6 +91,28 @@ def contents(*, action: Action) -> bytes:
         raise ValueError(message)
     data = action.image.read_bytes()
     return data.ljust(padded(length=len(data), unit=SECTOR_SIZE), b"\0")
+
+
+def flashed(
+    *,
+    partitions: dict[str, Partition],
+    source: pathlib.Path,
+    step: FastbootFlash,
+    unlock: Unlock,
+) -> Action:
+    kind = type(step).__name__
+    if step.target not in partitions:
+        return Action(
+            image=image_of(image=step.image, source=source, unlock=unlock),
+            kind=kind,
+            label=step.label,
+            target=step.target,
+        )
+    write = Write(image=step.image, label=step.label, target=step.target)
+    return dataclasses.replace(
+        written(partitions=partitions, source=source, step=write, unlock=unlock),
+        kind=kind,
+    )
 
 
 def image_of(*, image: str, source: pathlib.Path, unlock: Unlock) -> pathlib.Path:
@@ -172,6 +193,14 @@ def resolve(*, raw: bytes, source: pathlib.Path, unlock: Unlock) -> tuple[Action
                 action(partitions=partitions, source=source, step=step, unlock=unlock)
             )
     return tuple(actions)
+
+
+def unplaced(*, kind: str, step: PayloadCommand | ZeroRpmb) -> Action:
+    if isinstance(step, PayloadCommand):
+        return Action(
+            command=step.command, kind=kind, label=step.label, settle=step.settle
+        )
+    return Action(expect=step.expect, kind=kind, label=step.label)
 
 
 def whole_sectors(

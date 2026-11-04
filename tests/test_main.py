@@ -509,15 +509,17 @@ def test_the_build_each_target_gets(
 
 def test_the_help_gives_each_device_s_builds_a_block_of_its_own() -> None:
     said = main.stock_builds_help()
-    assert "\n\n  Echo Dot (2nd Generation), 8149 when left out:" in said
-    assert "\n\n  Echo (2nd Generation), 8149 when left out:" in said
-    assert "8349" in said.partition("  Echo (2nd Generation), ")[2]
-    assert (
-        "8349"
-        not in said.partition("  Echo Dot (2nd Generation), ")[2].partition(
-            "  Echo (2nd Generation), "
-        )[0]
-    )
+    blocks = {
+        title: body.partition("\n\n  ")[0]
+        for title in ("Echo Dot (2nd Generation)", "Echo (2nd Generation)")
+        for body in (said.partition(f"\n\n  {title}, ")[2],)
+    }
+    assert all(blocks.values()), blocks
+    assert blocks["Echo Dot (2nd Generation)"].startswith("8149 when left out:")
+    assert blocks["Echo (2nd Generation)"].startswith("8149 when left out:")
+    assert "8349" not in blocks["Echo Dot (2nd Generation)"]
+    assert "8349" in blocks["Echo (2nd Generation)"]
+    assert "Echo Dot (3rd Generation)" not in said
 
 
 def test_the_help_lists_each_device_s_targets_its_default_first() -> None:

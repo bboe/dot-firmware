@@ -403,7 +403,9 @@ def test_a_short_gesture_names_where_to_short_the_device_it_is_given() -> None:
     assert "No one has found the Echo (2nd Generation)'s test point" in (
         identify.short_gesture(device=RADAR)
     )
-    assert "without --device: biscuit, radar" in identify.short_gesture(device=None)
+    assert "without --device: biscuit, donut, radar" in identify.short_gesture(
+        device=None
+    )
 
 
 def test_a_short_run_on_an_echo_with_no_such_target_says_which_echo_it_is(

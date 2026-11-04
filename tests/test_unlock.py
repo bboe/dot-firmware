@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from firebreak import unlock
-from firebreak.devices import BISCUIT, CROWN, RADAR, TARGETS, biscuit, radar
+from firebreak.devices import BISCUIT, CROWN, DONUT, RADAR, TARGETS, biscuit, radar
 from firebreak.ui import FatalError
 
 if TYPE_CHECKING:
@@ -83,6 +83,74 @@ def test_a_device_that_lists_no_bootloader_refuses_the_one_it_is_given(
         match=r"firebreak cannot unlock any Echo Show 8 \(1st Generation\) yet",
     ):
         unlock.newer_than_known(little_kernel="f379dba-20170906_000423")
+
+
+def test_a_donut_chain_passes_when_expdb_holds_the_unlock_s_own_bootloader(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    kaeru = tmp_path / "bin" / "kaeru-donut.bin"
+    kaeru.parent.mkdir(parents=True)
+    kaeru.write_bytes(b"kaeru" * 100)
+    monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
+    monkeypatch.setattr(name="current_device", target=unlock, value=lambda: DONUT)
+    monkeypatch.setattr(
+        name="partitions", target=unlock, value=lambda: {"expdb": (12, 34)}
+    )
+    monkeypatch.setattr(name="written_already", target=unlock, value=lambda **_: True)
+    unlock.kamakiri_chain()
+
+
+def test_a_donut_chain_refuses_a_device_that_is_not_unlocked(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    kaeru = tmp_path / "bin" / "kaeru-donut.bin"
+    kaeru.parent.mkdir(parents=True)
+    kaeru.write_bytes(b"kaeru")
+    monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
+    monkeypatch.setattr(name="current_device", target=unlock, value=lambda: DONUT)
+    monkeypatch.setattr(
+        name="partitions", target=unlock, value=lambda: {"expdb": (12, 34)}
+    )
+    monkeypatch.setattr(name="written_already", target=unlock, value=lambda **_: False)
+    with pytest.raises(expected_exception=FatalError, match="is not unlocked"):
+        unlock.kamakiri_chain()
+
+
+def test_a_donut_chain_says_when_the_table_has_no_expdb(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
+    monkeypatch.setattr(name="current_device", target=unlock, value=lambda: DONUT)
+    monkeypatch.setattr(name="partitions", target=unlock, value=dict)
+    with pytest.raises(expected_exception=FatalError, match="has no expdb"):
+        unlock.kamakiri_chain()
+
+
+def test_a_donut_recovery_stage_flashes_the_twrp_its_plan_declares(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    ran: list[list[str]] = []
+    monkeypatch.setattr(name="unpack", target=unlock, value=lambda **_: tmp_path)
+    monkeypatch.setattr(name="current_device", target=unlock, value=lambda: DONUT)
+    monkeypatch.setattr(name="unlocked_fastboot", target=unlock, value=lambda: True)
+    monkeypatch.setattr(
+        name="run",
+        target=unlock,
+        value=lambda **options: ran.append([
+            str(word) for word in options["arguments"]
+        ]),
+    )
+    assert unlock.stage_kamakiri_recovery() is True
+    assert ran[0][:5] == ["fastboot", "-S", "256M", "flash", "recovery"]
+    assert ran[0][5].endswith("twrp-donut.img")
+    assert ran[1] == ["fastboot", "reboot", "recovery"]
+
+
+def test_a_donut_recovery_stage_waits_for_an_unlocked_fastboot(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(name="unlocked_fastboot", target=unlock, value=lambda: False)
+    assert unlock.stage_kamakiri_recovery() is False
 
 
 @pytest.mark.parametrize(
@@ -729,3 +797,28 @@ def test_the_guard_refuses_a_stock_lk_in_both_slots(
             slots={"lk_a": LK["stock"], "lk_b": LK["stock"]},
             tmp_path=tmp_path,
         )
+
+
+def test_written_already_compares_a_partition_against_the_image(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    local = tmp_path / "image.bin"
+    local.write_bytes(b"x" * 64)
+    md5 = unlock.digest(kind="md5", path=local)
+    monkeypatch.setattr(name="adb_shell", target=unlock, value=lambda **_: f"{md5}  -")
+    assert unlock.written_already(local=local, node="/dev/block/mmcblk0p9") is True
+    monkeypatch.setattr(
+        name="adb_shell", target=unlock, value=lambda **_: f"{'0' * 32}  -"
+    )
+    assert unlock.written_already(local=local, node="/dev/block/mmcblk0p9") is False
+
+
+def test_written_already_gives_up_when_the_node_answers_nothing(
+    *, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    local = tmp_path / "image.bin"
+    local.write_bytes(b"x")
+    monkeypatch.setattr(name="adb_shell", target=unlock, value=lambda **_: "")
+    monkeypatch.setattr(name="reconnect", target=unlock, value=lambda **_: None)
+    with pytest.raises(expected_exception=FatalError, match="did not answer with an"):
+        unlock.written_already(local=local, node="/dev/block/mmcblk0p9")

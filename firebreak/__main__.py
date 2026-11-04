@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import functools
+import os
 import pathlib
 import shutil
 import subprocess
@@ -344,6 +345,19 @@ def cli() -> None:
     root()
 
 
+def leave(*, status: object) -> None:
+    if not SESSION.raw_usb:
+        if status:
+            sys.exit(status)
+        return
+    if isinstance(status, str):
+        print(status, file=sys.stderr)
+        status = 1
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(status or 0)
+
+
 def listed(*, label: str, summary: str) -> list[str]:
     return [
         f"  {label}",
@@ -361,18 +375,10 @@ def main() -> None:
     if sys.argv[1:2] == ["_child"]:
         sys.exit(child_main(arguments=sys.argv[3:], name=sys.argv[2]))
     try:
-        cli()
-    except FatalError as error:
-        stop(error=error)
-    except KeyboardInterrupt:
-        stop(error=FatalError(message="stopped", prefix=""))
-    except subprocess.TimeoutExpired as error:
-        stop(
-            error=FatalError(
-                message=f"{' '.join(map(str, error.cmd))} did not finish in"
-                f" {error.timeout:.0f} seconds"
-            )
-        )
+        reported()
+    except SystemExit as error:
+        leave(status=error.code)
+    leave(status=0)
 
 
 def option_parents(*, hidden: bool = False) -> dict[str, argparse.ArgumentParser]:
@@ -513,6 +519,22 @@ def parsed() -> argparse.Namespace:
     return options
 
 
+def reported() -> None:
+    try:
+        cli()
+    except FatalError as error:
+        stop(error=error)
+    except KeyboardInterrupt:
+        stop(error=FatalError(message="stopped", prefix=""))
+    except subprocess.TimeoutExpired as error:
+        stop(
+            error=FatalError(
+                message=f"{' '.join(map(str, error.cmd))} did not finish in"
+                f" {error.timeout:.0f} seconds"
+            )
+        )
+
+
 def stock_build(*, device: Device, wanted: str) -> None:
     ARGUMENTS.build = wanted or DEFAULT_BUILDS[device]
     if ARGUMENTS.build not in BUILDS[device]:
@@ -532,6 +554,8 @@ def stock_build(*, device: Device, wanted: str) -> None:
 def stock_builds_help() -> str:
     lines = ["the builds BUILD takes:"]
     for device, each in BUILDS.items():
+        if STOCK not in TARGETS.get(device, {}):
+            continue
         lines.append("")
         lines.extend(
             listed(
@@ -549,7 +573,10 @@ def target_help() -> str:
             lines.append("")
         lines.append(f"commands for the {device.title}:")
         default = DEFAULTS.get(device)
-        lines.extend(listed(label=STOCK + " [BUILD]", summary=targets[STOCK].summary))
+        if STOCK in targets:
+            lines.extend(
+                listed(label=STOCK + " [BUILD]", summary=targets[STOCK].summary)
+            )
         unlocks = sorted(
             (target for target in targets.values() if target.unlock),
             key=lambda target: (target.name != default, target.name),

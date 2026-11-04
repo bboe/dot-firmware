@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from firebreak import cache, plan, route, unlock, updates
-from firebreak.devices import BISCUIT, RADAR, TARGETS, biscuit, radar
+from firebreak.devices import BISCUIT, KAMAKIRI_UNLOCKS, RADAR, TARGETS, biscuit, radar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -86,18 +86,7 @@ class Scan:
                 self.function(bound={}, function=value)
             self.function(bound=function.keywords | bound, function=function.func)
             return
-        if function is plan.image_of:
-            self.found |= set(bound["unlock"].files.values())
-            return
-        if function is unlock.fastbrick_payload:
-            unlocking = bound["unlock"]
-            self.found.add(unlocking.source)
-            self.maybe |= set(unlocking.payloads.values())
-            return
-        if function is unlock.amonet_lk:
-            first, *rest = AMONET_LKS[route.ARGUMENTS.target.device]
-            self.found.add(first)
-            self.maybe |= set(rest)
+        if self.known(bound=bound, function=function):
             return
         if not inspect.isfunction(function) or not function.__module__.startswith(
             "firebreak"
@@ -110,6 +99,23 @@ class Scan:
         tree = ast.parse(textwrap.dedent(inspect.getsource(function))).body[0]
         assert isinstance(tree, ast.FunctionDef)
         self.statements(body=tree.body, scope={**function.__globals__, **bound})
+
+    def known(self, *, bound: dict[str, object], function: object) -> bool:
+        if function is plan.image_of:
+            self.found |= set(bound["unlock"].files.values())
+        elif function is unlock.fastbrick_payload:
+            unlocking = bound["unlock"]
+            self.found.add(unlocking.source)
+            self.maybe |= set(unlocking.payloads.values())
+        elif function is unlock.kamakiri_chain:
+            self.found.add(KAMAKIRI_UNLOCKS[route.ARGUMENTS.target.device].source)
+        elif function is unlock.amonet_lk:
+            first, *rest = AMONET_LKS[route.ARGUMENTS.target.device]
+            self.found.add(first)
+            self.maybe |= set(rest)
+        else:
+            return False
+        return True
 
     def statements(self, *, body: list[ast.stmt], scope: dict[str, object]) -> None:
         scope = dict(scope)

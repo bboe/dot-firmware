@@ -2,18 +2,26 @@ from __future__ import annotations
 
 import functools
 import itertools
+import time
 from typing import TYPE_CHECKING
 
 from firebreak.emmc import RPMB_SIZE, EmmcArea
 from firebreak.mediatek.usbdl import UsbdlError
 from firebreak.plan import BOOT0_HEADER, SECTOR_SIZE, whole_sectors
-from firebreak.plugin import BOOT0, FastbootFlash, Reboot, ZeroRpmb
+from firebreak.plugin import (
+    BOOT0,
+    FastbootFlash,
+    PayloadCommand,
+    Reboot,
+    ZeroRpmb,
+)
 from firebreak.ui import PROGRESS, FatalError, again, title
 
 if TYPE_CHECKING:
     from firebreak.emmc import Emmc
     from firebreak.plan import Action
 
+PAYLOAD_COMMAND = PayloadCommand.__name__
 REBOOT = Reboot.__name__
 UNSUPPORTED_KINDS = frozenset({FastbootFlash.__name__})
 USER_AREA_SIGNATURE = b"\x55\xaa"
@@ -76,6 +84,10 @@ def execute_one(*, action: Action, payload: Emmc) -> bool:
         return zero_rpmb(action=action, payload=payload)
     if action.kind == REBOOT:
         payload.reboot()
+        return False
+    if action.kind == PAYLOAD_COMMAND:
+        payload.send_command(command=action.command or 0)
+        time.sleep(action.settle)
         return False
     partition, offset = place(action=action)
     switch(partition=partition, payload=payload)

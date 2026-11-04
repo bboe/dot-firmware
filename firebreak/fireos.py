@@ -40,7 +40,7 @@ from firebreak.host import (
 from firebreak.probe import read_recovery
 from firebreak.twrp import partition_table, wait_for_twrp, write_system
 from firebreak.ui import ARGUMENTS, PROGRESS, SESSION, FatalError, again, title, warn
-from firebreak.unlock import amonet_chain
+from firebreak.unlock import amonet_chain, kamakiri_chain
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -205,6 +205,43 @@ def hide_updater() -> None:
         delay *= 2
 
 
+def install_and_root() -> None:
+    zip_path = fetch(download=BOOT_ROOT)
+    if "boot_a_x" in partition_table():
+        raise FatalError(
+            message="this TWRP runs on a boot moved partition table. " + again()
+        )
+    build = "" if ARGUMENTS.factory_reset else installed_build(slot=active_slot())
+    if not ARGUMENTS.factory_reset:
+        PROGRESS.steps = PROGRESS.step + (5 if not build else 2)
+    if not build:
+        install_fireos6()
+        build = ARGUMENTS.target.installs.build
+    PROGRESS.begin(estimate="10 s", label="installing boot-root")
+    push_checked(local=zip_path, remote="/sdcard/boot-root.zip")
+    output = adb_shell(command="twrp install /sdcard/boot-root.zip", timeout=300)
+    errors = [line for line in output.split(sep="\n") if "(!) Error" in line]
+    if errors:
+        raise FatalError(message="boot-root.zip failed: " + errors[0])
+    ended = boot_root_ended()
+    if not ended.endswith("RC=0"):
+        raise FatalError(message="boot-root.zip failed: " + ended)
+    slot = active_slot()
+    patched = adb_shell(
+        command=f"grep -c 'slot _{slot}: neutering ota updates' /tmp/recovery.log;"
+        f" echo {ZIP_OK}",
+        timeout=30,
+    ).split(sep="\n")
+    counted = "".join(patched[-2:-1]).strip()
+    if patched[-1:] != [ZIP_OK] or not counted.isdigit() or not int(counted):
+        raise FatalError(
+            message=f"boot-root.zip ended without patching slot {slot}, which holds"
+            f" Fire OS 6 {build}. " + again()
+        )
+    PROGRESS.begin(estimate="60 s", label=f"waiting for rooted Fire OS 6 {build}")
+    reboot_rooted()
+
+
 def install_fireos6() -> None:
     build = ARGUMENTS.target.installs.build
     update_file = updates.download(build=build, builds=BUILDS[ARGUMENTS.target.device])
@@ -357,40 +394,12 @@ def stage_install_fireos(*, reboot: bool = True, slot: str = "") -> None:
 
 def stage_install_fireos6() -> None:
     amonet_chain()
-    zip_path = fetch(download=BOOT_ROOT)
-    if "boot_a_x" in partition_table():
-        raise FatalError(
-            message="this TWRP runs on a boot moved partition table. " + again()
-        )
-    build = "" if ARGUMENTS.factory_reset else installed_build(slot=active_slot())
-    if not ARGUMENTS.factory_reset:
-        PROGRESS.steps = PROGRESS.step + (5 if not build else 2)
-    if not build:
-        install_fireos6()
-        build = ARGUMENTS.target.installs.build
-    PROGRESS.begin(estimate="10 s", label="installing boot-root")
-    push_checked(local=zip_path, remote="/sdcard/boot-root.zip")
-    output = adb_shell(command="twrp install /sdcard/boot-root.zip", timeout=300)
-    errors = [line for line in output.split(sep="\n") if "(!) Error" in line]
-    if errors:
-        raise FatalError(message="boot-root.zip failed: " + errors[0])
-    ended = boot_root_ended()
-    if not ended.endswith("RC=0"):
-        raise FatalError(message="boot-root.zip failed: " + ended)
-    slot = active_slot()
-    patched = adb_shell(
-        command=f"grep -c 'slot _{slot}: neutering ota updates' /tmp/recovery.log;"
-        f" echo {ZIP_OK}",
-        timeout=30,
-    ).split(sep="\n")
-    counted = "".join(patched[-2:-1]).strip()
-    if patched[-1:] != [ZIP_OK] or not counted.isdigit() or not int(counted):
-        raise FatalError(
-            message=f"boot-root.zip ended without patching slot {slot}, which holds"
-            f" Fire OS 6 {build}. " + again()
-        )
-    PROGRESS.begin(estimate="60 s", label=f"waiting for rooted Fire OS 6 {build}")
-    reboot_rooted()
+    install_and_root()
+
+
+def stage_install_kamakiri() -> None:
+    kamakiri_chain()
+    install_and_root()
 
 
 def stage_replace_twrp() -> None:

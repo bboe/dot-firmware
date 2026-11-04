@@ -141,10 +141,12 @@ class Session:
     dd: str = "dd"
     device: Device | None = None
     fastboot: bool = False
+    hardware_code: int | None = None
     held: bool = False
     named: str = ""
     no_wait: bool = False
     probing: bool = False
+    raw_usb: bool = False
     read_flash: bool = False
     short: bool = False
     shown: Kind | None = None

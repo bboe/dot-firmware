@@ -48,6 +48,7 @@ class Download:
     browser: bool = False
     directory: str = ""
     mirror: bool = False
+    root: str = "amonet"
     size: int = 0
 
 
@@ -626,7 +627,7 @@ def unpack(*, download: Download) -> pathlib.Path:
             with zipfile.ZipFile(file=archive) as zip_file:
                 zip_file.extractall(path=part)
             part.replace(target=target)
-        return target / "amonet"
+        return target / download.root
 
 
 def walked(*, directory: pathlib.Path) -> list[tuple[str, pathlib.Path]]:

@@ -139,6 +139,12 @@ class Client:
             if error is not None:
                 raise error
 
+    def hardware_code(self) -> int:
+        self.rig.steps.append("hardware code")
+        if self.rig.hardware_error is not None:
+            raise self.rig.hardware_error
+        return self.rig.hardware_code
+
     def start_payload(self, *, payload: bytes) -> Live:
         self.rig.steps.append(f"payload {payload.decode()}")
         return Live(port=self.port, rig=self.rig)
@@ -153,6 +159,8 @@ def rig(*, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> Rig:
         erased=[],
         exploit_error=None,
         handshakes=[],
+        hardware_code=0x8163,
+        hardware_error=None,
         lks=dict.fromkeys(LK_FIRST.values(), BISCUIT_LK),
         not_ready=False,
         now=[0.0],
@@ -331,6 +339,21 @@ def test_a_bootrom_port_that_comes_and_goes_is_handshaked_once(*, rig: Rig) -> N
     rig.ports = [BOOTROM, BOOTROM, {}, BOOTROM]
     assert step(rig=rig) is True
     assert rig.steps.count("handshake") == 1
+
+
+def test_a_bootrom_says_which_chip_it_is_right_after_the_handshake(*, rig: Rig) -> None:
+    bootrom_step.SESSION.hardware_code = None
+    rig.hardware_code = 0x8167
+    assert step(rig=rig) is True
+    assert bootrom_step.SESSION.hardware_code == 0x8167
+    assert rig.steps[:2] == ["handshake", "hardware code"]
+
+
+def test_a_bootrom_that_cannot_say_its_hardware_code_still_runs(*, rig: Rig) -> None:
+    bootrom_step.SESSION.hardware_code = None
+    rig.hardware_error = ProtocolMismatchError("hardware code status")
+    assert step(rig=rig) is True
+    assert bootrom_step.SESSION.hardware_code is None
 
 
 def test_a_bootrom_that_does_not_answer_as_one_stops_the_run(*, rig: Rig) -> None:
@@ -529,7 +552,7 @@ def test_a_missed_short_is_counted_and_the_run_keeps_waiting(
     rig.ports = [{}, {}, PRELOADER, BOOTROM]
     assert step(rig=rig) is True
     assert "Short 1 missed" in capsys.readouterr().out
-    assert rig.steps[:3] == ["handshake", "watchdog", "countdown"]
+    assert rig.steps[:3] == ["handshake", "hardware code", "watchdog"]
     assert rig.written == [WRITES]
     assert bootrom_step.SESSION.boot0_erased is False
 
@@ -769,6 +792,7 @@ def test_a_stock_preloader_step_zeroes_the_rpmb_and_writes_boot0(
     )
     assert rig.steps == [
         "handshake",
+        "hardware code",
         "watchdog",
         "range checks",
         f"payload {PAYLOAD.decode()}",
@@ -960,6 +984,7 @@ def test_the_plan_is_carried_out_through_the_payload_and_stops_at_its_reboot(
     assert step(rig=rig) is True
     assert rig.steps == [
         "handshake",
+        "hardware code",
         "watchdog",
         "range checks",
         f"payload {PAYLOAD.decode()}",

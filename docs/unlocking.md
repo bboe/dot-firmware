@@ -341,6 +341,33 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
   that can be undone. Nothing here has read a donut's fuse, so what the bit
   says on that device is still unknown, and the claim is kept above rather
   than deleted.
+- kamakiri-donut v1.0.0 starts its payload through USB control transfers, not
+  through the bootrom's write-words command. It sends a CDC `SET_LINE_CODING`
+  of 11 bytes where the descriptor declares 7, reads nine bytes of the
+  configuration descriptor to trigger it, and repeats the pair to walk a saved
+  pointer one byte at a time. That gives it the bootrom's `cmd_da` as an
+  arbitrary read and write, which places its stage1 at `0x100A00`. A serial
+  port sends no control transfer, so pyserial cannot carry this step whatever
+  else is reshaped. The GCPU route is no way around it: a donut refuses the
+  engine's own registers, measured in
+  [measurements.md](measurements.md#an-echo-dot-3rd-generation-in-its-bootrom).
+- Its payload is two stages, where amonet ships one. stage1 answers
+  `\xa1\xa2\xa3\xa4` and takes two framed commands: `0x4000` loads stage2 at
+  `0x201000`, and `0x4001` jumps to it. stage2 then answers
+  `\xb1\xb2\xb3\xb4` and speaks amonet's payload protocol, including
+  biscuit's `0x1003`, `0x1004` and `0x5000`. It adds `0x3001` to kick the
+  watchdog and `0x6000` to set the fastboot flag. So the two stages cost a
+  loader, not a protocol.
+- One write of `0x22000000` to `0x10007000` does not hold donut's watchdog as
+  it holds biscuit's. The kit writes `0x1971` to `0x10007008` every second
+  before the exploit, and kicks through `0x3001` after every batch of blocks.
+- `bin/lk-donut.bin` holds `DONUT\0` at `0x2c0c4`, after an RSA exponent, and
+  holds no `\0product\0DONUT\0` anywhere. So the product check above would
+  refuse a donut rather than name it, where amonet's own `bin/lk.bin` holds
+  `\0product\0BISCUIT\0` for biscuit and `\0product\0RADAR\0` for radar. The
+  kit writes this LK byte for byte for 6009 and later, so it is a stock donut
+  LK. All four readings are from v1.0.0's files on 2026-11-02; no donut ran
+  them.
 - It reads ports from pyserial's USB list and opens only the bootrom's, where
   amonet opened every port to see it. On Linux the preloader's
   `/dev/ttyACM*` is `dialout`'s, and the udev rule covers only `0e8d:0003`,
@@ -2178,3 +2205,525 @@ amonet states for it, as for radar, because it declares no Fire OS 5 chain.
 amonet-crown's own `main.py` is where the boot0 header clear in front of every
 chain comes from. And `tests/test_preloader.py` compares its cached preloader
 against biscuit's and the radar one amonet-radar v1.0.0 writes.
+
+### Echo Dot (3rd Generation)
+
+donut declares an unlock, kamakiri-donut v1.0.0, and a `fireos6` target whose
+route runs that unlock through `kamakiri_step` and carries on from the TWRP it
+leaves. The whole route has run: on 2026-11-03 `firebreak unlock fireos6`
+took a donut from its bootrom to rooted Fire OS 6.5.7.5 (NS6575/8349) in
+3m 02s, with nothing told to it but the target. Every write was read back and
+compared before the run went on, and `write the TEE` and `write the bootloader`
+both came back as skips. **It has also run from a donut genuinely restored to
+stock and locked**, on 2026-11-04, which is the state the route was written
+for: 12 steps, and the same two skips.
+
+Those two skips are not a used Echo's leftovers, which is what the first run
+suggested. The kit's `tee` and `lk` images are this donut's own stock bytes,
+so a stock Echo already holds what those steps write, and a restored one
+holds them again. What the steps are for is an Echo carrying some other
+firmware, and on a stock or a once-unlocked donut they are both read-backs
+that match. `write kaeru` and `write the TEE payload` are the writes that
+change anything, two and seven seconds.
+
+The last step sometimes needs a hand, and it is not predictable. Two of the
+three runs showed nothing on USB after boot-root, and the run asked for a
+power cycle and carried on by itself when adb returned; the third came back by
+itself in 24 s. The run that waited took 323 s against the 60 s estimate,
+which is why it ran 7m 06s where a set-up Echo ran 3m 02s. So the prompt earns
+its place and the wait is not a fault, but nothing yet says which runs need it.
+
+**The first Linux run, on 2026-11-04, took the route's second half and not
+its first.** The hold landed in kaeru's fastboot rather than the bootrom, so
+the run went fastboot, TWRP, boot-root and rooted 8349 in four steps and
+1m 07s, with no libusb in it at all: writing TWRP 21 s, boot-root 12 s and the
+first boot 26 s, each as quick as the Mac or quicker. So adb and fastboot
+drive a donut on Linux, and **the bootrom half is still unrun there**. What
+`cdc_acm` does to a bootrom libusb then wants is the open question, because
+nothing here detaches a kernel driver, and that platform is also the only one
+where the exploit's trigger goes out unprivileged.
+
+That run is a second reading of the hold landing in fastboot on a donut
+carrying kaeru, on another host, which is what separates it from a stock one:
+the stock Echo gave the bootrom every try.
+
+**Then the bootrom half ran on Linux and failed, which answers the open
+question.** On 2026-11-04, from a donut restored to stock and held into its
+bootrom, the run reached `waiting for the bootrom` and stopped:
+
+```text
+ERROR: the Echo Dot (3rd Generation)'s bootrom did not answer as one: [Errno
+16] Resource busy. Nothing was written. Unplug the Echo Dot (3rd Generation).
+```
+
+`EBUSY` there is the kernel. Linux binds `cdc_acm` to the bootrom's CDC
+interface, which is what gives it `/dev/ttyACM0`, and libusb cannot claim an
+interface a kernel driver holds. macOS attaches its own CDC driver and hands
+the endpoints over anyway, which is why three months of readings on one host
+never saw this. So `open_bootrom` now calls `detached` first, which asks
+whether a kernel driver holds the data interface and detaches it if so.
+`NotImplementedError` means a platform that does not do this, which is every
+platform but Linux, and a `USBError` from the detach itself becomes a refusal
+naming the udev rules. Nothing was written when it failed, because the
+handshake comes first.
+
+The error that reached the user was correct and useless: `[Errno 16] Resource
+busy` through the generic `did not answer as one`. A reading on a second
+platform is the only thing that would have found it, and the fix is three
+lines pyusb has had all along.
+
+**With the interface detached, the handshake went through and the exploit did
+not: the kernel refuses the trigger.** The run reached stage 1's ready pattern
+and read nothing, answering `[Errno 5] Input/Output Error` from the transfer
+itself, and `dmesg` named the reason:
+
+```text
+[1845275.920702] Did not find alt setting 204 for intf 0, config 1
+```
+
+204 is `0xCC`. Linux checks which interface a control transfer names before it
+sends one, and `0xCC` is a table index rather than an interface, which is the
+whole exploit: the bootrom indexes with it and returns into the payload. So
+the kernel fails the transfer with `EIO` and the Echo never sees it. Two
+readings say the Echo never saw it: that warning appears once per attempt with
+no disconnect or re-enumeration beside it, and `lsusb` still lists
+`0e8d:0003` afterwards, so the bootrom stayed in USBDL mode. macOS validates
+nothing of the kind, which is why the same four steps work there.
+
+So on a platform that does not elevate, the trigger sends the proven form
+first and, where the host refuses it, the same class request addressed to the
+**device** instead of the interface, which the kernel does allow. The first
+attempt costs nothing when it is refused, because nothing reaches the Echo.
+**A Linux kernel will not send that transfer, and this is the reading that
+proves it rather than infers it.** Three probes on 2026-11-04, on kernel
+6.8.0-147, against a donut sitting in its bootrom:
+
+| form | result | reached the Echo |
+| --- | --- | --- |
+| class to interface `0x00` or `0x01` | `LIBUSB_ERROR_PIPE` | yes, and stalled |
+| class to interface `0x02`, `0x40`, `0xCC` | `LIBUSB_ERROR_IO` | no |
+| vendor to interface `0xCC` | `EPIPE` | yes, and stalled |
+| class to device `0xCC` | `EPIPE` | yes, and stalled |
+
+The same request sent straight at usbfs, bypassing libusb and pyusb, answers
+**`EINVAL`** for `class/interface 0xCC` and `EPIPE` for the vendor form. That
+is `check_ctrlrecip`: it returns early for a vendor request, and for a class
+request it calls `checkintf`, which refuses an interface the kernel has no
+record of. `0xCC` is 204, and the only interfaces are 0 and 1. **Being out of
+bounds is the exploit** — the bootrom indexes a table with that value and
+returns into the payload — so no index a kernel would send can replace it, and
+the forms a kernel does send are the ones the bootrom stalls.
+
+The warning `Did not find alt setting 204 for intf 0` is not the refusal and
+was a red herring: it comes from pyusb's own `SETINTERFACE` ioctl, and sending
+through libusb directly produces the same `EIO` with no such line.
+
+mtkclient reaches the same wall, which is worth knowing before anyone tries
+again: its trigger is `ctrl_transfer(0xA1, 0, 0, self.var1, 0)` with `var1`
+brute-forced per SoC, and on Linux only a `var1` naming a real interface
+leaves the host.
+
+So **firebreak unlocks a donut from macOS only**, which the README says and
+the failure says again with this reading behind it. That is a limit of the
+attack firebreak carries, and **not of the Echo**, which is the part the first
+write-up of this got wrong.
+
+**The kit reaches the same bootrom with requests a kernel will send, which is
+why kamakiri is Linux tooling.** Read out of `modules/load_payload.py` in
+kamakiri-donut v1.0.0:
+
+```python
+linecode = ctrl_transfer(0xA1, 0x21, 0, 0, 7)  # GET_LINE_CODING, interface 0
+ctrl_transfer(0x21, 0x20, 0, 0, linecode + pointer)  # SET_LINE_CODING, 11 bytes not 7
+ctrl_transfer(0x80, 0x06, 0x0200, 0, 9)  # GET_DESCRIPTOR, the device
+```
+
+Every recipient there is real: interface 0 exists and the device always does.
+The overflow is in the **data stage** of a legitimate `SET_LINE_CODING`, which
+overwrites a pointer the bootrom then walks when it answers a plain descriptor
+read, and command `0xDA` carries the reads and writes. Nothing is out of
+bounds in a `wIndex`, so `check_ctrlrecip` has nothing to refuse. The kit also
+ships a ModemManager check, which is a Linux concern and nothing else's.
+
+**The kit's attack runs on Linux, read on 2026-11-04, and that settles it.**
+Its own `read` path was run on kernel 6.8.0-147 against a donut held into a
+fresh bootrom, with `cdc_acm` detached first:
+
+```text
+[12:42:45.977818] Let's rock
+[12:42:45.993346] Waiting for stage 1 to come online...
+[12:42:46.021512] Party time
+[12:42:46.030079] All good
+[12:42:46.976838] Dump misc (1024 blocks at block 51200) to /tmp/misc.bin
+[1024 / 1024] 100.0% at 0.43 MB/s
+```
+
+Three seconds from handshake to stage 2, then 512 KB of `misc` read off the
+eMMC at 0.43 MB/s, and nothing written. **So a donut's bootrom is exploitable
+on Linux**, and what is macOS-only is the attack firebreak carries.
+
+That also corrects the note above it. The kit's loader does not simply fail:
+it failed on macOS, which is where every donut reading before that day was
+taken, and macOS is where `SET_LINE_CODING` goes to the CDC interface Apple's
+driver owns. The two attacks fail on opposite platforms, each needing what the
+other host will not give, which is why one tool carrying both is the thing
+worth building.
+
+The dump paid for itself twice. `misc`'s command field is all zeros, which is
+the self-clearing the fastboot route relies on, and `0x360` reads
+`00 41 42 42 01 00 8f 00` on an Echo freshly restored to stock: the same bytes
+as the rooted reading, so the restore leaves that block alone as intended and
+whatever zeroed slot a did it during the `--factory-reset` unlock rather than
+the restore.
+
+Windows is unread as well, and WinUSB validating no recipient is the reason to
+try the attack firebreak already carries there.
+
+**`--factory-reset` has run too, on 2026-11-04: 14 steps in 7m 14s**, from a
+donut genuinely stock and locked to rooted 8349 with an erased `/data`, and
+that was the last unrun donut path. The wipe took a second, each OTA install
+156 s and 168 s against a 135 s estimate, boot-root 8 s, and the first boot
+24 s with no power cycle asked for.
+
+**The slot question is settled by that run: a TWRP install of an A/B OTA does
+flip the active slot by itself, as the general section says.** The run reads
+`bcbtool get_active` before and after each install and stops unless it
+changed, so two installs finishing is the proof, and no `bcbtool set_active`
+is needed on a donut either.
+
+Three readings agree on where it landed, and the third is worth more than the
+other two. `ro.boot.slot_suffix` is `_b` and `/proc/cmdline` carries
+`androidboot.slot_suffix=_b`, which say only which slot this boot used. The
+stored state that picks the next one is `bootloader_control` at `0x360` of
+`misc`, read from the rooted Echo as `00 41 42 42 01 00 8f 00`: one metadata
+byte per slot, where `0x8f` is priority 15 with a successful boot and zero
+tries, and `0x00` is priority 0, which is a slot marked unbootable.
+
+**So slot a holds 8349 and cannot be booted, and nothing here knows what
+zeroed it.** The same offset read `00 41 42 42 01 8e 8f 00` on 2026-11-03,
+with slot a at priority 14, so it was zeroed somewhere in the day's runs. The
+candidates are the second OTA install, boot-root, and the first boot of the
+new slot, and one reading cannot separate them. It costs nothing while slot b
+boots, and it means there is no fallback slot if one ever does not, so it is
+worth reading again on the next `--factory-reset` and before.
+
+That run also found the gap in naming a donut. An Echo already sitting in its
+bootrom when the run starts is read by `probe` first, which sees the CDC serial
+port, reads `Generic CDC` as the USB product, cannot reach a bootloader in
+flash, and stops: `firebreak cannot tell which Echo this is`. The hardware code
+settles it one step later, in `bootrom_device`, which such a run never reaches.
+Unplugging and starting again works, because then the bootrom wait comes first.
+The bootrom this met could not have answered anyway, having spent its handshake
+on the run before, so what a fresh one does in `probe` is untried.
+
+**A donut is named by the hardware code its bootrom reports, inside the one
+handshake that bootrom gives.** `fireos6` names three devices, so something has
+to say which. Reading the bootloader out of flash cannot: that goes through
+amonet's serial payload, which a donut's bootrom does not answer. So
+`bootrom_client` reads `0xFD` as soon as the handshake lands, `reached` raises
+`NotAmonetError` when the code names another family, and `bootrom_device`
+catches that and returns the device instead of a payload. The code separates
+donut from the rest and nothing more: a biscuit and a radar are both `0x8163`,
+and their bootloader in flash still tells them apart.
+
+**The one handshake is the whole design, and the first attempt got it wrong.**
+A bootrom answers one handshake per power-on, measured over both transports:
+afterwards `0xa0` draws no `0x5f` until the Echo is replugged, which is what
+`usbdl`'s message has always said. A probe that handshook the device just to
+look at it was written first and taken out on 2026-11-03, because it spent the
+handshake amonet's route needs and left that route facing a bootrom which
+answers nothing. Nothing reorders around it: the state is in the bootrom, not
+in a transport. So identification sits inside the session that goes on to
+drive the device, and `kamakiri_step` reuses that handshake rather than asking
+for another, which is why it reads `SESSION.hardware_code` before deciding to
+send `0xa0`.
+
+Two cheaper ways were measured and both are closed. The USB descriptors are
+identical on a donut and a biscuit, down to there being no string descriptors
+on either. And `0xFD` before the handshake answers a single `0xfe`.
+
+What makes this work on a donut is that the handshake crosses transports. Named
+over the serial port, a donut is then exploited over libusb on the same
+power-on with no second handshake: measured on 2026-11-03, where
+`disable_watchdog` and a second word write both went through after a serial
+handshake alone. The serial port carries `0xFD` on a donut as well as libusb
+does, so identification needs no libusb and no new driver on any platform.
+The readings are in
+[measurements.md](measurements.md#what-a-bootrom-gives-you-before-it-is-exploited).
+
+It is the first unlock that is not amonet's, and the first that pyserial cannot
+carry. Two separate reasons say so, and either alone would be enough. Its
+payload is set running by a USB control transfer, which a serial port does not
+send. And a donut's bootrom does not answer a plain word write through macOS's
+CDC driver at all, where it answers the same write over the bulk endpoints. So
+`firebreak/mediatek/libusb.py` is not a convenience: nothing else reaches that
+device. The readings behind both, and why macOS needs root for the control
+transfers alone, are in
+[measurements.md](measurements.md#what-libusb-can-do-on-macos) and
+[measurements.md](measurements.md#an-echo-dot-3rd-generation-in-its-bootrom).
+
+The exploit in `firebreak/mediatek/kamakiri.py` is mtkclient's, not the kit's,
+and the two are different attacks on the same bootrom. The kit's own loader
+overflows `SET_LINE_CODING` and then walks a pointer with command `0xDA`; it
+was run against a donut and it fails, so firebreak does not carry it. What is
+here instead is four steps: one word to the watchdog's `0x50`, holding the
+payload's load address **byte-reversed**; fifteen reads below that word, each
+starting one word higher and ending on it; command `0xE0` with a length, which
+answers whether the bootrom kept room and then takes the bytes; and a single
+control transfer, `0xA1` with `wIndex` `0xCC`, which returns into the payload.
+
+Two details of that last transfer are not free choices. `0xCC` is this chip's
+value, not a general one, and `0x8167` is the only MediaTek part firebreak
+sends it to. And because `0xA1` names an interface, pyusb tries to claim
+interface `0xCC`, which does not exist; the claim has to be suppressed, so
+`trigger` opens a handle of its own, blanks the claim on it, and throws it
+away. The transfer itself raises once the payload is running, which is why the
+error is swallowed rather than reported.
+
+The join held: the exploit is mtkclient's and the payload is the kit's, and
+sending the kit's stage1 through `0xE0` brings it up. Both expect the same
+`0xa1a2a3a4` when a payload is ready, and that is why.
+
+Four more readings came off that run:
+
+- The ladder's first read answers status `0x0003`, where every other read this
+  project sends answers `0x0000`. It reads below the word it just wrote, so it
+  reaches addresses the bootrom objects to on purpose, and the data still comes.
+  `read_words` takes `strict=False` for it, and refuses anything past `0xff`.
+- One watchdog disable value does for every Echo here. mtkclient writes
+  `0x22000064` to a watchdog at `0x10007000` where this project writes
+  `0x22000000`, and the unlock run used mtkclient's. Afterwards, on a donut
+  restored to stock, `disable_watchdog` was sent on its own and the exploit
+  came up and read the eMMC correctly, so the difference in the other mode
+  bits does not matter and nothing needs a value of its own.
+- A payload reboot leaves libusb holding a device that has left the bus, and
+  pyusb's teardown then blocks releasing its interface. The process cannot be
+  interrupted, because the block is inside a C call, so it looks busy after all
+  its work is done. `Usb.close` suppresses `USBError`, which does not help: a
+  device that has gone does not raise, it hangs. The route has to drop the
+  handle deliberately.
+- `FACTFACT`, sent to the preloader when it offers its ready byte `Y`, is the
+  persistent way back to fastboot, and `FACTORYM` the way to recovery. That is
+  what the kit's `boot-fastboot.sh` does, and it is nothing to do with `misc`.
+  The udev rules here cover `0e8d:0003` but not the preloader's `0e8d:2000`, so
+  that route would be denied on Linux as the rules stand.
+
+Nor is the engine a way around the exploit. A donut refuses writes to the
+GCPU's own registers, where a Dot allows them, so the range-check defeat in
+`Unlock: amonet v2` cannot bootstrap this device and a second payload client
+alone would never have been enough.
+
+Its payload is two stages, and the second is the surprise: stage1 is only a
+loader, taking `0x4000` to place stage2 and `0x4001` to jump to it, and stage2
+then speaks the protocol this project already sends, down to the commands
+`firebreak/amonet/biscuit_v2_0_0.py` added. So
+`firebreak/kamakiri/donut_v1_0_0.py` is close to a copy of that client, with
+two differences. It pins two hashes rather than one, stage1's and stage2's. And
+it does not flush a read, where biscuit's client reads four bytes of the
+payload's own memory after every read to push the pipe along, because the kit
+reads straight back and never flushes.
+
+The `recovery` target works over fastboot even though a donut has no such
+partition: `getvar partition-size:recovery` comes back empty, `fastboot flash
+recovery` warns `recovery partition size: 0` and then reports OKAY, and the
+TWRP it wrote started. kaeru's fastboot maps the name onto something real,
+and `swdl` at 32 MiB is the only partition the 19 MiB image fits. So a
+`FastbootFlash` step is resolved without the partition table: where a
+`Write` to a name the table lacks stops the run, this one carries its image
+and its name and lets fastboot place it. A table that does hold the name is
+still read, because a TWRP run writes that partition itself with `dd`.
+
+**`firebreak fastboot` reaches a donut by writing `bootonce-bootloader` into
+`misc`, not by asking adb for a bootloader reboot.** `adb reboot bootloader`,
+which every other device here takes, does nothing on a donut: on 2026-11-03 a
+run of it looped three times, each try rebooting and coming back in the system
+again, and `misc` was still byte-identical to the stock backup afterwards. So
+Amazon's Android on this device never writes the bootloader control block, and
+nothing downstream of it ever sees the request. Only fastboot is affected:
+`adb reboot recovery` reaches a donut's TWRP in 19 seconds, so `firebreak twrp`
+needs none of this.
+
+kaeru does read that block. It holds `bootonce-bootloader`, `boot-recovery`
+and `%s: Bootloader command pending.`, so `Device.fastboot_command` carries the
+command and `twrp.ask_fastboot` writes it over the first 32 bytes of `misc`,
+keeping the rest of the sector, before a plain `adb reboot`. Measured the same
+day, from rooted Fire OS 6: the Echo came up in kaeru's fastboot in 11 seconds,
+reading `unlock_status: true`, with no gesture and no bootrom. From TWRP
+3.7.0_9-0 the same run took 9 seconds. The command
+clears itself, which is what makes this safe to leave in a device file rather
+than undo afterwards: after the next boot `misc` hashed the same as it did
+before the write, so an Echo cannot be left looping into fastboot.
+
+That fastboot answers more than a stock one. `current-slot` is `b` and
+`slot-count` is `2`, where a stock donut's fastboot answers no slot variable at
+all, so the active slot can be read without a recovery and `bcbtool`.
+
+Three things in the plan are this project's choice rather than the kit's:
+
+- The kit zeroes the RPMB. The plan does not, because this unlock writes no
+  older firmware than the device already runs. A donut's two preloaders, the
+  stock one read off the device and the kit's, carry identical GFH blocks but
+  for `m_file_len`, version block `0x0001` included; its two TEE images share
+  an identical first `0xd804` bytes, Amazon header and all. Nothing here moves
+  an anti-rollback counter, so nothing needs the counter cleared. That matters
+  beyond a saved step: zeroing the RPMB is the one part of the kit's order that
+  a backup cannot undo, and leaving it out makes the whole unlock reversible.
+
+- The kit sets the fastboot flag with a command of its payload's, `0x6000`,
+  and the plan sends that same command. `ForceFastboot`, which writes
+  `FASTBOOT_PLEASE\0` over the first 16 bytes of `misc` as biscuit's and
+  crown's chains do, was tried here first and is wrong: `0x6000` left all
+  512 KB of `misc` byte-identical to a backup, so the flag it sets is not in
+  flash and does not outlive a power cycle. The command therefore has to come
+  in the same payload session as the reboot, which is the order the kit uses,
+  with five seconds after it for the eMMC to settle.
+- The kit resets no bootloader control block, and neither does the plan.
+  `ResetBcb` writes `\0ABB\x01\x8f\0` at `0x360` of `misc`, and on a donut
+  that offset holds A/B slot metadata, read as `\0ABB\x01\x8e\x8f\0`, so
+  the step would change two bytes of slot state for no measured reason. That
+  offset is in `misc`'s second sector, which is why `ask_fastboot` writes the
+  first sector alone and leaves the slot state where it is.
+- The kit clears boot0's header first, so that a run which stalls can reach the
+  bootrom without shorting. The plan does not, because a donut reaches its
+  bootrom by holding its action button, and boot0 read back its `EMMC_BOOT`
+  header untouched after the whole run. The hold has to start before the cable
+  does, and last until the run says the bootrom answered: on 2026-11-03 the
+  same gesture on a donut carrying kaeru reached the bootrom some tries and
+  fastboot others, so the preloader takes the button when the bootrom has
+  already passed it on. Letting go early boots the Fire OS. No short was
+  needed either way.
+
+What is missing, and would stop a run driven from the command line, is the
+privileged call. On macOS libusb hands an unprivileged process the bootrom's
+bulk endpoints but not endpoint 0, and the exploit's trigger is the one thing
+that needs endpoint 0: a single `ctrl_transfer`. Everything else in the run,
+the handshake, the reads and writes, the payload upload and the whole eMMC
+protocol, went through unprivileged. firebreak refuses to run as root, because
+its downloads would belong to root, so the trigger has to go out through a
+privileged child that does only that. Linux needs none of this, as the udev
+rules already cover `0e8d:0003`.
+
+**That password has to be asked for before the button is, not after.** The
+check sat at the head of `kamakiri_step`, which runs once the Echo is already
+on its way to the bootrom, so on 2026-11-04 the prompt arrived while the
+action button was being held: the hold was let go to type the password, the
+preloader took the button, and the Echo booted the Fire OS instead. The sudo
+check is now `authorized`, and `password_first` calls it just before the
+gesture is printed, before anything is unplugged. It is `sudo -v`, so the
+call inside the step costs nothing when the route has already made it, and a
+refusal still stops the run before a write.
+
+**And it says why, naming the Echo.** The first move of that check printed
+nothing at all: a bare `Password:` arrived with no sentence before it, because
+the prompt sat inside the call that built the guidance rather than before it,
+and `say` prints what that call returns. A password asked for by a program
+that has said nothing is a password worth refusing, and the one thing the user
+could not tell from it was whether firebreak had worked out which Echo this
+is. It had: a stock-booted donut publishes `AEODN` as its USB product string,
+which `named_device` reads before the route starts, so the target is settled
+before anything privileged is asked for. The sentence now says that, by naming
+the device, and says what the call is for and that nothing is written yet. The
+note is skipped where `ELEVATES` is false, because Linux is covered by the
+udev rules and is never asked. A blank line goes either side of the prompt,
+because sudo writes `Password:` to the terminal itself and nothing else would
+separate it from the text around it.
+
+**What a guided unlock prints was read back from a run and cut.** Four lines
+went, each for a reason worth keeping:
+
+- The gesture's closing sentence, which named what a mistimed hold reaches and
+  how to recover. It is true, but it is advice for a failure the run reports
+  by itself, and it sat between the user and the one instruction that matters.
+- Its opening clause, `This Echo needs no short`, which answered a question
+  nobody in an unlock had asked. It earned its place in one caller only:
+  `ask_for_short` leads with `Short the Echo's test point and plug it in` and
+  appends the gesture, so for a donut the clause was the correction. That
+  caller is amonet's, and a donut cannot use it — its bootrom does not answer
+  that payload, which is why `firebreak bootrom` refuses the device outright.
+  `firebreak short` reaches it all the same and now reads as though a donut
+  had a test point, so that entry wants the same refusal `bootrom` gives.
+- The whole wait line for a device in `KAMAKIRI_UNLOCKS`. It said to keep
+  holding, which the gesture had just said, and the progress line `waiting for
+  the bootrom` appears directly below it. `waiting_line` returns an empty
+  string there and the route prints nothing, where amonet's devices keep
+  theirs: it names the ring colours, which is a reading nothing else carries.
+- `This Echo is in amonet's fastboot` on an Echo whose fastboot is not
+  amonet's. `exploit_name` reads `kamakiri` for a device in `KAMAKIRI_UNLOCKS`
+  and `amonet` for the rest, matching the step label beside it. The fastboot
+  itself is kaeru's, the LK inside the kamakiri kit, but the kit is the name
+  that holds if another device joins that unlock.
+- That same line mid-run. It is the announcement of a state the run has
+  arrived in, and it reads as news only when the run starts there, so it is
+  now printed on an empty `done` alone. The run that put the Echo in that
+  fastboot has a step line for it already.
+- `amonet-fastboot` and `amonet-twrp`, the state names themselves, which
+  every closing message and every stuck-state refusal printed raw. A donut's
+  fastboot is kaeru's and its recovery came from the kamakiri kit, and the
+  first fix for that rendered those states as `kamakiri-` instead. That was
+  the wrong axis. **Nothing in this project branches on which exploit wrote a
+  bootloader**: it routes on `FASTBOOTS`, `LOCKED_FASTBOOTS` and `TWRPS`, so
+  the distinction that matters to a reader is stock against unlocked, and
+  provenance was a second naming scheme with no user. `states.shown` renders
+  a locked fastboot as `stock fastboot`, any other as `unlocked fastboot`,
+  every recovery as `TWRP`, which is the command's own name and what every one
+  of those states holds, and everything else by its own name. The step that
+  starts a recovery from a fastboot says `restarting into TWRP` for the same
+  reason, because it waits for a state in `TWRPS` and refuses anything else.
+  `restarting into recovery` stays where a run reboots a Fire OS that may hold
+  Amazon's recovery rather than this project's. It needs
+  no device, and it corrects the same jargon for a biscuit, which was reading
+  `amonet-fireos5-bboe-twrp` at a user. The values themselves do not change,
+  and `--verbose` still prints them, because they are what the code reasons
+  about.
+
+**A refusal for a device with no bootrom chain comes before the reboot
+now.** `firebreak bootrom` on a rooted
+donut restarted it into TWRP, 19 seconds, and refused from there: the check
+is `chainable`, which the entry called once it had walked the Echo to a state
+it could clear boot0 from. Nothing in the check needs that state. The entry
+names the device at its first line, so the check runs there instead, as soon
+as the state is read and before anything is asked of the Echo. It is skipped
+where the device is unknown, which is the case the walk exists for: an Echo
+that names itself only in a fastboot or a recovery still has to be taken to
+one, and `chainable` then refuses as it always did.
+
+**Two readings a review asked for, and what they changed.** A donut in stock
+fastboot has no stage in `kamakiri_stages` and no prompt in the guidance, so a
+run that met one would print nothing for ten minutes and then give the generic
+timeout. Nothing has code for it, because nothing has reached that state: the
+hold on a stock, locked donut went to the bootrom every try, and whether a
+stock LK offers fastboot at all is unproven. It is written down here rather
+than guessed at, and the first reading of a stock donut in fastboot is what
+would settle the branch.
+
+The privileged call is the other. `sudo -v` caches for five minutes by
+default, and the trigger comes after the button hold and whatever a run still
+has to download, which can be longer. So `authorized` is called again once the
+bootrom has answered, which is silent inside the window and, past it, prompts
+between steps rather than over a spinner or mid-hold. And `endpoints` now
+turns the `USBError` that libusb raises for a device it may see but not open
+into a refusal naming the udev rules: on Linux nothing elevates, so that is
+the ordinary way a missing rule shows, and it used to reach the user as a
+traceback.
+
+**A donut is asked for its bootrom, not for fastboot.** The two prompts that
+guide an unlock named `fastboot_mode` and offered a green ring to wait for,
+which is biscuit's route: there a stock Echo's unlock starts in its own
+fastboot. A kamakiri unlock starts in the bootrom and never visits fastboot,
+so both prompts now read `short_gesture` for any device in `KAMAKIRI_UNLOCKS`,
+and the line they wait on names the bootrom and says to keep holding. The
+colour is left out because no reading on a donut says what its ring does
+there.
+
+Whether a stock donut can reach fastboot by the button at all is unproven. On
+2026-11-04, from a donut genuinely restored to stock and locked, repeated
+holds reached the bootrom and gave no green ring and no fastboot. The reading
+above, where the same gesture landed in fastboot on some tries, was taken
+before that restore, on an Echo carrying kaeru, so it says nothing about a
+stock LK. `fastboot_mode` still describes the hold, because `firebreak
+fastboot` on a stock-booted donut has no other way to offer: without root
+there is no adb that can write `misc`.
+
+libusb itself is never bundled: it is a native library, so a run without it
+fails on pyusb's own `NoBackendError`, which `firebreak/mediatek/libusb.py`
+turns into a message naming `brew install libusb`.

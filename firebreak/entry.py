@@ -13,13 +13,19 @@ from firebreak.bootrom_step import (
     payload_device,
     unwritten,
 )
-from firebreak.devices import BOOTROM_UNLOCKS, FASTBRICKS, FIREOS5_CHAINS
+from firebreak.devices import (
+    BOOTROM_UNLOCKS,
+    DEFAULTS,
+    FASTBRICKS,
+    FIREOS5_CHAINS,
+    KAMAKIRI_UNLOCKS,
+)
 from firebreak.host import run
 from firebreak.identify import POLL, identify
 from firebreak.probe import state
 from firebreak.route import TWRPS
-from firebreak.states import State
-from firebreak.twrp import clear_boot0, reboot
+from firebreak.states import State, shown
+from firebreak.twrp import ask_fastboot, clear_boot0, reboot
 from firebreak.ui import (
     MINUTE,
     PROGRESS,
@@ -56,6 +62,11 @@ FASTBOOTS = frozenset({
     State.STOCK_FASTBOOT,
     State.STOCK_FIREOS5_FASTBOOT,
 })
+HARDWARE_CODES = {
+    unlock.device.hardware_code: unlock.device
+    for unlock in KAMAKIRI_UNLOCKS.values()
+    if unlock.device.hardware_code is not None
+}
 LOCKED_FASTBOOTS = frozenset({State.STOCK_FASTBOOT, State.STOCK_FIREOS5_FASTBOOT})
 NAMELESS = frozenset({State.BOOTROM, State.NONE, State.PRELOADER})
 RECOVERY_WAIT = 90
@@ -90,6 +101,19 @@ WAYS_OUT = {
 }
 
 
+class NotAmonetError(FatalError):
+    def __init__(self, *, device: Device) -> None:
+        self.device = device
+        target = DEFAULTS.get(device)
+        way = (
+            f" `firebreak unlock {target}` is the way into this one." if target else ""
+        )
+        super().__init__(
+            message=f"this is an {device.title}, which amonet does not unlock,"
+            f" so its bootrom was left alone.{way}"
+        )
+
+
 def already_held() -> bool:
     live = answering()
     if live is None:
@@ -119,7 +143,7 @@ def awaited() -> State:
             say(text=awaiting())
         if time.monotonic() - since > STUCK:
             raise FatalError(
-                message=f"the {known()} has read as {current.value} for"
+                message=f"the {known()} has read as {shown(current=current)} for"
                 f" {STUCK // 60} minutes, so this run stops."
                 + WAYS_OUT.get(current, "")
             )
@@ -145,7 +169,12 @@ def bootrom_device() -> Device | None:
     SESSION.read_flash = True
     live = answering()
     if live is None:
-        live = reached(erase=None)
+        try:
+            live = reached(erase=None)
+        except NotAmonetError as error:
+            PROGRESS.end()
+            SESSION.device = error.device
+            return error.device
     PROGRESS.end()
     device = payload_device(live=live)
     with contextlib.suppress(OSError):
@@ -163,6 +192,8 @@ def bootrom_entry(*, force: bool) -> None:
             return
         parked(live=reached(erase=None))
         return
+    if SESSION.device is not None:
+        chainable()
     if current in TO_TWRP:
         current = walk(
             acts=dict.fromkeys(TO_TWRP, to_twrp),
@@ -198,9 +229,10 @@ def bootrom_entry(*, force: bool) -> None:
         )
     else:
         raise FatalError(
-            message=f"the {known()} reads as {current.value}, which nothing"
-            f" here can reach a {BOOTROM} from. Start its fastboot or its TWRP"
-            f" first, with `firebreak {FASTBOOT}` or `firebreak {TWRP}`, or"
+            message=f"the {known()} reads as {shown(current=current)},"
+            f" which nothing here can reach a {BOOTROM} from. Start its"
+            f" fastboot or its TWRP first, with `firebreak {FASTBOOT}` or"
+            f" `firebreak {TWRP}`, or"
             f" short its test point with `firebreak {SHORT}`."
         )
 
@@ -311,6 +343,11 @@ def reached(*, erase: Callable[[], str] | None) -> Client:
         return live
     if client is None:
         raise FatalError(message=f"the {known()} did not reach its bootrom.")
+    named = HARDWARE_CODES.get(SESSION.hardware_code)
+    if named is not None:
+        with contextlib.suppress(OSError):
+            client.port.close()
+        raise NotAmonetError(device=named)
     if not SESSION.short:
         PROGRESS.begin(estimate="15 s", label="starting amonet's payload")
     return exploit(client=client, payload=payload)
@@ -327,7 +364,7 @@ def registered(*, holding: dict[Device, object], what: str) -> Device:
 
 
 def restarted() -> None:
-    PROGRESS.begin(estimate="40 s", label="restarting into the recovery it holds")
+    PROGRESS.begin(estimate="40 s", label="restarting into TWRP")
     if restart_refusals():
         PROGRESS.end(skipped=True)
         raise FatalError(
@@ -370,7 +407,12 @@ def short_entry() -> None:
 
 
 def to_fastboot() -> None:
-    reboot(into="bootloader", label="restarting into fastboot")
+    command = known_device().fastboot_command
+    if not command:
+        reboot(into="bootloader", label="restarting into fastboot")
+        return
+    ask_fastboot(command=command)
+    reboot(into="", label="restarting into fastboot")
 
 
 def to_twrp() -> None:
@@ -444,13 +486,14 @@ def walk(
             noticed()
         if current in goal:
             PROGRESS.end()
-            passed(message=f"The {known()} is in {current.value}.")
+            passed(message=f"The {known()} is in {shown(current=current)}.")
             return current
         act = acts.get(current)
         if act is None and current not in WAITS:
             raise FatalError(
-                message=f"the {known()} reads as {current.value}, which nothing"
-                f" here can reach a {what} from." + WAYS_OUT.get(current, "")
+                message=f"the {known()} reads as {shown(current=current)},"
+                f" which nothing here can reach a {what} from."
+                + WAYS_OUT.get(current, "")
             )
         if current == State.NONE and SESSION.boot0_erased:
             raise FatalError(
@@ -473,7 +516,7 @@ def walk(
             since = time.monotonic()
         elif current not in patient and time.monotonic() - since > STUCK:
             raise FatalError(
-                message=f"the {known()} has read as {current.value} for"
+                message=f"the {known()} has read as {shown(current=current)} for"
                 f" {STUCK // 60} minutes, so this run stops."
                 + WAYS_OUT.get(current, "")
             )

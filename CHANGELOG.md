@@ -4,6 +4,32 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+### Added
+
+- A run names an Echo Dot (3rd Generation) rather than calling it an unknown
+  device, and `report` prints it. donut declares the unlock kamakiri-donut
+  v1.0.0 and a `fireos6` target, whose route runs the unlock through a step of
+  its own and carries on from the TWRP it leaves. A donut in fastboot is named
+  by its `product`, and one in its bootrom by the hardware code that bootrom
+  reports, read inside the single handshake a bootrom gives per power-on. So
+  `firebreak unlock fireos6` resolves a donut without being told which Echo it
+  is. The whole route has run on a donut, on 2026-11-03 from a once-unlocked
+  Echo and on 2026-11-04 from one genuinely stock and locked, both of them to
+  rooted Fire OS 6 8349 in 12 steps, and with `--factory-reset` in 14 steps
+  and 7m 14s. It is the first unlock that
+  is not amonet's, and the first whose entry a serial port cannot carry: a USB
+  control transfer sets its payload running. So `pyusb` is pinned as a third
+  dependency.
+- `firebreak fastboot` reaches an Echo whose Android does not take `adb reboot
+  bootloader`. Such a device names the bootloader command that does reach its
+  fastboot, and a run writes that command into `misc` and reboots. Measured on
+  a donut, where the old way rebooted in a loop and left `misc` untouched: the
+  Echo now comes up in fastboot in eleven seconds, and the command clears
+  itself, so nothing is left to undo.
+- libusb is never bundled, because it is a native library rather than a wheel.
+  A run that needs it and has not got it says so and names `brew install
+  libusb`, in place of pyusb's own `No backend available`.
+
 ### Changed
 
 - No error message calls an unlock a payload any more, which is this project's
@@ -47,6 +73,44 @@ This project adheres to [Semantic Versioning](https://semver.org).
   (3rd Generation) OTA names `tee1` and `tee2` and writes the same image to
   both. A build's CSV gains a row for each partition, and the TEE the survey
   reports is the first of them, with a warning where they differ.
+- An unlock that needs a password asks for it before it asks for the button,
+  not while the button is being held. The prompt had arrived mid-hold, so
+  letting go to type it started the Fire OS and the gesture had to be done
+  again. It also says why it asks, and names the Echo it has identified, in
+  place of a bare `Password:` with nothing before it.
+- `firebreak bootrom` refuses a device it has no bootrom chain for before it
+  restarts the Echo, not after. On an Echo Dot (3rd Generation) it rebooted
+  into TWRP first and then refused, though the device was named before it
+  started.
+- A bootrom libusb can see but not open is refused with a message naming the
+  udev rules that give a user access to it, in place of a traceback. On Linux
+  no run elevates, so a missing rule showed that way.
+- A bootrom reaches its unlock on Linux, where the kernel's `cdc_acm` driver
+  held the interface libusb needs and the run stopped with `[Errno 16]
+  Resource busy`. A run detaches that driver first, and says so where it
+  cannot.
+- The exploit's trigger says what it answered where the payload does not come
+  up, in place of swallowing it, and names what a Linux kernel does with that
+  transfer: usbfs refuses a class request naming an interface it has no record
+  of, and being out of bounds is the exploit. So firebreak unlocks an Echo Dot
+  (3rd Generation) from macOS only, which the README now says, while every
+  other command reaches that Echo on Linux. kamakiri's own kit overflows a
+  `SET_LINE_CODING` to a real interface instead, which a kernel sends, and its
+  exploit has now run on Linux against the same Echo, so the limit is the
+  attack this carries rather than the Echo.
+- The password for the privileged call is asked for again once the bootrom has
+  answered, because sudo's own timestamp can expire during the button hold and
+  the download, which put the prompt back where it was.
+- A message that names the state an Echo is in says `stock fastboot`,
+  `unlocked fastboot` or `TWRP`, where it printed the state's own name and
+  called every unlocked bootloader amonet's whatever had written it. A run
+  says which state it found only when the Echo was already there rather than
+  mid-run, and a guided unlock is shorter by two lines that repeated the
+  gesture beside them.
+- An Echo Dot (3rd Generation) is asked for its bootrom, with its own gesture,
+  where the unlock prompts asked for fastboot mode and offered a green ring to
+  wait for. That unlock starts in the bootrom and never visits fastboot, and
+  the hold has to last until the run says the bootrom answered.
 
 ## 0.11.0 - 2026-11-01
 

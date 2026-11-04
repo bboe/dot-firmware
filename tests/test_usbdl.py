@@ -6,7 +6,16 @@ import sys
 import types
 
 import pytest
-from conftest import FakePort, reply_read, reply_write, sent_read, sent_write, shook
+from conftest import (
+    FakePort,
+    reply_payload,
+    reply_read,
+    reply_write,
+    sent_payload,
+    sent_read,
+    sent_write,
+    shook,
+)
 
 from firebreak.mediatek import usbdl
 from firebreak.sizes import padded
@@ -17,13 +26,16 @@ MEASURED = {
     "CACHE_DISABLE_SUBCOMMAND": 0xB1,
     "HANDSHAKE": ((0xA0, 0x5F), (0x0A, 0xF5), (0x50, 0xAF), (0x05, 0xFA)),
     "HANDSHAKE_TIMEOUT": 10,
+    "HARDWARE_CODE_SIZE": 4,
     "JUMP_REGISTER": 0x1028A8,
     "MEDIATEK_VENDOR_ID": 0x0E8D,
     "MESSAGE_LIMIT": 64,
     "PAYLOAD_LOAD_ADDRESS": 0x201000,
+    "PAYLOAD_STATUS": b"\x00\x00",
     "PORT_POLL_INTERVAL": 0.25,
     "READ_STATUS": b"\x00\x00",
     "READ_TIMEOUT": 5,
+    "STATUS_LIMIT": 0xFF,
     "WATCHDOG_DISABLE_ADDRESS": 0x10007000,
     "WATCHDOG_DISABLE_VALUE": 0x22000000,
     "WORD_MASK": 0xFFFFFFFF,
@@ -35,6 +47,8 @@ MEASURED_ENUMS = {
         ("EXTENDED", 0xC8),
         ("READ_WORDS", 0xD1),
         ("WRITE_WORDS", 0xD4),
+        ("SEND_PAYLOAD", 0xE0),
+        ("HARDWARE_CODE", 0xFD),
     ],
     "ProductId": [("BOOTROM", 0x0003), ("PRELOADER", 0x2000)],
 }
@@ -147,6 +161,27 @@ def test_handshake_walks_the_four_steps() -> None:
     assert port.replies == bytearray()
 
 
+def test_hardware_code_keeps_the_code_and_checks_the_status() -> None:
+    bootrom, port = shook(
+        replies=bytes([usbdl.BootromCommand.HARDWARE_CODE])
+        + struct.pack(">HH", 0x8167, 0x0000)
+    )
+    assert bootrom.hardware_code() == 0x8167
+    assert bytes(port.written) == bytes([usbdl.BootromCommand.HARDWARE_CODE])
+    assert port.replies == bytearray()
+
+
+def test_hardware_code_refuses_a_status_the_bootrom_sets() -> None:
+    bootrom, _ = shook(
+        replies=bytes([usbdl.BootromCommand.HARDWARE_CODE])
+        + struct.pack(">HH", 0x8167, 0xCA00)
+    )
+    with pytest.raises(
+        expected_exception=usbdl.ProtocolMismatchError, match="hardware code status"
+    ):
+        bootrom.hardware_code()
+
+
 def test_mediatek_ports_keeps_only_mediatek(*, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_serial(
         monkeypatch=monkeypatch,
@@ -228,6 +263,26 @@ def test_read_words() -> None:
     assert bytes(port.written) == sent_read(address=0x1234, count=2)
 
 
+def test_read_words_keeps_the_data_behind_a_status_the_bootrom_objects_with() -> None:
+    objected = b"\x00\x03"
+    bootrom, port = shook(
+        replies=sent_read(address=0x10007014, count=2)
+        + objected
+        + struct.pack(">2I", 7, 8)
+        + objected
+    )
+    assert bootrom.read_words(address=0x10007014, count=2, strict=False) == (7, 8)
+    assert port.replies == bytearray()
+
+
+def test_read_words_refuses_a_status_past_the_limit_even_when_tolerant() -> None:
+    bootrom, _ = shook(replies=sent_read(address=0x10007014, count=1) + b"\x01\x00")
+    with pytest.raises(
+        expected_exception=usbdl.ProtocolMismatchError, match="0x0100 is past 0xff"
+    ):
+        bootrom.read_words(address=0x10007014, count=1, strict=False)
+
+
 def test_read_words_refuses_a_wrong_status() -> None:
     bootrom, _ = shook(
         replies=bytes([usbdl.BootromCommand.READ_WORDS])
@@ -265,6 +320,19 @@ def test_send_extended_discards_three_bytes() -> None:
         usbdl.BootromCommand.EXTENDED,
         usbdl.CACHE_DISABLE_SUBCOMMAND,
     ])
+    assert port.replies == bytearray()
+
+
+def test_send_payload_refuses_a_payload_the_bootrom_has_no_room_for() -> None:
+    bootrom, _ = shook(replies=reply_payload(length=3, room=b"\x00\x01"))
+    with pytest.raises(expected_exception=usbdl.PayloadTooLargeError, match="no room"):
+        bootrom.send_payload(payload=b"big")
+
+
+def test_send_payload_uploads_it_after_the_room_status() -> None:
+    bootrom, port = shook(replies=reply_payload(length=8))
+    bootrom.send_payload(payload=b"stage1!!")
+    assert bytes(port.written) == sent_payload(payload=b"stage1!!")
     assert port.replies == bytearray()
 
 

@@ -35,6 +35,7 @@ DEFAULT_TARGET = None
 FASTBRICK = None
 FIREOS5_BUILDS: frozenset[str] = frozenset()
 FIREOS5_CHAIN = None
+KAMAKIRI_UNLOCK = None
 LK_VALUES: frozenset[str] = frozenset()
 SOURCE = Download(
     browser=True,

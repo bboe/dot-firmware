@@ -64,6 +64,9 @@ class Payload(Connection):
     def reboot(self) -> None:
         self._send(command=Command.REBOOT)
 
+    def send_command(self, *, command: int) -> None:
+        self._send(command=command)
+
     def switch_partition(self, *, partition: int) -> None:
         self._send(arguments=(partition,), command=Command.SWITCH_PARTITION)
 

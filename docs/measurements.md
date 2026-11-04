@@ -128,6 +128,48 @@ Odds and ends:
   another Dot from Windows, with `/system` in slices, took 4 min 51 s,
   8 min 17 s, 5 min 14 s and 8 min 16 s.
 
+## What libusb can do on macOS
+
+Measured on 2026-11-02, on a Dot held in its bootrom by amonet's payload, to
+find out what an Echo Dot (3rd Generation) unlock would need of a host. That
+unlock loads its payload through USB control transfers, so it cannot go through
+pyserial; see [unlocking.md](unlocking.md#an-echo-that-shows-no-light).
+
+- The bootrom offers two interfaces: 0 of class `0x02` subclass `0x02`, and 1
+  of class `0x0a`, whose bulk endpoints are `0x81` in and `0x01` out with
+  64-byte packets. It carries no USB strings, which agrees with the reading
+  below.
+- Unprivileged, macOS answers `EACCES` to every question about its own driver
+  on both interfaces, yet the data interface still carries the whole payload
+  protocol: the payload answered its read-memory command, the switch to the
+  user area took, block 0 of that area ended `55 aa`, and the table read back
+  all 16 partitions in order. So the OS driver holds interface 0 alone. The
+  root run said so by name: it detached interface 0 and found no driver on
+  interface 1.
+- Endpoint 0 is the exception. A plain `SET_LINE_CODING` is refused with
+  `EACCES` unprivileged, and takes its 7 bytes under root, where the
+  configuration descriptor reads back `09 02 43 00 02 01 00 80 00`. So that
+  unlock needs **root on macOS**, where nothing else about this transport
+  does.
+- The transport is not what limits a run. 1 MiB off `lk_a` took 2.03 s through
+  libusb and 2.02 s through pyserial, 0.49 MiB/s either way, which agrees with
+  the 0.66 MB/s amonet's own script read on a radar. The payload and the eMMC
+  set the rate.
+- pyserial worked again directly after the unprivileged run, with no reset and
+  no power cycle. The root run is not so tidy: detaching interface 0 removes
+  the `/dev/cu.usbmodem` node, and pyserial cannot see the bootrom again until
+  something attaches it back or the Echo is power cycled. Anything that uses
+  both must give the interface back.
+- **A privileged detach does not hand endpoint 0 to an unprivileged process.
+  It takes away what that process had.** With the driver on interface 0, an
+  unprivileged libusb lists the Echo and drives the free interface. With the
+  driver detached by root, the same process lists **no devices at all**, while
+  `ioreg` still shows the device registered and active. So one privileged
+  command per plug is not a way to keep a run unprivileged: either the step
+  holds the device open as root throughout, as the run above did, or it cannot
+  reach endpoint 0. What is left for a tool that may not ask for root is an
+  unlock that needs no control transfer.
+
 ## An Echo (2nd Generation) in its bootrom
 
 Measured on one radar on 2026-10-27, from TWRP, by clearing boot0's header by
@@ -167,3 +209,112 @@ Measured again on 2026-10-30, on a rooted radar on Fire OS 6.5.5.5
   its own flash, not biscuit alone.
 - A second `bootrom` joined the hold in 2 s, and `fastboot` from that bootrom
   refused and named `unlock`, as on a Dot.
+
+## An Echo Dot (3rd Generation) in its bootrom
+
+Measured on 2026-11-02, on the first donut to reach this project, over libusb
+and over a serial port. Every reading below is from that one unit, and nothing
+was written to its flash.
+
+- It reports hardware code `0x8167`, sub code `0x8a00`, hardware version
+  `0xcb00` and software version `0x0001`. mtkclient names that code
+  `MT8167/MT8516/MT8362`, so one bootrom covers the family, and calling donut
+  an MT8516 elsewhere is not contradicted by it.
+- Its target config is `0x000000e5`: secure boot set, serial-link
+  authorization clear, and **DA authorization set**. So the `0xDA` command is
+  refused without an authorized download agent, which is what this family's
+  exploit is for rather than a fault.
+- **A word write lands over libusb and not through macOS's CDC driver.** The
+  watchdog disable at `0x10007000` returned its status over the bulk endpoints,
+  both through the kit and through this project's own code, and returned
+  nothing at all through a serial port, twice, on a port that carried the
+  handshake and every echo of that same command. So a donut needs libusb
+  whatever starts its payload. No other device here shows that difference, and
+  the mechanism is unread.
+- **amonet's GCPU route does not carry to this chip.** Driven with mtkclient's
+  published values for `0x8167`, a GCPU base of `0x1020D000`, a range check at
+  `0x102968` and a jump register at `0x1029AC`, the first GCPU write, 9 words
+  at the engine's `LENGTH`, answered `0x1d02` in place of its status, moments
+  after the watchdog write at `0x10007000` had succeeded on the same
+  connection. The bootrom's own write check covers the engine's registers on an
+  MT8167 where it does not on an MT8163, so the engine cannot be the way in.
+  That is why this family's kit exploits USB instead, and it closes the
+  question of whether a second payload client alone would have been enough.
+- The kit's pointers are mtkclient's published ones for this code: `0x100A00`
+  for the payload, `0xd2e4` for the send pointer and `0xd7ac` for the register
+  access. So its literals are right for this bootrom.
+- The kit's own run reached `cmd_da` and was refused with `0x1d1a`, after macOS
+  carried its 12-byte `SET_LINE_CODING`, 7 of line coding, a zero and a 4-byte
+  pointer, and reported all 12 delivered. So the host did not stop it, and
+  where the overflow lands is the remaining suspect. The kit is developed on
+  Linux, which its own ModemManager check shows, so the same run there is what
+  would settle it.
+
+## What a bootrom gives you before it is exploited
+
+Measured on 2026-11-03, on a donut restored to stock and on a biscuit, both in
+their bootrom over libusb, and on the donut over its CDC serial port as well.
+Nothing was written to either device's flash.
+
+- **A bootrom gives one handshake per power-on, not one per connection.** On a
+  donut, a second `0xa0` after a completed handshake drew no `0x5f` for the
+  full `HANDSHAKE_TIMEOUT`, over libusb and over the serial port, on a device
+  that was still listed and still opened without error. `usbdl`'s own message
+  already says it: *the port needs a replug*. So whatever handshakes a bootrom
+  must also be what drives it, and nothing can handshake a device to look at it
+  and then hand it on.
+- **`0xFD`'s second halfword is a status, not a version.** A donut answers
+  `81670000` and a biscuit `81630000`, so the code differs and the status is
+  `0x0000` on both. The `0x8a00` sub code recorded above comes from a different
+  command, and `hardware_code` checks the status now. mtkclient reads the reply
+  the same way.
+- **`0xFD` works over the CDC serial port on a donut**, answering the same
+  `81670000` that libusb gets, with the handshake taking 1 ms. So the serial
+  port carries the echo commands on a donut; it is the word *write* that
+  returns nothing, and only that.
+- **Before the handshake a bootrom answers `0xFD` with a single `0xfe`.** No
+  code, no echo. So nothing identifies a device before the handshake is spent.
+  A stray pre-handshake byte did not stop the handshake that followed.
+- **A donut's bootrom and a biscuit's are identical over USB.** Both report
+  `bcdDevice` `0x0100`, `bcdUSB` `0x0110`, device class `0x02`, **no string
+  descriptors at all** for manufacturer, product or serial, and the same two
+  interfaces: `0x02` with one 64-byte endpoint at `0x84`, and `0x0a` with
+  64-byte endpoints at `0x81` and `0x01`. So the descriptors cannot say which
+  Echo is in front of a run, and only the hardware code can.
+
+## A stock Echo Dot (3rd Generation) in fastboot
+
+Read on 2026-11-03 from the donut above, restored to stock, by `getvar`.
+
+- `product` is `DONUT`, so the device file's value is right and firebreak names
+  it "Echo Dot (3rd Generation), by its fastboot product DONUT".
+- `unlock_status: false`, `secure: yes`, `prod: 1`, `rpmb_state: 1`, and the
+  three antirollback versions are each `0x0001`.
+- `lk_build_desc` is `6f7225e-20230407_013816`, which donut already declares.
+  `pl_build_desc` is `9eb982d-20231103_081354`, where `survey` reads `<none>`
+  from every donut OTA: the OTAs ship no preloader, so only the device has it.
+- `max-download-size` is `0x8000000`, `kernel` is `lk`, `version-preloader` is
+  `0.1.00` and `version` is `0.5`.
+- **It answers no A/B slot variables at all.** `current-slot`, `slot-count`,
+  `has-slot:boot`, `slot-successful:a` and `slot-unbootable:a` all come back
+  empty on a device whose table has both slots. So fastboot cannot say which
+  slot is active and cannot set one, and `bcbtool` from a recovery is the only
+  way at it, which is what the kit's own guide uses.
+
+## A handshake crosses transports
+
+Measured on 2026-11-03, on the stock donut above, on one power-on.
+
+- **A handshake taken over the CDC serial port still counts over libusb.** The
+  port handshaked, answered `0xFD` with `81670000`, and was closed. libusb then
+  opened the same endpoints and `disable_watchdog` wrote `0x10007000` with no
+  second handshake, and a second write went through after it, so the stream
+  stays in step. That is what lets a donut be named over the serial port and
+  then exploited over libusb on the same power-on.
+- **Pick the first command after the switch with care.** `read_words` of one
+  word at `0x10007000` answered argument status `0x0003` rather than `0x0000`,
+  the same status the kamakiri ladder tolerates, and the failure left unread
+  bytes behind: the write after it then read `0x00` where it wanted `0xd4`'s
+  echo. So that first reading looked like the handshake had been lost when it
+  had not. The command echoes had matched, which a bootrom that has not
+  handshaked does not do, since it answers `0xfe` instead.

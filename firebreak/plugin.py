@@ -27,9 +27,13 @@ class Device:
     name: str
     product: str
     title: str
+    device_type_id: str = ""
+    fastboot_command: bytes = b""
     fastboot_mode: str = ""
+    hardware_code: int | None = None
     layouts: tuple[Layout, ...] = ()
     models: frozenset[str] = frozenset()
+    named_by_bootloader: bool = True
     short_gesture: str = ""
     twrp_models: frozenset[str] = frozenset()
 
@@ -100,6 +104,13 @@ class Layout(Protocol):
 
 
 @dataclasses.dataclass(frozen=True)
+class PayloadCommand:
+    command: int
+    label: str
+    settle: float = 0.0
+
+
+@dataclasses.dataclass(frozen=True)
 class Reboot:
     into: str | None = None
     label: str = "reboot"
@@ -167,6 +178,7 @@ Step = Union[
     ClearBoot0Header,
     FastbootFlash,
     ForceFastboot,
+    PayloadCommand,
     Reboot,
     Repartition,
     ResetBcb,
