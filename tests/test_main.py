@@ -511,7 +511,11 @@ def test_the_help_gives_each_device_s_builds_a_block_of_its_own() -> None:
     said = main.stock_builds_help()
     blocks = {
         title: body.partition("\n\n  ")[0]
-        for title in ("Echo Dot (2nd Generation)", "Echo (2nd Generation)")
+        for title in (
+            "Echo Dot (2nd Generation)",
+            "Echo Dot (3rd Generation)",
+            "Echo (2nd Generation)",
+        )
         for body in (said.partition(f"\n\n  {title}, ")[2],)
     }
     assert all(blocks.values()), blocks
@@ -519,7 +523,7 @@ def test_the_help_gives_each_device_s_builds_a_block_of_its_own() -> None:
     assert blocks["Echo (2nd Generation)"].startswith("8149 when left out:")
     assert "8349" not in blocks["Echo Dot (2nd Generation)"]
     assert "8349" in blocks["Echo (2nd Generation)"]
-    assert "Echo Dot (3rd Generation)" not in said
+    assert blocks["Echo Dot (3rd Generation)"] == "8349 when left out:\n      8349"
 
 
 def test_the_help_lists_each_device_s_targets_its_default_first() -> None:

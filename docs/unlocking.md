@@ -1433,6 +1433,13 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
 
 - A restore ends with `adb reboot bootloader`, so the next run needs no button
   held. `--end-in-fireos` starts the Fire OS instead. Only `stock` takes it.
+- A device that names a `fastboot_command` ends in the firmware whichever way
+  it was asked, because that command is its unlock's bootloader and a restore
+  has just written Amazon's over it. donut is the one: `bootonce-bootloader`
+  is in `kaeru-donut.bin` and in no stock LK, which holds `boot-recovery`
+  alone, and its Android writes no bootloader control block either. So a
+  restored donut reaches fastboot only by the button hold its `fastboot_mode`
+  describes.
 - 5.5.0.3 cannot reach fastboot that way: its restore ends in the bootrom over
   a serial port, so no kernel is left to carry a reboot reason. The preloader's
   own USB handshake takes `FASTBOOT` and answers `TOOBTSAF`, but a stock LK
@@ -1600,6 +1607,13 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   bootrom step writes: `00 41 42 42 01 8f 00`. Slot a is then `prio 15 tries 0
   success 1`, and slot b is unused. Each slot byte packs `priority:4`,
   `tries:3` and `success:1`, low bits first.
+- A device whose unlock never writes `misc` is written none of this, and says
+  so with `unlock_keeps_misc`. donut is the one: its `misc` read back
+  byte-identical to a stock backup after the whole unlock, so there is nothing
+  to put back, and the block above is biscuit's rather than a universal one.
+  At `0x360` a donut keeps `00 41 42 42 01 8E 8F 00`, which is slot state and
+  not a command, so writing biscuit's seven bytes there would change a slot
+  rather than restore one.
 - A zeroed `misc` is not safe. Stock's first boot starts slot a with a few
   tries and `success 0`, and each boot cut short spends one. On a Dot, a
   gesture during the first boot and the power-ons after it left slot a at
@@ -2557,6 +2571,51 @@ before the write, so an Echo cannot be left looping into fastboot.
 That fastboot answers more than a stock one. `current-slot` is `b` and
 `slot-count` is `2`, where a stock donut's fastboot answers no slot variable at
 all, so the active slot can be read without a recovery and `bcbtool`.
+
+**donut's `stock` target runs the same restore every other device does, with
+two differences and one caveat.** Its OTA carries the whole set the restore
+needs, measured by `survey` on 8349: boot, system, lk, tee1, tee2 and
+preloader. That the images are the right ones is not an assumption either: the
+OTA's system image has the sha256 this Echo's own `system_b` was read with
+while stock, `e393504d…`, and its boot image the one recorded for 8349. The
+table needs no surgery, because a donut is never repartitioned: its own table
+is already the stock one, 16 partitions, and `stock_gpt` rebuilds it unchanged.
+Its TWRP answers everything the restore checks, read on 2026-11-03:
+`ro.product.device` is `donut`, `sgdisk`, `mke2fs`, `blockdev` and `md5sum`
+are all there, and `sgdisk --verify` finds no problem.
+
+The two differences are `misc`, which is left alone, and the ending, which is
+the firmware rather than fastboot. Both are above, under the stock target.
+
+**It has run three times: 15 steps in 5m 02s from TWRP on 2026-11-03, 16
+steps in 5m 26s from rooted Fire OS on 2026-11-04, and 15 steps in 5m 32s from
+TWRP on Linux the same day**, the extra step in the middle one being the reboot
+into TWRP, 19 s of it. All three ended in stock 8349. The first was read as adb
+answering `unauthorized` rather than `device`, which is a boot image without
+boot-root's adbd; the others were read as stock 24 s and 26 s after the last
+write.
+
+The Linux run is the restore's first reading off another host, and it moves
+nothing: the two system writes took 124 s and 123 s against 123 s and 124 s on
+the Mac, the same five steps skipped, and `tee1` and the preloader wrote in
+their usual second. So the restore is host-independent as far as two hosts can
+say.
+
+The same five steps came back as skips on every run, because a restore writes
+what is already there only when it differs, and this Echo's `lk_a`, `lk_b`,
+`tee2` and both copies of the table already held stock bytes: the kit writes
+this donut's own stock LK, and the unlock leaves the table alone. `tee1` is
+the one that always writes, because that is where the unlock's TEE payload
+goes. The two system images took 123 to 125 seconds each and everything else
+was seconds, so the whole restore is the two system writes and little else.
+
+Three defects turned up in that first run, none of which the tests or the
+lint could have caught, and each is worth knowing because the shape recurs:
+the route dispatched on the device rather than the target, so `stock` on a
+donut ran the unlock and rooted it again; the OTA extractor asked for a `tee`
+partition where a donut's OTA names them `tee1` and `tee2`, which `survey`
+already knew and the extractor did not; and a cached donut preloader made four
+MT8163 engine tests fail, because they glob every preloader in the cache.
 
 Three things in the plan are this project's choice rather than the kit's:
 

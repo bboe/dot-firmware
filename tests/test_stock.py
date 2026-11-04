@@ -11,7 +11,7 @@ import pytest
 
 from firebreak import stock
 from firebreak.android.gpt import Partition
-from firebreak.devices import BISCUIT, RADAR, TARGETS
+from firebreak.devices import BISCUIT, DONUT, RADAR, TARGETS
 from firebreak.survey import PROPERTIES
 from firebreak.ui import FatalError
 
@@ -144,6 +144,21 @@ def test_a_bootrom_build_writes_its_preloader_through_the_bootrom(
     assert stock.SESSION.boot0_erased is True
 
 
+def test_a_device_whose_unlock_keeps_misc_is_written_no_misc_image(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        name="target", target=stock.ARGUMENTS, value=TARGETS[DONUT]["stock"]
+    )
+    assert "misc" not in [step.partition for step in stock.writes()]
+    assert stock.stock_steps() == stock.STOCK_STEPS - 1
+
+
+def test_a_device_whose_unlock_writes_misc_gets_the_stock_block_back() -> None:
+    assert "misc" in [step.partition for step in stock.writes()]
+    assert stock.stock_steps() == stock.STOCK_STEPS
+
+
 def test_a_fire_os_5_restore_reboots_without_waiting(
     *, monkeypatch: pytest.MonkeyPatch, restored: FakeAdb, tmp_path: pathlib.Path
 ) -> None:
@@ -174,6 +189,26 @@ def test_a_restore_can_leave_the_dot_in_fastboot(
     )
     assert "restarting into fastboot" in stock.PROGRESS.line
     assert restored.asked[-1][-2:] == ["reboot", "bootloader"]
+
+
+def test_a_restore_ends_in_the_firmware_where_no_stock_bootloader_takes_the_ask(
+    *, monkeypatch: pytest.MonkeyPatch, restored: FakeAdb, tmp_path: pathlib.Path
+) -> None:
+    wrote(monkeypatch=monkeypatch)
+    monkeypatch.setattr(name="fastboot", target=stock.SESSION, value=True)
+    monkeypatch.setattr(
+        name="target", target=stock.ARGUMENTS, value=TARGETS[DONUT]["stock"]
+    )
+    stock.restore(
+        backup_sector=9999,
+        build="8349",
+        files=written(tmp_path=tmp_path),
+        parts=PARTITIONS,
+        work=tmp_path,
+    )
+    assert "waiting for stock 8349" in stock.PROGRESS.line
+    assert restored.asked[-1][-1] == "reboot"
+    assert stock.ends_in_fastboot() is False
 
 
 @pytest.mark.parametrize(

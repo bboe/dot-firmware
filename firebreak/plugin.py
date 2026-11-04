@@ -36,6 +36,7 @@ class Device:
     named_by_bootloader: bool = True
     short_gesture: str = ""
     twrp_models: frozenset[str] = frozenset()
+    unlock_keeps_misc: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

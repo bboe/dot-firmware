@@ -47,7 +47,7 @@ from firebreak.mediatek.libusb import ELEVATES
 from firebreak.plugin import FireOs5, FireOs6
 from firebreak.probe import state
 from firebreak.states import State, shown
-from firebreak.stock import STOCK_STEPS, stage_restore
+from firebreak.stock import ends_in_fastboot, stage_restore, stock_steps
 from firebreak.twrp import reboot
 from firebreak.ui import (
     ARGUMENTS,
@@ -267,7 +267,7 @@ def in_browser(*, need: Need) -> bool:
 
 def kamakiri_stages() -> dict[State, Stage]:
     unlock = KAMAKIRI_UNLOCKS[ARGUMENTS.target.device]
-    return {
+    table = {
         State.BOOTROM: Stage(
             needs=(unlock.source,),
             run=stage_kamakiri,
@@ -280,17 +280,25 @@ def kamakiri_stages() -> dict[State, Stage]:
             steps=1,
             then=State.AMONET_TWRP,
         ),
-        State.AMONET_TWRP: Stage(
-            needs=(unlock.source, ota_build, BOOT_ROOT),
-            run=stage_install_kamakiri,
-            steps=5 if ARGUMENTS.factory_reset else None,
-            then=State.AMONET_BOOTED,
-        ),
-    } | {
-        state: stage
-        for state, stage in reboot_stages().items()
-        if state in KAMAKIRI_REBOOTS
     }
+    if ARGUMENTS.target.unlock is None:
+        return table | restore_stages()
+    return (
+        table
+        | {
+            State.AMONET_TWRP: Stage(
+                needs=(unlock.source, ota_build, BOOT_ROOT),
+                run=stage_install_kamakiri,
+                steps=5 if ARGUMENTS.factory_reset else None,
+                then=State.AMONET_BOOTED,
+            )
+        }
+        | {
+            state: stage
+            for state, stage in reboot_stages().items()
+            if state in KAMAKIRI_REBOOTS
+        }
+    )
 
 
 def keeps_restarting() -> str:
@@ -397,7 +405,7 @@ def restore_stages() -> dict[State, Stage]:
             ),
             passes=TWRPS,
             run=stage_restore,
-            steps=STOCK_STEPS + 2 if bootrom else STOCK_STEPS,
+            steps=stock_steps() + 2 if bootrom else stock_steps(),
             then=State.STOCK_BOOTED,
         )
         for twrp in TWRPS
@@ -596,7 +604,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                         " with no button held. Power it off and it starts stock"
                         f" {ARGUMENTS.build} instead."
                     )
-                elif SESSION.fastboot:
+                elif ends_in_fastboot():
                     passed(
                         message=f"Stock {ARGUMENTS.build} is written, and the"
                         f" {title()} waits in fastboot."

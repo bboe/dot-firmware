@@ -40,7 +40,6 @@ PL_UPDATE = b"[ANTI-ROLLBACK] Updating PL version"
 PROPERTIES = "META-INF/com/amazon/android/target.build.prop"
 STRING = re.compile(rb"[\x20-\x7e]{6,}")
 TEE_HEADER = b"EET KTM"
-TEE_NAMES = ("tee", "tee1", "tee2")
 TEE_VERSION = slice(0xF, 0x11)
 WIDE_PREFIXES = frozenset({0b11101, 0b11110, 0b11111})
 
@@ -305,7 +304,7 @@ def survey_all(*, paths: list[pathlib.Path]) -> None:
 
 
 def tee_names(*, names: frozenset[str]) -> tuple[str, ...]:
-    return tuple(name for name in TEE_NAMES if name in names) or ("tee",)
+    return tuple(name for name in ota.TEE_NAMES if name in names) or ("tee",)
 
 
 def tee_version(*, data: bytes) -> int | None:

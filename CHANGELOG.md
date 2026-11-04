@@ -20,6 +20,15 @@ This project adheres to [Semantic Versioning](https://semver.org).
   is not amonet's, and the first whose entry a serial port cannot carry: a USB
   control transfer sets its payload running. So `pyusb` is pinned as a third
   dependency.
+- `firebreak stock` takes an Echo Dot (3rd Generation) back to Amazon's Fire
+  OS 6 8349 and locks it again. Its OTA carries every image the restore needs,
+  and the one it reads off the Echo matches the stock partition byte for byte.
+  A device whose unlock leaves `misc` alone is written no `misc` image, since
+  the block written otherwise is amonet's and that offset holds slot state on
+  a donut. The restore ends in the firmware rather than fastboot, because the
+  command that reaches a donut's fastboot belongs to the bootloader the
+  restore has just written over. Measured twice: 15 steps in 5m 02s from TWRP,
+  and 16 in 5m 26s from rooted Fire OS, both to stock 8349.
 - `firebreak fastboot` reaches an Echo whose Android does not take `adb reboot
   bootloader`. Such a device names the bootloader command that does reach its
   fastboot, and a run writes that command into `misc` and reboots. Measured on
@@ -73,6 +82,14 @@ This project adheres to [Semantic Versioning](https://semver.org).
   (3rd Generation) OTA names `tee1` and `tee2` and writes the same image to
   both. A build's CSV gains a row for each partition, and the TEE the survey
   reports is the first of them, with a warning where they differ.
+- A restore takes its TEE image from such an OTA too, where only `survey`
+  could read those names and the restore stopped on the same message.
+- A route for a device unlocked with kamakiri is chosen by the target rather
+  than the device, so `firebreak stock` on an Echo Dot (3rd Generation)
+  restores it instead of unlocking and rooting it again.
+- The tests that read the GCPU routines out of a cached preloader skip the
+  ones belonging to a device with another engine, where a cached Echo Dot
+  (3rd Generation) preloader failed four of them.
 - An unlock that needs a password asks for it before it asks for the button,
   not while the button is being held. The prompt had arrived mid-hold, so
   letting go to type it started the Fire OS and the gesture had to be done

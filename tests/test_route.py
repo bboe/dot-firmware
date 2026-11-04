@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from firebreak import route, twrp, unlock
+from firebreak import route, stock, twrp, unlock
 from firebreak.devices import BISCUIT, DONUT, RADAR, TARGETS, biscuit, radar
 from firebreak.devices.biscuit import BUILDS
 from firebreak.plugin import ClearBoot0Header
@@ -147,7 +147,7 @@ def test_a_background_failure_is_left_for_the_run_to_meet(
 
 @pytest.mark.parametrize(
     ("build", "extra", "steps"),
-    [("5.5.0.3", 1, route.STOCK_STEPS + 2), ("5.5.3.1", 0, route.STOCK_STEPS)],
+    [("5.5.0.3", 1, stock.STOCK_STEPS + 2), ("5.5.3.1", 0, stock.STOCK_STEPS)],
 )
 def test_a_bootrom_build_restores_with_the_bootrom_s_downloads_and_steps(
     *, build: str, extra: int, monkeypatch: pytest.MonkeyPatch, steps: int
@@ -177,7 +177,7 @@ def test_a_bootrom_restore_counts_the_same_whichever_way_it_ends(
     )
     monkeypatch.setattr(name="fastboot", target=route.SESSION, value=fastboot)
     table = route.restore_stages()
-    assert {table[state].steps for state in route.TWRPS} == {route.STOCK_STEPS + 2}
+    assert {table[state].steps for state in route.TWRPS} == {stock.STOCK_STEPS + 2}
 
 
 def test_a_bootrom_step_that_finds_a_preloader_is_not_counted(
@@ -452,6 +452,22 @@ def test_a_fire_os_6_prefetch_downloads_its_build(
         needs=route.needed(start=route.State.AMONET_TWRP, table=route.stages())
     )
     assert got == [downloaded]
+
+
+@pytest.mark.parametrize(
+    ("name", "run"),
+    [("stock", "stage_restore"), ("fireos6", "stage_install_kamakiri")],
+)
+def test_a_kamakiri_route_runs_the_stage_its_target_asks_for_from_twrp(
+    *, monkeypatch: pytest.MonkeyPatch, name: str, run: str
+) -> None:
+    monkeypatch.setattr(
+        name="target", target=route.ARGUMENTS, value=TARGETS[DONUT][name]
+    )
+    monkeypatch.setattr(name="build", target=route.ARGUMENTS, value="8349")
+    table = route.stages()
+    assert table[route.State.AMONET_TWRP].run.__name__ == run
+    assert table[route.State.BOOTROM].run.__name__ == "stage_kamakiri"
 
 
 def test_a_preloader_is_waited_through_and_keeps_the_markers(

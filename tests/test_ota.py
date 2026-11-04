@@ -301,6 +301,20 @@ def test_extract_reads_another_block_size_and_skips_other_partitions(
     assert not (tmp_path / "vendor.img").exists()
 
 
+def test_extract_takes_the_tee_from_an_ota_that_names_it_tee1_and_tee2(
+    *, capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path
+) -> None:
+    images = {key: value for key, value in IMAGES.items() if key != "tee"}
+    for name in ("tee1", "tee2"):
+        images[name] = image(name="tee", size=3000)
+    kinds = {**KINDS, "tee1": KINDS["tee"], "tee2": KINDS["tee"]}
+    body = payload(images=images, kinds=kinds)
+    update = write_ota(members={"payload.bin": body}, path=tmp_path / "ota.zip")
+    ota.extract(update=update, work=tmp_path)
+    assert (tmp_path / "tee.img").read_bytes() == IMAGES["tee"]
+    assert "tee1 matches the manifest" in capsys.readouterr().out
+
+
 def test_fields() -> None:
     message = (
         number(field=1, value=300)

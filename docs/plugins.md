@@ -36,6 +36,11 @@ A device also gives its product, the name its LKs and its fastboot report:
 `BISCUIT`, `RADAR` and `CROWN`. It is not always the codename in capitals:
 amonet-crown v1.1.1's LK names `CHECKERS`.
 
+A device whose unlock leaves `misc` as Amazon wrote it says so with
+`unlock_keeps_misc`, and a restore writes it no `misc` image: there is nothing
+to put back, and the block the restore writes otherwise is amonet's rather
+than every device's.
+
 A device whose Android does not take `adb reboot bootloader` names the
 bootloader command that reaches its fastboot instead, `fastboot_command`, which
 `firebreak fastboot` writes over the first 32 bytes of `misc` before a plain

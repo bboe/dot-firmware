@@ -6,6 +6,7 @@ import struct
 import pytest
 
 from firebreak.cache import CACHE
+from firebreak.devices import KAMAKIRI_UNLOCKS
 from firebreak.mediatek.gcpu import BASE, Register
 
 ACQUIRE_LITERALS = (BASE + Register.CONTROL + 4, BASE)
@@ -32,9 +33,13 @@ ENGINE_ROUTINE = bytes.fromhex(
     "fcd50323002013607047"
 )
 ENGINE_WINDOW = 0x1000
-PRELOADERS = sorted(CACHE.glob("*/preloader.img")) + sorted(
-    CACHE.glob("*/amonet/bin/preloader.img")
-)
+OTHER_ENGINES = tuple(f"stock-{device.name}-" for device in KAMAKIRI_UNLOCKS)
+PRELOADERS = [
+    path
+    for path in sorted(CACHE.glob("*/preloader.img"))
+    + sorted(CACHE.glob("*/amonet/bin/preloader.img"))
+    if not path.relative_to(CACHE).parts[0].startswith(OTHER_ENGINES)
+]
 SLOT_ROUTINE = bytes.fromhex("8000002300f18152194602f58632d1500433102bfbd17047")
 
 

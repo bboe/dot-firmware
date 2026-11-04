@@ -25,6 +25,7 @@ BLOCK_IMAGES = {
 IMAGES = ("preloader", "lk", "tee", "boot", "system")
 LABEL_WIDTH = max(map(len, IMAGES))
 PAYLOAD_VERSION = 2
+TEE_NAMES = ("tee", "tee1", "tee2")
 TRANSFER_FIELDS = 2
 VARINT_MORE = 0x80
 
@@ -173,23 +174,24 @@ def extract_payload(
     with archive.open(name="payload.bin") as payload:
         manifest = read_manifest(payload=payload)
         for name in wanted:
-            if name not in manifest.partitions:
+            held = named_partition(names=frozenset(manifest.partitions), wanted=name)
+            if held is None:
                 raise FatalError(message=f"the OTA has no {name} image")
-            partition = manifest.partitions[name]
+            partition = manifest.partitions[held]
             want = blob(value=partition.info[InfoField.HASH]).hex()
             path = work / (name + ".img")
             if not path.is_file() or digest(kind="sha256", path=path) != want:
                 path.write_bytes(
                     data=image_bytes(
                         manifest=manifest,
-                        name=name,
+                        name=held,
                         partition=partition,
                         payload=payload,
                     )
                 )
                 if digest(kind="sha256", path=path) != want:
-                    raise FatalError(message=name + " does not match the manifest")
-            passed(message=f"{name:>{LABEL_WIDTH}} matches the manifest")
+                    raise FatalError(message=held + " does not match the manifest")
+            passed(message=f"{held:>{LABEL_WIDTH}} matches the manifest")
 
 
 def field_values(*, message: bytes) -> dict[int, int | bytes]:
@@ -239,6 +241,14 @@ def image_bytes(
             position += length
     del image[size:]
     return image
+
+
+def named_partition(*, names: frozenset[str], wanted: str) -> str | None:
+    if wanted in names:
+        return wanted
+    if wanted not in TEE_NAMES:
+        return None
+    return next((name for name in TEE_NAMES if name in names), None)
 
 
 def number(*, value: int | bytes) -> int:

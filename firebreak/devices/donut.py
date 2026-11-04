@@ -16,7 +16,7 @@ from firebreak.plugin import (
     Write,
 )
 from firebreak.states import State
-from firebreak.targets import FIREOS6
+from firebreak.targets import FIREOS6, STOCK
 from firebreak.updates import cdn_ota
 
 if TYPE_CHECKING:
@@ -56,6 +56,7 @@ DONUT = Device(
     product="DONUT",
     short_gesture=BUTTON_GESTURE,
     title="Echo Dot (3rd Generation)",
+    unlock_keeps_misc=True,
 )
 FASTBRICK = None
 FIREOS5_BUILDS: frozenset[str] = frozenset()
@@ -109,6 +110,15 @@ KAMAKIRI_V1_0_0 = Unlock(
 )
 KAMAKIRI_UNLOCK = KAMAKIRI_V1_0_0
 TARGETS = (
+    Target(
+        device=DONUT,
+        goal=State.STOCK_BOOTED,
+        installs=FireOs6(build=None),
+        name=STOCK,
+        summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
+        " which erases the whole Echo and locks it again.",
+        unlock=None,
+    ),
     Target(
         device=DONUT,
         goal=State.AMONET_BOOTED,

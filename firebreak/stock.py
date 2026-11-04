@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
 
 CHAIN_TEE = ("tee2", "tee1")
+MISC = "misc"
 NAMED = "device-named"
 STOCK_STEPS = 16
 TWRP_VERSIONS = ("3.2.", "3.7.")
@@ -206,7 +207,7 @@ def chain_writes() -> tuple[Step, ...]:
 
 
 def check_images_fit(*, files: dict[str, pathlib.Path], table: Table) -> None:
-    for step in (*WRITES, *chain_writes()):
+    for step in (*writes(), *chain_writes()):
         if files[step.image].stat().st_size > table.partitions[step.partition].size:
             raise FatalError(
                 message=f"{files[step.image].name} does not fit {step.partition}"
@@ -272,6 +273,10 @@ def confirm(*, build: str) -> None:
     )
 
 
+def ends_in_fastboot() -> bool:
+    return SESSION.fastboot and not ARGUMENTS.target.device.fastboot_command
+
+
 def known_twrp(*, version: str) -> None:
     if not version.startswith(TWRP_VERSIONS):
         raise FatalError(
@@ -320,7 +325,7 @@ def restore(  # ruff: ignore[complex-structure]
     clear_boot0()
     PROGRESS.end()
 
-    for step in WRITES:
+    for step in writes():
         write(
             estimate=step.estimate,
             label=step.label,
@@ -404,7 +409,7 @@ def restore(  # ruff: ignore[complex-structure]
     SESSION.boot0_erased = False
     PROGRESS.end()
 
-    if SESSION.fastboot:
+    if ends_in_fastboot():
         reboot_into_fastboot()
         return
     if build in FIREOS5_BUILDS[ARGUMENTS.target.device]:
@@ -450,6 +455,10 @@ def stage_restore() -> None:
         ) from None
 
 
+def stock_steps() -> int:
+    return STOCK_STEPS - len(WRITES) + len(writes())
+
+
 def stock_table(*, work: pathlib.Path) -> Table:
     raw = read_sectors(count=TABLE_SECTORS, start=0)
     if not gpt_intact(
@@ -480,3 +489,9 @@ def wait_for_fastboot() -> None:
             )
         time.sleep(2)
     PROGRESS.end()
+
+
+def writes() -> tuple[Step, ...]:
+    if not ARGUMENTS.target.device.unlock_keeps_misc:
+        return WRITES
+    return tuple(step for step in WRITES if step.partition != MISC)
