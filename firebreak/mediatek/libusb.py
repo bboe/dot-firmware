@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import subprocess
 import sys
 import types
@@ -37,6 +38,8 @@ try:
 except usb.core.USBError:
     pass
 """
+USBDK = sys.platform == "win32"
+USE_USBDK = 1
 
 
 class NoLibusbError(UsbdlError):
@@ -133,6 +136,18 @@ def authorize() -> bool:
     )
 
 
+def backend() -> Any:  # ruff: ignore[any-type]
+    if not USBDK:
+        return None
+    from usb.backend import libusb1  # ruff: ignore[import-outside-top-level]
+
+    chosen = libusb1.get_backend()
+    if chosen is not None:
+        chosen.lib.libusb_set_option.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        chosen.lib.libusb_set_option(chosen.ctx, USE_USBDK)
+    return chosen
+
+
 def chunked(*, data: bytes, limit: int) -> Iterator[bytes]:
     step = max(limit, TRANSFER_LIMIT // limit * limit)
     for index in range(0, len(data), step):
@@ -208,13 +223,14 @@ def facing(*, core: Any, data: Any, wanted: int) -> Any:  # ruff: ignore[any-typ
 def found(*, core: Any) -> Any:  # ruff: ignore[any-type]
     try:
         device = core.core.find(
-            idProduct=ProductId.BOOTROM, idVendor=MEDIATEK_VENDOR_ID
+            backend=backend(), idProduct=ProductId.BOOTROM, idVendor=MEDIATEK_VENDOR_ID
         )
     except core.core.NoBackendError as error:
         message = (
             f"libusb is not installed, so this run cannot speak raw USB: {error}."
             " On macOS `brew install libusb` provides it, and on Linux it is the"
-            " libusb-1.0 package."
+            " libusb-1.0 package. On Windows it is libusb-1.0.dll from libusb's"
+            " release in a folder on the PATH, with UsbDk installed beside it."
         )
         raise NoLibusbError(message) from error
     if device is None:

@@ -6,6 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- An Echo Dot (3rd Generation) unlocks on Windows. Its bootrom is reached
+  through UsbDk, which takes the device from MediaTek's serial driver while
+  libusb holds it, so the bootrom keeps its COM port for naming the Echo. The
+  README's Windows section installs UsbDk and libusb. Measured on Windows 11
+  on 2026-11-05: stock 8349 to rooted 8349 in 13 steps.
 - A run names an Echo Dot (3rd Generation) rather than calling it an unknown
   device, and `report` prints it. donut declares the unlock kamakiri-donut
   v1.0.0 and a `fireos6` target, whose route runs the unlock through a step of

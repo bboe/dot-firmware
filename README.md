@@ -94,6 +94,25 @@ uvx --managed-python firebreak@latest
 Store keeps firebreak's files where adb and fastboot cannot see them, and
 firebreak stops on it.
 
+An Echo Dot (3rd Generation) also needs UsbDk and libusb, because its bootrom
+is driven over raw USB. Install UsbDk from an administrator PowerShell:
+
+```powershell
+curl.exe -fLo $env:TEMP\UsbDk.msi https://github.com/daynix/UsbDk/releases/download/v1.00-22/UsbDk_1.0.22_x64.msi
+msiexec /i $env:TEMP\UsbDk.msi /qn
+```
+
+Then put libusb on your PATH, not as administrator, and open a new
+PowerShell:
+
+```powershell
+$d = "$env:LOCALAPPDATA\Programs\libusb"
+mkdir -Force $d
+curl.exe -fLo $env:TEMP\libusb.7z https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.7z
+tar -xf $env:TEMP\libusb.7z -C $d VS2022/MS64/dll/libusb-1.0.dll
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$d\VS2022\MS64\dll", "User")
+```
+
 ## Notes
 
 - From stock, firebreak asks for the fastboot gesture.

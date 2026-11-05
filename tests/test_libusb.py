@@ -5,6 +5,7 @@ import types
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from usb.backend import libusb1
 
 from firebreak.mediatek import libusb
 
@@ -179,6 +180,43 @@ def ported(
         device,
         pair,
     )
+
+
+def test_a_backend_is_left_to_pyusb_off_windows(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(name="USBDK", target=libusb, value=False)
+    assert libusb.backend() is None
+
+
+def test_a_backend_on_windows_asks_libusb_for_usbdk(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    options: list[tuple[object, int]] = []
+
+    class SetOption:
+        def __init__(self) -> None:
+            self.argtypes: list[object] = []
+
+        def __call__(self, context: object, option: int) -> int:
+            options.append((context, option))
+            return 0
+
+    chosen = types.SimpleNamespace(
+        ctx="context", lib=types.SimpleNamespace(libusb_set_option=SetOption())
+    )
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: chosen)
+    assert libusb.backend() is chosen
+    assert options == [("context", libusb.USE_USBDK)]
+
+
+def test_a_backend_on_windows_with_no_libusb_is_none(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: None)
+    assert libusb.backend() is None
 
 
 def test_a_device_with_no_cdc_interface_is_named() -> None:

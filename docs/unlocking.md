@@ -2426,7 +2426,8 @@ unprivileged run went from the bootrom to rooted Fire OS 6 8349 in 13 steps
 and 3m 22s, with no `sudo`. The same day a Linux restore took that Echo to
 stock 8349 in 16 steps and 5m 31s, and a Linux unlock took it from genuinely
 stock and locked to rooted again in 12 steps and 3m 07s. Both unlocks asked
-for the power cycle after boot-root. Windows also takes the kit's path, and is unread.
+for the power cycle after boot-root. Windows also takes the kit's path, as
+below.
 
 **macOS detaches nothing.** The detach above was never run on macOS, and the
 first macOS unlock after it stopped at `waiting for the bootrom`:
@@ -2444,6 +2445,28 @@ that takes the kit's path asks about a kernel driver. With that change, a
 macOS unlock on 2026-11-04 took the Echo from stock 8349 to rooted 8349 in 13
 steps and 5m 44s through mtkclient's trigger. It asked for the power cycle
 after boot-root as well, and the wait for it holds most of that time.
+
+**Windows reaches the bootrom through UsbDk.** Windows libusb cannot open a
+device that a kernel driver holds, and MediaTek's `cdc-acm` holds the bootrom
+there, which is what gives it a COM port. UsbDk, a filter driver, detours the
+device from that driver for as long as libusb holds it, as the `cdc_acm`
+detach does on Linux. The kit turns it on with libusb's
+`LIBUSB_OPTION_USE_USBDK`, and mtkclient falls back to it on `Access denied`,
+so on Windows `found` asks pyusb's libusb backend for the same option.
+mtkclient's code notes that UsbDk's enumeration broke on Windows build 26200,
+and this was read on 22631 only. Through UsbDk the bootrom reports no active
+configuration, so the first request failed with `Configuration not set`; on
+Windows the open sets one and reads it again, as mtkclient does. The COM port
+stays, so a run that has not named the Echo reads the hardware code over it
+before libusb takes the device.
+
+On 2026-11-05, on Windows 11 22631 with UsbDk 1.0.22 and libusb 1.0.30, a
+donut went from stock 8349 to rooted 8349 in 13 steps. The run named it from
+its bootrom over the COM port, and the bootrom half, from the hold to kaeru's
+fastboot, took 35 s, with the TEE and the bootloader skipped as on the other
+hosts. It asked for the power cycle after boot-root too. One hold before it
+passed through the bootrom to the preloader within a second, which reads as
+the button let go too soon, and the next hold, kept for 10 seconds, stayed.
 
 The dump paid for itself twice. `misc`'s command field is all zeros, which is
 the self-clearing the fastboot route relies on, and `0x360` reads
