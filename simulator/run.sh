@@ -1,7 +1,9 @@
 #!/bin/sh
-# Usage: [DEVICE=radar] [START=no-light|twrp|stock-booted] simulator/run.sh OUT TARGET [FLAG...]
+# Usage: [DEVICE=radar|donut] [START=no-light|twrp|stock-booted] simulator/run.sh OUT TARGET [FLAG...]
 # Create a fresh simulated Dot, or with DEVICE=radar an Echo (2nd
-# Generation), in stock fastboot or, with START=no-light,
+# Generation) and with DEVICE=donut an Echo Dot (3rd Generation), whose
+# button is held into its bootrom when firebreak asks, in stock fastboot or,
+# with START=no-light,
 # unplugged with boot0 erased and plugged in when firebreak asks for the
 # short. START=twrp starts it unlocked with amonet v2, in that TWRP, and
 # START=stock-booted starts the stock Fire OS, which answers no adb.
@@ -41,7 +43,7 @@ command -v timeout >/dev/null || { echo "run.sh needs timeout (coreutils)" >&2; 
 "$python" -c 'import sys; sys.exit(not any(type(f).__module__ == "firebreak_sim_ports" for f in sys.meta_path))' \
     || { echo "the virtualenv's port hook is not active" >&2; exit 2; }
 : > "$out.log"
-if [ "$start" = no-light ]; then
+if [ "$start" = no-light ] || [ "$device" = donut ]; then
     (
         trap 'exit 0' TERM
         until grep -qE "test point and plug it in|start it in its bootrom|on USB. Connect it|Waiting for an Echo to appear" "$out.log"; do sleep 0.5; done

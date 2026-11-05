@@ -1,6 +1,8 @@
 """Show the simulated Dot's bootrom as the only serial port pyserial lists,
 and the simulated Dot as the only USB device firebreak.identify lists. Give
-firebreak.cache a Downloads folder in the state folder, not the user's.
+firebreak.cache a Downloads folder in the state folder, not the user's. Hand
+firebreak.mediatek.libusb the bootrom's pseudo-terminal in place of a device,
+with its control transfers on a second one, and a trigger that needs no sudo.
 
 Run each process's clock FIREBREAK_SIM_SPEED times faster, except while a call
 to the simulated Dot or its eMMC runs.
@@ -13,6 +15,7 @@ simulated Dot's clock on.
 from __future__ import annotations
 
 import contextlib
+import errno
 import fcntl
 import importlib.abc
 import json
@@ -22,6 +25,7 @@ import select
 import selectors
 import subprocess
 import sys
+import termios
 import time
 from typing import TYPE_CHECKING
 
@@ -32,8 +36,15 @@ if TYPE_CHECKING:
 
 BOOTROM_PRODUCT_ID = 0x0003
 CHUNK_SECONDS = 0.05
+CONTROL_SECONDS = 5
+ELEVATES = os.environ.get("FIREBREAK_SIM_ELEVATES", "")
 MEDIATEK_VENDOR_ID = 0x0E8D
-MODULES = ("firebreak.cache", "firebreak.identify", "serial.tools.list_ports")
+MODULES = (
+    "firebreak.cache",
+    "firebreak.identify",
+    "firebreak.mediatek.libusb",
+    "serial.tools.list_ports",
+)
 NANOSECONDS = 1_000_000_000
 PRELOADER_PRODUCT_ID = 0x2000
 REAL_MONOTONIC = time.monotonic_ns
@@ -160,8 +171,62 @@ class Loader(importlib.abc.Loader):
             module.downloads_dir = downloads_dir
         elif module.__name__ == "firebreak.identify":
             module.usb_devices = usb_devices
+        elif module.__name__ == "firebreak.mediatek.libusb":
+            install_libusb(module=module)
         else:
             module.comports = comports
+
+
+class SimUsb:
+    def __init__(self, *, control: str, port: str, timeout: float) -> None:
+        self.control = os.open(control, os.O_RDWR | os.O_NOCTTY)
+        self.port = os.open(port, os.O_RDWR | os.O_NOCTTY)
+        self.timeout = timeout
+
+    def close(self) -> None:
+        for descriptor in (self.control, self.port):
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+
+    def control_in(
+        self, *, index: int, length: int, request: int, request_type: int, value: int
+    ) -> bytes:
+        return transfer(
+            control=self.control,
+            request={
+                "index": index,
+                "length": length,
+                "request": request,
+                "request_type": request_type,
+                "value": value,
+            },
+        )
+
+    def control_out(self, *, data: bytes, index: int, request: int, value: int) -> None:
+        transfer(
+            control=self.control,
+            request={
+                "data": data.hex(),
+                "index": index,
+                "length": len(data),
+                "request": request,
+                "request_type": 0x21,
+                "value": value,
+            },
+        )
+
+    def read(self, *, size: int) -> bytes:
+        readable, _, _ = select.select([self.port], [], [], self.timeout)
+        return os.read(self.port, size) if readable else b""
+
+    def reset_input_buffer(self) -> None:
+        termios.tcflush(self.port, termios.TCIFLUSH)
+
+    def write(self, *, data: bytes) -> int:
+        view = memoryview(data)
+        while view:
+            view = view[os.write(self.port, view) :]
+        return len(data)
 
 
 @contextlib.contextmanager
@@ -247,6 +312,47 @@ def install_clock() -> Clock | None:
     return clock
 
 
+def install_libusb(*, module: ModuleType) -> None:
+    if ELEVATES in {"0", "1"}:
+        module.ELEVATES = ELEVATES == "1"
+
+    def held() -> dict:
+        state = settled_state() or {}
+        if state.get("mode") != "bootrom" or not state.get("port"):
+            message = (
+                f"no {MEDIATEK_VENDOR_ID:04x}:{BOOTROM_PRODUCT_ID:04x} answered libusb"
+            )
+            raise module.NotThereError(message)
+        return state
+
+    def open_bootrom(*, timeout: float = module.READ_TIMEOUT) -> SimUsb:
+        state = held()
+        return SimUsb(control=state["control"], port=state["port"], timeout=timeout)
+
+    def trigger(*, index: int) -> str:
+        state = held()
+        control = os.open(state["control"], os.O_RDWR | os.O_NOCTTY)
+        try:
+            with contextlib.suppress(OSError):
+                transfer(
+                    control=control,
+                    request={
+                        "index": index,
+                        "length": 0,
+                        "request": 0,
+                        "request_type": 0xA1,
+                        "value": 0,
+                    },
+                )
+        finally:
+            os.close(control)
+        return ""
+
+    module.authorize = lambda: True
+    module.open_bootrom = open_bootrom
+    module.trigger = trigger
+
+
 def running(*, pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -288,6 +394,22 @@ def settled_state() -> dict | None:
         return state
 
 
+def transfer(*, control: int, request: dict) -> bytes:
+    os.write(control, json.dumps(request).encode() + b"\n")
+    answer = b""
+    while not answer.endswith(b"\n"):
+        readable, _, _ = REAL_SELECT([control], [], [], CONTROL_SECONDS)
+        if not readable:
+            raise OSError(
+                errno.ETIMEDOUT, "the simulated bootrom sent no control reply"
+            )
+        answer += os.read(control, 4096)
+    reply = json.loads(answer)
+    if "error" in reply:
+        raise OSError(errno.EPIPE, reply["error"])
+    return bytes.fromhex(reply.get("data", ""))
+
+
 def usb_devices() -> list:
     from firebreak.identify import UsbDevice  # ruff: ignore[import-outside-top-level]
 
@@ -313,6 +435,11 @@ def usb_devices() -> list:
             "recovery": (0x18D1, 0xD001, "Amazon", "Echo Dot (2nd Gen)"),
             "recovery 3.2.3": (0x18D1, 0x4EE2, "Amazon", "Echo Dot 2nd Gen"),
             "unauthorized": (MEDIATEK_VENDOR_ID, 0x201C, "MediaTek", "AEOBC"),
+        },
+        "donut": {
+            "device": (MEDIATEK_VENDOR_ID, 0x201C, "MediaTek", "AEODN"),
+            "recovery": (0x18D1, 0xD001, "Amazon", "Echo Dot (3rd Gen)"),
+            "unauthorized": (MEDIATEK_VENDOR_ID, 0x201C, "MediaTek", "AEODN"),
         },
         "radar": {
             "device": (MEDIATEK_VENDOR_ID, 0x201C, "MediaTek", "AEORD"),

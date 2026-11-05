@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 
+BOOTONCE = b"bootonce-bootloader"
 BOOT_LAYOUT = b"BRLYT"
 BY_NAME = pathlib.Path("/dev/block/platform/mtk-msdc.0/by-name")
 DECOYS = {
@@ -230,7 +231,9 @@ def facts(*, spec: dict) -> dict:
         path = BY_NAME / name
         if path.exists():
             with path.open("rb") as file:
-                result[f"{name}_fastboot"] = file.read(15) == b"FASTBOOT_PLEASE"
+                head = file.read(len(BOOTONCE))
+            result[f"{name}_fastboot"] = head.startswith(b"FASTBOOT_PLEASE")
+            result[f"{name}_bootonce"] = head == BOOTONCE
     for slot in ("a", "b"):
         path = BY_NAME / f"system_{slot}"
         result[f"system_{slot}"] = (

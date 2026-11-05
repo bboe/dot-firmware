@@ -1,4 +1,6 @@
-"""Serve the simulated Dot's bootrom, then amonet's payload, on a pseudo-terminal.
+"""Serve the simulated Echo's bootrom, then amonet's payload or kamakiri's two
+stages, on a pseudo-terminal. A second pseudo-terminal carries the control
+transfers that a donut's exploits send.
 
 python3 simulator/bootrom.py WORK
 """
@@ -8,7 +10,9 @@ from __future__ import annotations
 import collections
 import enum
 import hashlib
+import json
 import os
+import select
 import signal
 import struct
 import subprocess
@@ -16,20 +20,29 @@ import sys
 import time
 import tty
 import zipfile
+from typing import TYPE_CHECKING
 
 import dot
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 try:
     from firebreak_sim_ports import REAL_MONOTONIC, REAL_SLEEP
 except ImportError:
     REAL_MONOTONIC, REAL_SLEEP = time.monotonic_ns, time.sleep
 
+ACCESS = 0xDA
+ACCESS_OFFSET = 0x40
+ACCESS_WALKS = frozenset({0xD7A8, 0xD7A9, 0xD7AA, 0xD7B1, 0xD7B2, 0xD7B3})
 ACKNOWLEDGEMENT = b"\xd0\xd0\xd0\xd0"
 AES_LENGTH = 1
 AES_SLOT_POINTERS = [18, 26, 26]
 AREAS = {0: "user", 1: "boot0", 2: "boot1"}
 BLOCK = 512
-BOOTROM_COMMANDS = frozenset({0xC8, 0xD1, 0xD4})
+BOOTROM_COMMANDS = frozenset({0xC8, 0xD1, 0xD4, 0xFD})
+CONFIGURATION = bytes.fromhex("0902430002010080fa")
+CONTROL_STALL = {"error": "[Errno 32] Pipe error"}
 DECRYPT_FUNCTION = 126
 EMMC_HEADER = struct.Struct(">cBQI")
 EXTENDED = 0xC8
@@ -48,8 +61,26 @@ GCPU_LENGTH = GCPU + 0x0C0C
 GCPU_MONITOR = GCPU + 0x0418
 GCPU_PROGRAM_CONTROL = GCPU + 0x0400
 GCPU_SLOT_POINTERS = GCPU + 0x0C14
+GET_DESCRIPTOR = (0x80, 0x06, 0x0200)
+GET_LINE_CODING = (0xA1, 0x21)
 HANDSHAKE = ((0xA0, 0x5F), (0x0A, 0xF5), (0x50, 0xAF), (0x05, 0xFA))
+HARDWARE_CODE = 0xFD
 JUMP_REGISTER = 0x1028A8
+KAMAKIRI_COMMANDS = frozenset({
+    0x1000,
+    0x1002,
+    0x1003,
+    0x1004,
+    0x2000,
+    0x3000,
+    0x3001,
+    0x5000,
+    0x6000,
+})
+KAMAKIRI_PAYLOAD = 0x100A00
+LADDER = frozenset(range(2, 17))
+LINE_CODING = bytes.fromhex("00c20100000008")
+LOAD_STAGE2 = 0x4000
 MAGIC = 0xF00DD00D
 MAXIMUM_BLOCKS = 64
 MMIO_START = 0x10000000
@@ -65,22 +96,83 @@ REFUSED = b"\x1d\x0c"
 REFUSED_STATUS = 0x3
 RPMB_AREA = 3
 RPMB_SIZE = 0x100
+SEND_PAYLOAD = 0xE0
+SEND_POINTER = 0xD2E4
+SEND_ROUTINE = 0x102C40
+SET_FASTBOOT_FLAG = 0x6000
+SET_LINE_CODING = (0x21, 0x20)
 SHOWN_WORDS = 16
+STAGE1_READY = b"\xa1\xa2\xa3\xa4"
+STAGES = {
+    "stage1": "brom-payload/stage1/stage1.bin",
+    "stage2": "brom-payload/stage2/stage2.bin",
+}
+START_STAGE2 = 0x4001
 START_WAIT = 10
+TRIGGER = (0xA1, 0x00, 0xCC)
 V1_COMMANDS = frozenset({0x1000, 0x1001, 0x1002, 0x2000, 0x2001, 0x3000})
+WATCHDOG_RESTART = 0x10007050
 WRITE_STATUS = b"\x00\x01"
 WRITE_WORDS = 0xD4
 ZERO_DECRYPTION = bytes.fromhex("4dd12bdf0ec7d26c482490b3482a1b1f")
 
 
 class Bootrom:
-    def __init__(self, *, payloads: dict[str, bytes], port: Port) -> None:
+    def __init__(
+        self,
+        *,
+        hardware: int,
+        payloads: dict[str, bytes],
+        port: Port,
+        stages: dict[str, bytes] | None = None,
+    ) -> None:
         self.acquired = False
         self.defeated = False
-        self.memory: dict[int, int] = {}
+        self.hardware = hardware
+        self.ladder: set[int] = set()
+        self.line_coding = LINE_CODING
+        self.memory: dict[int, int] = (
+            {} if stages is None else {SEND_POINTER: SEND_ROUTINE}
+        )
         self.payloads = payloads
+        self.pointer: int | None = None
         self.port = port
         self.recorder = Recorder()
+        self.sent = b""
+        self.stages = stages
+        self.walked: set[int] = set()
+        port.answer = self.control
+
+    def access(self) -> str | None:
+        writing, address, length = (self.echo(length=4) for _ in range(3))
+        operation = "write" if writing else "read"
+        if not self.walked >= ACCESS_WALKS:
+            self.recorder.say(
+                tool="bootrom",
+                words=["access", operation, f"{address:#x}", f"refused {length}"],
+            )
+            self.port.write(data=REFUSED)
+            return None
+        self.walked.clear()
+        real = address + ACCESS_OFFSET
+        self.port.write(data=READ_STATUS)
+        if not writing:
+            self.recorder.say(
+                tool="bootrom", words=["access", "read", f"{real:#x}", str(length)]
+            )
+            self.port.write(data=self.bytes_at(address=real, length=length))
+            self.port.write(data=READ_STATUS)
+            return None
+        data = self.port.read(length=length)
+        shown = dot.md5(data=data) if length > SHOWN_WORDS * 4 else data.hex()
+        self.recorder.say(
+            tool="bootrom", words=["access", "write", f"{real:#x}", str(length), shown]
+        )
+        self.put(address=real, data=data)
+        if real == self.memory[SEND_POINTER] + 8:
+            return self.jump(target=self.memory.get(real, 0))
+        self.port.write(data=READ_STATUS)
+        return None
 
     def aes(self) -> int:
         pointers = [
@@ -111,6 +203,31 @@ class Bootrom:
             for offset in range(0, length, 4)
         )[:length]
 
+    def control(self, *, request: dict) -> dict:
+        data = bytes.fromhex(request.get("data", ""))
+        kind, code = request["request_type"], request["request"]
+        words = [f"{kind:#04x}", f"{code:#04x}", f"{request['index']:#x}"]
+        self.recorder.say(tool="control", words=[*words, data.hex()] if data else words)
+        if self.stages is None:
+            return CONTROL_STALL
+        if (kind, code) == SET_LINE_CODING and request["index"] == 0:
+            self.line_coding = data[: len(LINE_CODING)]
+            if len(data) >= len(LINE_CODING) + 5:
+                self.pointer = struct.unpack_from("<I", data, len(LINE_CODING) + 1)[0]
+            return {}
+        if (kind, code) == GET_LINE_CODING and request["index"] == 0:
+            return {"data": self.line_coding.hex()}
+        if (kind, code, request["value"]) == GET_DESCRIPTOR:
+            if self.pointer is not None:
+                self.walked.add(self.pointer)
+                self.pointer = None
+            return {"data": CONFIGURATION[: request["length"]].hex()}
+        if (kind, code, request["index"]) == TRIGGER and self.triggered():
+            self.put(address=KAMAKIRI_PAYLOAD, data=self.sent)
+            self.sent = b""
+            self.port.jumping = KAMAKIRI_PAYLOAD
+        return CONTROL_STALL
+
     def echo(self, *, length: int) -> int:
         data = self.port.read(length=length)
         self.port.write(data=data)
@@ -129,22 +246,40 @@ class Bootrom:
                 step = 0
         self.recorder.say(tool="bootrom", words=["handshake"])
 
-    def identify(self) -> str | None:
-        for name, payload in self.payloads.items():
+    def hardware_code(self) -> None:
+        self.recorder.say(
+            tool="bootrom", words=["hardware code", f"{self.hardware:#06x}"]
+        )
+        self.port.write(data=struct.pack(">HH", self.hardware, 0))
+
+    def identify(self, *, target: int) -> str | None:
+        known = (
+            {"stage1": self.stages["stage1"]}
+            if self.stages is not None and target == KAMAKIRI_PAYLOAD
+            else self.payloads
+            if target == PAYLOAD_ADDRESS
+            else {}
+        )
+        for name, payload in known.items():
             padded = payload + bytes(-len(payload) % 4)
-            if self.bytes_at(address=PAYLOAD_ADDRESS, length=len(padded)) == padded:
+            if self.bytes_at(address=target, length=len(padded)) == padded:
                 return name
         return None
 
     def jump(self, *, target: int) -> str:
-        found = self.identify() if target == PAYLOAD_ADDRESS else None
+        found = self.identify(target=target)
         self.recorder.say(
             tool="bootrom", words=["jump", f"{target:#x}", found or "unknown code"]
         )
         while found is None:
             self.port.read(length=1)
-        self.port.write(data=READY)
+        self.port.write(data=STAGE1_READY if found == "stage1" else READY)
         return found
+
+    def put(self, *, address: int, data: bytes) -> None:
+        whole = data + bytes(-len(data) % 4)
+        for offset in range(0, len(whole), 4):
+            (self.memory[address + offset],) = struct.unpack_from("<I", whole, offset)
 
     def read_words(self) -> None:
         address = self.echo(length=4)
@@ -156,29 +291,57 @@ class Bootrom:
             self.port.write(data=REFUSED)
             return
         self.recorder.say(tool="bootrom", words=["read32", f"{address:#x}", str(count)])
+        if address + 4 * count == WATCHDOG_RESTART + 4:
+            self.ladder.add(count)
         values = [self.memory.get(address + 4 * index, 0) for index in range(count)]
         self.port.write(
             data=READ_STATUS + struct.pack(f">{count}I", *values) + READ_STATUS
         )
 
+    def send_payload(self) -> None:
+        length = self.echo(length=4)
+        self.port.write(data=READ_STATUS)
+        self.sent = self.port.read(length=length)
+        self.recorder.say(
+            tool="bootrom",
+            words=["send payload", str(length), dot.md5(data=self.sent)],
+        )
+        self.port.write(data=READ_STATUS + READ_STATUS)
+
     def serve(self) -> str:
         self.handshake()
+        try:
+            return self.served()
+        except Jumped as jumped:
+            return self.jump(target=jumped.target)
+
+    def served(self) -> str:
+        commands = BOOTROM_COMMANDS | (
+            frozenset() if self.stages is None else {ACCESS, SEND_PAYLOAD}
+        )
         while True:
             command = self.port.read(length=1)[0]
-            if command not in BOOTROM_COMMANDS:
+            if command not in commands:
                 self.recorder.say(tool="bootrom", words=["unknown", f"{command:#04x}"])
                 continue
             self.port.write(data=bytes([command]))
+            jumped = None
             if command == READ_WORDS:
                 self.read_words()
             elif command == WRITE_WORDS:
                 jumped = self.write_words()
-                if jumped is not None:
-                    return jumped
+            elif command == HARDWARE_CODE:
+                self.hardware_code()
+            elif command == ACCESS:
+                jumped = self.access()
+            elif command == SEND_PAYLOAD:
+                self.send_payload()
             else:
                 subcommand = self.echo(length=1)
                 self.port.write(data=bytes(3))
                 self.recorder.say(tool="bootrom", words=["ext", f"{subcommand:#04x}"])
+            if jumped is not None:
+                return jumped
 
     def store(self, *, address: int, word: int) -> None:
         self.memory[address] = word
@@ -193,6 +356,14 @@ class Bootrom:
             status = self.aes()
             self.memory[GCPU_INTERRUPT_STATUS] = status
             self.memory[GCPU_MONITOR] = status & FINISHED
+
+    def triggered(self) -> bool:
+        reversed_address = struct.unpack("<I", struct.pack(">I", KAMAKIRI_PAYLOAD))[0]
+        return (
+            bool(self.sent)
+            and self.ladder >= LADDER
+            and self.memory.get(WATCHDOG_RESTART) == reversed_address
+        )
 
     def write_words(self) -> str | None:
         address = self.echo(length=4)
@@ -267,12 +438,22 @@ class Emmc:
             return self.answer(length=1) == b"k"
 
 
+class Jumped(Exception):  # ruff: ignore[error-suffix-on-exception-name]
+    def __init__(self, *, target: int) -> None:
+        super().__init__(f"{target:#x}")
+        self.target = target
+
+
 class Payload:
     def __init__(self, *, bootrom: Bootrom, emmc: Emmc, version: str) -> None:
         self.area = 0
         self.bootrom = bootrom
-        self.commands = V1_COMMANDS if version == "v1.1.0" else frozenset(Command)
+        self.commands = {
+            "stage2": KAMAKIRI_COMMANDS,
+            "v1.1.0": V1_COMMANDS,
+        }.get(version, frozenset(Command))
         self.emmc = emmc
+        self.fastboot = False
         self.port = bootrom.port
         self.recorder = bootrom.recorder
 
@@ -375,6 +556,9 @@ class Payload:
         elif command == Command.STOCK_SEND:
             self.recorder.say(tool="payload", words=["stock send"])
             self.port.write(data=ACKNOWLEDGEMENT)
+        elif command == SET_FASTBOOT_FLAG:
+            self.recorder.say(tool="payload", words=["fastboot flag"])
+            self.fastboot = True
 
     def write(self, *, command: int, data: bytes, first: int) -> None:
         written = self.area in AREAS and self.emmc.write(
@@ -403,12 +587,35 @@ class Port:
         self.master, self.slave = os.openpty()
         tty.setraw(self.slave)
         self.name = os.ttyname(self.slave)
+        self.control_master, self.control_slave = os.openpty()
+        tty.setraw(self.control_slave)
+        self.control_name = os.ttyname(self.control_slave)
+        self.answer: Callable[..., dict] | None = None
+        self.jumping: int | None = None
+        self.requests = b""
 
     def read(self, *, length: int) -> bytes:
         data = b""
         while len(data) < length:
-            data += os.read(self.master, length - len(data))
+            readable, _, _ = select.select([self.master, self.control_master], [], [])
+            if self.control_master in readable:
+                self.serve_control()
+            if self.master in readable:
+                data += os.read(self.master, length - len(data))
         return data
+
+    def serve_control(self) -> None:
+        self.requests += os.read(self.control_master, 4096)
+        while b"\n" in self.requests:
+            line, self.requests = self.requests.split(b"\n", 1)
+            request = json.loads(line)
+            reply = (
+                CONTROL_STALL if self.answer is None else self.answer(request=request)
+            )
+            self.write_control(reply=reply)
+        if self.jumping is not None:
+            target, self.jumping = self.jumping, None
+            raise Jumped(target=target)
 
     def word(self) -> int:
         return struct.unpack(">I", self.read(length=4))[0]
@@ -417,6 +624,11 @@ class Port:
         view = memoryview(data)
         while view:
             view = view[os.write(self.master, view) :]
+
+    def write_control(self, *, reply: dict) -> None:
+        view = memoryview(json.dumps(reply).encode() + b"\n")
+        while view:
+            view = view[os.write(self.control_master, view) :]
 
 
 class Recorder:
@@ -494,7 +706,9 @@ def claim(*, port: Port) -> dict | None:
             state = dot.load() if dot.STATE.exists() else {}
             mode = state.get("mode", "gone")
             if mode == "bootrom":
-                state.update(bootrom_pid=os.getpid(), port=port.name)
+                state.update(
+                    bootrom_pid=os.getpid(), control=port.control_name, port=port.name
+                )
                 dot.save(state=state)
                 return state
         REAL_SLEEP(0.1)
@@ -515,6 +729,16 @@ def known_payloads(*, cache: str) -> dict[str, bytes]:
     return found
 
 
+def known_stages(*, cache: str, spec: dict) -> dict[str, bytes] | None:
+    if "kit" not in spec:
+        return None
+    with zipfile.ZipFile(f"{cache}/{spec['kit']}") as archive:
+        return {
+            name: dot.member(archive=archive, suffix=suffix)
+            for name, suffix in STAGES.items()
+        }
+
+
 def main() -> int:
     if sys.argv[1:] != [str(dot.WORK)]:
         print(f"usage: {sys.argv[0]} {dot.WORK}", file=sys.stderr)
@@ -524,26 +748,35 @@ def main() -> int:
     state = claim(port=port)
     if state is None:
         return 1
-    rebooted = False
+    into = None
     try:
-        bootrom = Bootrom(payloads=known_payloads(cache=state["cache"]), port=port)
+        spec = dot.DEVICES[state["device"]]
+        bootrom = Bootrom(
+            hardware=spec["hardware"],
+            payloads=known_payloads(cache=state["cache"]),
+            port=port,
+            stages=known_stages(cache=state["cache"], spec=spec),
+        )
         try:
             version = bootrom.serve()
+            if version == "stage1":
+                version = stage1(bootrom=bootrom)
             bootrom.recorder.say(tool="payload", words=["ready", version])
-            Payload(
+            payload = Payload(
                 bootrom=bootrom,
                 emmc=Emmc(container=state["container"]),
                 version=version,
-            ).serve()
-            rebooted = True
+            )
+            payload.serve()
+            into = "bootloader" if payload.fastboot else "system"
         finally:
             bootrom.recorder.flush()
     finally:
-        release(rebooted=rebooted)
+        release(into=into)
     return 0
 
 
-def release(*, rebooted: bool) -> None:
+def release(*, into: str | None) -> None:
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     with dot.locked():
         if not dot.STATE.exists():
@@ -552,10 +785,42 @@ def release(*, rebooted: bool) -> None:
         if state.get("bootrom_pid") != os.getpid():
             return
         state.pop("bootrom_pid", None)
+        state.pop("control", None)
         state.pop("port", None)
-        if rebooted:
-            dot.reboot(into="system", state=state)
+        if into is not None:
+            dot.reboot(into=into, state=state)
         dot.save(state=state)
+
+
+def stage1(*, bootrom: Bootrom) -> str:
+    port, recorder = bootrom.port, bootrom.recorder
+    stage2 = b""
+    while True:
+        if port.word() != MAGIC:
+            recorder.say(tool="stage1", words=["no magic"])
+            continue
+        command = port.word()
+        if command == LOAD_STAGE2:
+            address, length = port.word(), port.word()
+            stage2 = port.read(length=length)
+            recorder.say(
+                tool="stage1",
+                words=["load", f"{address:#x}", str(length), dot.md5(data=stage2)],
+            )
+            port.write(data=ACKNOWLEDGEMENT)
+        elif command == START_STAGE2:
+            address = port.word()
+            known = stage2 == (bootrom.stages or {}).get("stage2")
+            recorder.say(
+                tool="stage1",
+                words=["start", f"{address:#x}", "stage2" if known else "unknown code"],
+            )
+            while not known:
+                port.read(length=1)
+            port.write(data=READY)
+            return "stage2"
+        else:
+            recorder.say(tool="stage1", words=["unknown", f"{command:#06x}"])
 
 
 def stop(*_: object) -> None:

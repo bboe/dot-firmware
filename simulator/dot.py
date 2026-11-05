@@ -1,7 +1,8 @@
-"""Simulate an Echo Dot (2nd Generation), or an Echo (2nd Generation), for
-firebreak.
+"""Simulate an Echo Dot (2nd Generation), an Echo (2nd Generation) or an Echo
+Dot (3rd Generation) for firebreak.
 
-python3 simulator/dot.py create [--cache DIR] [--device biscuit|radar] [--runner PID]
+python3 simulator/dot.py create [--cache DIR] [--device biscuit|donut|radar]
+    [--runner PID]
     [--start fastboot|no-light|stock-booted|twrp]
 python3 simulator/dot.py plug
 python3 simulator/dot.py status
@@ -50,37 +51,32 @@ ADB_SHELL_MODES = frozenset({"device", "recovery"})
 ADB_SHELL_OPTIONS = frozenset("ntTx")
 ADB_UNAUTHORIZED_VERBS = frozenset({"exec-out", "get-state", "push", "reboot", "shell"})
 BOOT0_SECTORS = 2048
+BOOTONCE_BYTES = 32
 BOOT_SECONDS = float(os.environ.get("FIREBREAK_SIM_BOOT_SECONDS", "3"))
 BY_NAME = "/dev/block/platform/mtk-msdc.0/by-name"
 DETACH_SHELL = "mkdir -p /sim/run && cat > /sim/run/loops && /sim/bin/sim-boot detach"
-DEVICES = {
-    "biscuit": {
-        "amonet": "amonet-biscuit-v2.0.0.zip",
-        "fastbricks": {"63cb91b-20221007_072309": "fastbrick-20221007.img"},
-        "kaeru": "bin/biscuit-kaeru.bin",
-        "model": "AEOBC",
-        "stock": "Fire OS 6574.1 (NS65741/8146)",
-        "stock_lk": "63cb91b-20221007_072309",
-        "v2_lk": "63cb91b-20221007_072309",
-    },
-    "radar": {
-        "amonet": "amonet-radar-v1.0.1.zip",
-        "fastbricks": {
-            "2c3569d-20260617_051433": "fastbrick-20260617.img",
-            "59779ca-20220524_183401": "fastbrick-20220524.img",
-            "63cb91b-20221007_073612": "fastbrick-20221007.img",
-        },
-        "kaeru": "bin/radar-kaeru.bin",
-        "model": "AEORD",
-        "stock": "Fire OS 6572.1 (NS6572/6436)",
-        "stock_lk": "63cb91b-20221007_073612",
-        "v2_lk": "59779ca-20220524_183401",
-    },
-}
-DISK_BYTES = 3917479936
+DONUT_TABLE = (
+    ("kb", 2048, 2048),
+    ("dkb", 4096, 2048),
+    ("lk_a", 6144, 2048),
+    ("tee1", 8192, 10240),
+    ("lk_b", 18432, 2048),
+    ("tee2", 20480, 10240),
+    ("expdb", 30720, 20480),
+    ("misc", 51200, 1024),
+    ("persist", 52224, 32768),
+    ("boot_a", 84992, 32768),
+    ("boot_b", 117760, 32768),
+    ("swdl", 150528, 65536),
+    ("system_a", 216064, 2097152),
+    ("system_b", 2313216, 2097152),
+    ("cache", 4410368, 65536),
+    ("userdata", 4475904, 3159007),
+)
 DOWNLOAD_SUFFIXES = frozenset({".bin", ".img", ".zip"})
 FASTBOOT_FLAGS = frozenset({"-S", "-s"})
 FASTBOOT_INTO = frozenset({"bootloader", "fastboot"})
+FASTBOOT_PLEASE_BYTES = 16
 FASTBOOT_REBOOTS = {
     "oem reboot-recovery": "recovery",
     "reboot": "system",
@@ -90,6 +86,8 @@ FASTBOOT_REBOOTS = {
 FASTBOOT_SPARSE_UNITS = {"G": 1 << 30, "K": 1 << 10, "M": 1 << 20}
 HALT_SECONDS = 10
 HERE = pathlib.Path(__file__).resolve().parent
+IDME_BLOCKS = 64
+IDME_MAGIC = b"beefdeed"
 IMAGE = "firebreak-sim"
 INSIDE_PATH = "/sim/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 LEGACY_SERVICE_BYTES = 4096
@@ -109,6 +107,7 @@ STARTS = {"fastboot": "bootloader", "stock-booted": "system", "twrp": "recovery"
 STDIN_CHUNK = 1 << 20
 STDIN_POLL_SECONDS = 0.1
 STOCK_LK_SIZE = 241664
+STOCK_RECOVERY = b"ANDROID!SIM STOCK RECOVERY".ljust(1 << 20, b"\0")
 STOCK_TABLE = (
     ("kb", 2048, 2048),
     ("dkb", 4096, 2048),
@@ -127,10 +126,59 @@ STOCK_TABLE = (
     ("cache", 3440640, 1605632),
     ("userdata", 5046272, 2605023),
 )
+DEVICES = {
+    "biscuit": {
+        "amonet": "amonet-biscuit-v2.0.0.zip",
+        "boot_bytes": 1048576,
+        "fastbricks": {"63cb91b-20221007_072309": "fastbrick-20221007.img"},
+        "hardware": 0x8163,
+        "kaeru": "bin/biscuit-kaeru.bin",
+        "model": "AEOBC",
+        "sectors": 7651328,
+        "stock": "Fire OS 6574.1 (NS65741/8146)",
+        "stock_lk": "63cb91b-20221007_072309",
+        "table": STOCK_TABLE,
+        "v2_lk": "63cb91b-20221007_072309",
+    },
+    "donut": {
+        "boot_bytes": 4194304,
+        "device_type": "A32DOYMUN6DTXA",
+        "hardware": 0x8167,
+        "kaeru": "bin/kaeru-donut.bin",
+        "kit": "kamakiri-donut-v1.0.0.zip",
+        "model": "AEODN",
+        "sectors": 7634944,
+        "stock": "Fire OS 6.5.7.5 (NS6575/8349)",
+        "stock_lk": "6f7225e-20230407_013816",
+        "table": DONUT_TABLE,
+    },
+    "radar": {
+        "amonet": "amonet-radar-v1.0.1.zip",
+        "boot_bytes": 1048576,
+        "fastbricks": {
+            "2c3569d-20260617_051433": "fastbrick-20260617.img",
+            "59779ca-20220524_183401": "fastbrick-20220524.img",
+            "63cb91b-20221007_073612": "fastbrick-20221007.img",
+        },
+        "hardware": 0x8163,
+        "kaeru": "bin/radar-kaeru.bin",
+        "model": "AEORD",
+        "sectors": 7651328,
+        "stock": "Fire OS 6572.1 (NS6572/6436)",
+        "stock_lk": "63cb91b-20221007_073612",
+        "table": STOCK_TABLE,
+        "v2_lk": "59779ca-20220524_183401",
+    },
+}
 TABLE_BACKUP_SECTORS = 33
 TABLE_PRIMARY_SECTORS = 34
 TOOL_CACHE = "firebreak"
-TWRPS = {"bboe": "3.7.0_9-bboe2", "v1": "3.2.3-0", "v2": "3.7.0_9-0"}
+TWRPS = {
+    "bboe": "3.7.0_9-bboe2",
+    "donut": "3.7.0_9-0",
+    "v1": "3.2.3-0",
+    "v2": "3.7.0_9-0",
+}
 USB_CUT_STATUS = 255
 USB_DROP_SECONDS = 1.0
 USB_SWITCH_SECONDS = 5.0
@@ -199,18 +247,22 @@ def adb(*, arguments: list[str]) -> int:  # ruff: ignore[complex-structure, too-
 def boot(*, into: str, state: dict) -> None:
     sim_boot(action="boot", state=state)
     known = state["known"]
-    known["lk"]["stock"] = stock_lks(device=state["device"])
+    known["lk"]["stock"] = stock_lks(
+        cache=pathlib.Path(state["cache"]), device=state["device"]
+    )
     spec = {
         "prefixes": {
+            "expdb": sizes(table=known.get("kaeru", {})),
             "lk_a": sizes(table=known["lk"]),
-            "recovery": sizes(table=known["recovery"]),
+            recovery_part(device=state["device"]): sizes(table=known["recovery"]),
         }
     }
     facts = json.loads(sim_boot(action="facts", spec=spec, state=state))
     outcome = decide(facts=facts, into=into, state=state)
     if outcome.get("consumed"):
         inside(
-            command=f"dd if=/dev/zero of={BY_NAME}/{outcome['consumed']} bs=16"
+            command=f"dd if=/dev/zero of={BY_NAME}/{outcome['consumed']}"
+            f" bs={outcome.get('consumed_bytes', FASTBOOT_PLEASE_BYTES)}"
             " count=1 conv=notrunc 2>/dev/null",
             state=state,
         )
@@ -276,6 +328,7 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
     TRACE.unlink(missing_ok=True)
     docker(arguments=["build", "-q", "-t", IMAGE, str(HERE)], capture_output=True)
     name = f"firebreak-sim-{uuid.uuid4().hex[:8]}"
+    spec = DEVICES[device]
     state = {
         "cache": str(cache),
         "container": name,
@@ -308,14 +361,14 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
         f"-n {number}:{first}:{first + sectors - 1} -c {number}:{part}"
         f" -t {number}:8300"
         f" -u {number}:{uuid.uuid5(uuid.NAMESPACE_DNS, 'firebreak-sim.' + part)}"
-        for number, (part, first, sectors) in enumerate(STOCK_TABLE, start=1)
+        for number, (part, first, sectors) in enumerate(spec["table"], start=1)
     )
     inside(
         command="mkdir -p /sim/disk /sim/run"
-        f" && truncate -s {DISK_BYTES} /sim/disk/mmcblk0.img"
-        " && for s in boot0 boot1 rpmb; do truncate -s 1048576 /sim/disk/$s.img;"
-        " done"
-        f" && sgdisk -o -U {disk_guid} {table} /sim/disk/mmcblk0.img >/dev/null"
+        f" && truncate -s {spec['sectors'] * SECTOR} /sim/disk/mmcblk0.img"
+        " && for s in boot0 boot1 rpmb; do"
+        f" truncate -s {spec['boot_bytes']} /sim/disk/$s.img; done"
+        f" && sgdisk -o -U {disk_guid} -a 1 {table} /sim/disk/mmcblk0.img >/dev/null"
         " && echo a > /sim/run/active",
         state=state,
     )
@@ -325,10 +378,18 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
             b"EMMC_BOOT".ljust(SECTOR, b"\0") + b"BRLYT\0SIM STOCK PRELOADER"
         ).ljust(262144, b"\x5a"),
         "/dev/block/mmcblk0rpmb": stock_rpmb(),
-        f"{BY_NAME}/lk_a": stock_lk(device=device),
-        f"{BY_NAME}/lk_b": stock_lk(device=device),
-        f"{BY_NAME}/recovery": b"ANDROID!SIM STOCK RECOVERY".ljust(1 << 20, b"\0"),
+        f"{BY_NAME}/lk_a": stock_lk(cache=cache, device=device),
+        f"{BY_NAME}/lk_b": stock_lk(cache=cache, device=device),
+        f"{BY_NAME}/{recovery_part(device=device)}": STOCK_RECOVERY,
     }
+    if "kit" in spec:
+        with zipfile.ZipFile(cache / spec["kit"]) as kit:
+            tee = member(archive=kit, suffix="bin/tee-donut.bin")
+        stock[f"{BY_NAME}/tee1"] = stock[f"{BY_NAME}/tee2"] = tee
+    if "device_type" in spec:
+        stock["/dev/block/mmcblk0boot1"] = (
+            IDME_MAGIC + f"\0device_type_id\0{spec['device_type']}\0".encode()
+        ).ljust(IDME_BLOCKS * SECTOR, b"\0")
     with tempfile.TemporaryDirectory() as folder:
         local = pathlib.Path(folder) / "image"
         for node, data in stock.items():
@@ -357,7 +418,10 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
         record(entry={"event": "unplugged"})
     else:
         if start == "twrp":
-            write_amonet_v2(state=state)
+            if "kit" in spec:
+                write_kamakiri(state=state)
+            else:
+                write_amonet_v2(state=state)
         boot(into=STARTS[start], state=state)
     save(state=state)
     print(f"{name}: {state['mode']}")
@@ -376,10 +440,14 @@ def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[comp
     known = state["known"]
     lk = identify(prefixes=facts["prefixes"].get("lk_a", {}), table=known["lk"])
     none = {"mode": "none", "why": ""}
+    if into == "held":
+        return {"mode": "bootrom", "why": "the action button was held at power-on"}
     if not facts["preloader"]:
         return {"mode": "bootrom", "why": "boot0 holds no preloader"}
     if lk is None:
         return {"mode": "preloader", "why": "lk_a holds no LK this simulator knows"}
+    if "kit" in spec:
+        return decide_kamakiri(facts=facts, into=into, lk=lk, state=state)
     description = {"stock": spec["stock_lk"], "v1": LK_FIREOS5}.get(lk, spec["v2_lk"])
     marker = (lk == "v1" and facts.get("expdb_fastboot")) or (
         lk == "v2" and facts.get("misc_fastboot")
@@ -464,6 +532,72 @@ def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[comp
             }
         return {"lk": lk, "mode": "unauthorized"}
     return {**none, "why": f"system_{slot} holds no OS this simulator knows"}
+
+
+def decide_kamakiri(*, facts: dict, into: str, lk: str, state: dict) -> dict:  # ruff: ignore[too-many-return-statements]
+    device = state["device"]
+    known = state["known"]
+    none = {"mode": "none", "why": ""}
+    kaeru = identify(prefixes=facts["prefixes"].get("expdb", {}), table=known["kaeru"])
+    description = DEVICES[device]["stock_lk"]
+    slot = facts["active"] or "a"
+    marker = kaeru and facts.get("misc_bootonce")
+    if into in FASTBOOT_INTO or marker:
+        slots = {"current-slot": slot, "slot-count": "2"} if kaeru else {}
+        return {
+            "consumed": "misc" if marker else None,
+            "consumed_bytes": BOOTONCE_BYTES,
+            "lk": lk,
+            "mode": "fastboot",
+            "vars": {
+                "lk_build_desc": description,
+                "product": device.upper(),
+                "unlock_status": "true" if kaeru else "false",
+                **slots,
+            },
+        }
+    if into == "recovery":
+        if not kaeru:
+            return {**none, "why": "a locked LK refuses an unsigned recovery"}
+        twrp = identify(
+            prefixes=facts["prefixes"].get("swdl", {}), table=known["recovery"]
+        )
+        if twrp is None:
+            return {**none, "why": "swdl holds no TWRP this simulator knows"}
+        return {
+            "flavour": "twrp-3.7.0",
+            "lk": lk,
+            "mode": "recovery",
+            "props": {
+                "ro.boot.lk_build_desc": description,
+                "ro.boot.slot_suffix": f"_{slot}",
+                "ro.product.device": device,
+                "ro.twrp.version": TWRPS[twrp],
+                "sys.usb.config": "mtp,adb",
+            },
+            "twrp": twrp,
+            "uid": 0,
+        }
+    system = facts.get(f"system_{slot}") or {}
+    version = build_prop(key="ro.build.version.name", text=system.get("build"))
+    if not version.startswith("Fire OS 6"):
+        return {**none, "why": f"system_{slot} holds no OS this simulator knows"}
+    if facts.get(f"root_adb_{slot}"):
+        return {
+            "flavour": "fire-os-6",
+            "lk": lk,
+            "mode": "device",
+            "props": {
+                "ro.boot.lk_build_desc": description,
+                "ro.boot.slot_suffix": f"_{slot}",
+                "ro.build.version.name": version,
+                "ro.product.device": device,
+                "sim.su": "0",
+                "sys.boot_completed": "1",
+            },
+            "uid": 0,
+        }
+    return {"lk": lk, "mode": "unauthorized"}
 
 
 def destroy() -> None:
@@ -555,7 +689,7 @@ def docker(
 
 def dump_table(*, path: pathlib.Path) -> None:
     state = current()
-    skip = DISK_BYTES // SECTOR - TABLE_BACKUP_SECTORS
+    skip = DEVICES[state["device"]]["sectors"] - TABLE_BACKUP_SECTORS
     inside(
         command="dd if=/sim/disk/mmcblk0.img bs=512"
         f" count={TABLE_PRIMARY_SECTORS} 2>/dev/null > /sim/run/table.bin"
@@ -657,6 +791,9 @@ def fastbrick(*, image: str, sparse: int | None, state: dict) -> int:
 def flash(*, image: str, part: str, sparse: int | None, state: dict) -> int:
     if part == "brick":
         return fastbrick(image=image, sparse=sparse, state=state)
+    if "kit" in DEVICES[state["device"]] and part == "recovery":
+        print("Warning: recovery partition size: 0")
+        part = "swdl"
     node = partition_node(part=part)
     size = partition_bytes(node=node, state=state)
     refusal = (
@@ -756,7 +893,21 @@ def is_runner(*, pid: int) -> bool:
 
 
 def known_images(*, cache: pathlib.Path, device: str) -> dict:
-    with zipfile.ZipFile(cache / DEVICES[device]["amonet"]) as v2:
+    spec = DEVICES[device]
+    if "kit" in spec:
+        with zipfile.ZipFile(cache / spec["kit"]) as kit:
+            images = {
+                "kaeru": {"kaeru": [member(archive=kit, suffix=spec["kaeru"])]},
+                "lk": {"stock": [stock_lk(cache=cache, device=device)]},
+                "recovery": {
+                    "donut": [member(archive=kit, suffix="bin/twrp-donut.img")]
+                },
+            }
+        return {
+            kind: {name: measured(images=found) for name, found in table.items()}
+            for kind, table in images.items()
+        }
+    with zipfile.ZipFile(cache / spec["amonet"]) as v2:
         lks = {"v2": [member(archive=v2, suffix="bin/lk.bin")]}
         recoveries = {"v2": [member(archive=v2, suffix="bin/twrp.img")]}
     if device == "biscuit":
@@ -764,7 +915,7 @@ def known_images(*, cache: pathlib.Path, device: str) -> dict:
             lks["v1"] = [member(archive=v1, suffix="bin/lk.bin")]
             recoveries["v1"] = [member(archive=v1, suffix="bin/twrp.img")]
         recoveries["bboe"] = [(cache / "twrp-3.7.0_9-bboe2-biscuit.img").read_bytes()]
-    lks["stock"] = [stock_lk(device=device)]
+    lks["stock"] = [stock_lk(cache=cache, device=device)]
     return {
         "lk": {name: measured(images=images) for name, images in lks.items()},
         "recovery": {
@@ -925,7 +1076,11 @@ def partition_node(*, part: str) -> str:
 def plug() -> None:
     with locked():
         state = load()
-        if state["mode"] == "none" and not state.get("booting"):
+        if "kit" in DEVICES[state["device"]] and state["mode"] != "bootrom":
+            record(entry={"event": "held"})
+            boot(into="held", state=state)
+            save(state=state)
+        elif state["mode"] == "none" and not state.get("booting"):
             boot(into="system", state=state)
             save(state=state)
         print(state["mode"])
@@ -1028,6 +1183,10 @@ def record(*, entry: dict) -> None:
             view = view[os.write(descriptor, view) :]
     finally:
         os.close(descriptor)
+
+
+def recovery_part(*, device: str) -> str:
+    return "swdl" if "kit" in DEVICES[device] else "recovery"
 
 
 def refuse_real_caches() -> None:
@@ -1247,7 +1406,10 @@ def start_bootrom() -> None:
         )
 
 
-def stock_lk(*, device: str) -> bytes:
+def stock_lk(*, cache: pathlib.Path, device: str) -> bytes:
+    if "kit" in DEVICES[device]:
+        with zipfile.ZipFile(cache / DEVICES[device]["kit"]) as kit:
+            return member(archive=kit, suffix="bin/lk-donut.bin")
     return (
         (f"SIM STOCK LK {DEVICES[device]['stock_lk']}\0product\0{device.upper()}\0")
         .encode()
@@ -1255,10 +1417,13 @@ def stock_lk(*, device: str) -> bytes:
     )
 
 
-def stock_lks(*, device: str) -> list[list]:
+def stock_lks(*, cache: pathlib.Path, device: str) -> list[list]:
     extracted = sorted((SIM_CACHE / TOOL_CACHE).glob(f"stock-{device}-*/lk.img"))
     return measured(
-        images=[stock_lk(device=device), *(path.read_bytes() for path in extracted)]
+        images=[
+            stock_lk(cache=cache, device=device),
+            *(path.read_bytes() for path in extracted),
+        ]
     )
 
 
@@ -1318,22 +1483,32 @@ def warn(*, text: str) -> None:
 
 def write_amonet_v2(*, state: dict) -> None:
     spec = DEVICES[state["device"]]
-    writes = []
-    with (
-        zipfile.ZipFile(pathlib.Path(state["cache"]) / spec["amonet"]) as v2,
-        tempfile.TemporaryDirectory() as folder,
-    ):
-        upload = pathlib.Path(folder) / "brick"
-        upload.mkdir()
-        for target, suffix in (
+    write_chain(
+        archive=spec["amonet"],
+        images=(
             ("lk_a", "bin/lk.bin"),
             ("lk_b", "bin/lk.bin"),
             ("tee2", "bin/tz.img"),
             ("tee1", "bin/tee-payload.bin"),
             ("expdb", spec["kaeru"]),
             ("recovery", "bin/twrp.img"),
-        ):
-            (upload / target).write_bytes(member(archive=v2, suffix=suffix))
+        ),
+        state=state,
+    )
+
+
+def write_chain(
+    *, archive: str, images: tuple[tuple[str, str], ...], state: dict
+) -> None:
+    writes = []
+    with (
+        zipfile.ZipFile(pathlib.Path(state["cache"]) / archive) as chain,
+        tempfile.TemporaryDirectory() as folder,
+    ):
+        upload = pathlib.Path(folder) / "brick"
+        upload.mkdir()
+        for target, suffix in images:
+            (upload / target).write_bytes(member(archive=chain, suffix=suffix))
             node = f"{BY_NAME}/{target}"
             writes.append(
                 f"blockdev --setrw {node} 2>/dev/null; dd if=/sim/brick/{target}"
@@ -1355,6 +1530,18 @@ def write_image(*, local: pathlib.Path, node: str, seek: int = 0, state: dict) -
         command=f"blockdev --setrw {node} 2>/dev/null; dd if=/sim/upload"
         f" of={node} bs=512 seek={seek} conv=notrunc,fsync 2>/dev/null;"
         f" rm -f /sim/upload{protect(node=node)}",
+        state=state,
+    )
+
+
+def write_kamakiri(*, state: dict) -> None:
+    write_chain(
+        archive=DEVICES[state["device"]]["kit"],
+        images=(
+            ("tee1", "bin/tee-donut-payload.bin"),
+            ("expdb", DEVICES[state["device"]]["kaeru"]),
+            ("swdl", "bin/twrp-donut.img"),
+        ),
         state=state,
     )
 

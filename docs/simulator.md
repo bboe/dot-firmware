@@ -1,7 +1,7 @@
 # The simulator
 
 `simulator/` runs firebreak against a simulated Dot. No Dot, real `adb`, real
-`fastboot` or real serial port takes part.
+`fastboot`, real serial port or real USB device takes part.
 
 ## Running it
 
@@ -12,6 +12,9 @@ START=twrp simulator/run.sh OUT stock 8149
 DEVICE=radar simulator/run.sh OUT unlock fireos6
 DEVICE=radar START=twrp simulator/run.sh OUT stock 6436
 DEVICE=radar START=no-light simulator/run.sh OUT short --device radar
+DEVICE=donut START=stock-booted simulator/run.sh OUT unlock fireos6
+FIREBREAK_SIM_ELEVATES=0 DEVICE=donut START=stock-booted simulator/run.sh OUT unlock fireos6
+DEVICE=donut START=twrp simulator/run.sh OUT stock 8349
 python3 simulator/trace.py OUT.jsonl             # one command per line, for diff
 python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per range
 ```
@@ -69,9 +72,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   full unlock run would get to.
 - `simulator/entries.sh OUT` runs each entry command twice on a fresh Echo,
   once to act and once to find the state it left, and checks what each run
-  says. It is the grid the entry commands are held to, 23 cases over both
-  devices: `fastboot` and `twrp` from an amonet TWRP, from stock fastboot and
-  from a stock boot; `twrp` from an amonet fastboot; `twrp --force` from the
+  says. It is the grid the entry commands are held to, 34 cases over the
+  three devices: `fastboot` and `twrp` from an amonet TWRP, from stock
+  fastboot and from a stock boot; `twrp` from an amonet fastboot; `twrp
+  --force` from the
   locked fastboot it fastbricks; `bootrom --force` from an amonet TWRP, from
   an amonet fastboot, from the locked fastboot that refuses it and from the
   stock boot that has no way in; `reboot` from an amonet TWRP, from either
@@ -79,7 +83,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   light. The second run of each is the no-op: `fastboot` and `twrp` report the
   state they are in, `bootrom` and `short` report a hold they join, `reboot`
   reports the firmware it finds running, or the bootrom it cannot leave, and
-  `twrp --force` writes no second fastbrick. It found the one that did not
+  `twrp --force` writes no second fastbrick. A donut's 11 add the refusals
+  it alone meets: `twrp --force` from stock fastboot, which has no fastbrick
+  there, `bootrom --force`, which has no bootrom chain, and `short`, which
+  amonet does not unlock. It found the one that did not
   hold: `short` asked for the short again on a bootrom already held, with the
   case open and a wire in hand for nothing.
 - `DEVICE=biscuit`, the default, makes an Echo Dot (2nd Generation).
@@ -90,19 +97,25 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   stock fastboot or `START=no-light` and `stock` from `START=twrp`. A radar
   unlock takes amonet-radar v1.0.1's archive and its own fastbrick map, which
   the simulated radar checks the flashed payload against.
-- **There is no `DEVICE=donut`, and adding one is not a flavour file.** This
-  simulator fakes two things: the USB listing, by patching
-  `firebreak.identify.usb_devices`, and a serial port, as a PTY. A donut needs
-  neither. `open_bootrom` calls libusb, so `firebreak.mediatek.libusb` would
-  have to join the patched modules and hand back a PTY-backed object in place
-  of `Usb`, which is the tractable part, because `Usb` is already the shape a
-  PTY speaks. `trigger` starts its payload by spawning `sudo`, so it would have
-  to poke the simulated bootrom instead. `bootrom.py` would need `0xFD`, the
-  read ladder and `0xE0`, then stage1's `0x4000` and `0x4001` with both ready
-  patterns, then stage2 speaking the payload protocol including `0x6000`. And
-  the device would need donut's 16-partition table, boot0, RPMB and Fire OS 6
-  flavours. That route has since run on hardware, repeatedly, so what this
-  cannot exercise is the one device whose unlock is measured best.
+- `DEVICE=donut` makes an Echo Dot (3rd Generation), and `START=stock-booted`
+  is the start its unlock is for. Its table is the 16 partitions read from a
+  stock donut's own GPT, `swdl` where the others have `recovery`, on a
+  7,634,944-sector disk, with boot areas of 4 MiB. Its stock `lk_a`, `lk_b`,
+  `tee1` and `tee2` hold the kit's `lk-donut.bin` and `tee-donut.bin`, because
+  on hardware the kit's images are the donut's own stock bytes, and boot1
+  opens with an IDME that names `A32DOYMUN6DTXA`. It reads as unlocked when
+  `expdb` holds the kit's kaeru, and `fastboot flash recovery` writes `swdl`,
+  as kaeru's fastboot does. Those runs match the hardware ones in steps and
+  skips: the unlock from stock took 12 steps with the TEE and the bootloader
+  skipped, `--factory-reset` took 14, and the restore from TWRP took 15 with
+  the same five skips.
+- A donut needs no short. `run.sh` holds its action button when firebreak asks
+  for the bootrom: `dot.py plug` restarts it into the bootrom whatever it was
+  doing, which is what the hold does on hardware.
+- `FIREBREAK_SIM_ELEVATES` picks the attack. `1` takes mtkclient's trigger,
+  which firebreak sends on macOS, and `0` takes the kit's overflow, which it
+  sends on Linux and Windows. Unset, firebreak picks by the host, as it does on
+  hardware. So one host runs both.
 - `report` and `write-test` take any start, because `run.sh` passes the target
   through as a command. `write-test` takes the bootrom route where the Echo
   reads as a bootrom, so `short` first is the way here to reach the
@@ -405,7 +418,8 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 
 - The bootrom is `simulator/bootrom.py`, on a pseudo-terminal, started at the boot
   into the bootrom. It runs no code. It answers the handshake, `0xd1`,
-  `0xd4` and `0xc8`.
+  `0xd4`, `0xc8` and `0xfd`, which reports `0x8163` for a biscuit and a radar
+  and `0x8167` for a donut, with status `0x0000`, as measurements.md read.
 - Waiting for the handshake, it answers any other byte with that byte plus
   one, as a real bootrom does, so `0xf0` comes back as `0xf1`. That is what a
   run's probe reads to tell a bare bootrom from a payload holding one. Until
@@ -422,6 +436,37 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 - A write to `0x1028A8` jumps. The bootrom compares the memory at `0x201000`
   with the `payload.bin` of each amonet zip. It answers as the payload that
   matches, and stays silent for any other code.
+
+### A donut's bootrom
+
+- A donut's bootrom also answers `0xda` and `0xe0`, and the control transfers
+  that arrive on its second pseudo-terminal. It stalls every transfer it does
+  not model, with `[Errno 32] Pipe error`.
+- The kit's overflow: `SET_LINE_CODING` on interface 0 keeps its first 7
+  bytes as the line coding, and the word after the eighth byte as a pointer.
+  `GET_LINE_CODING` returns the line coding. `GET_DESCRIPTOR` for the
+  configuration walks that pointer. An `0xda` access goes through only when the
+  six pointers firebreak walks, `0xd7a8` to `0xd7aa` and `0xd7b1` to `0xd7b3`,
+  were all walked since the last access, and is refused with `0x1d0c` otherwise.
+  The kit walks before every access, so the simulator asks for that, but which
+  walks a real bootrom needs, and whether an access spends them, is not
+  measured.
+- `0xda` adds `0x40` to the address it is given, as firebreak's offsets
+  assume. `0xd2e4` holds the send routine's address, `0x102c40`, which the
+  simulator invents. A write of a word to that address plus 8 jumps to the
+  word, with no end status.
+- mtkclient's trigger: `0xe0` keeps the payload it is sent. The control
+  transfer `0xa1` to `wIndex` `0xcc` jumps to that payload at `0x100a00` once
+  `0x10007050` holds that address byte-reversed and all 15 reads of the ladder
+  have ended on that word. Otherwise it stalls, and so does a second trigger
+  once the payload has jumped.
+- A jump to `0x100a00` compares the memory there with the kit's `stage1.bin`.
+  Stage 1 answers `0xa1a2a3a4`, takes `0x4000` and `0x4001`, and starts stage
+  2 only when what it was given is the kit's `stage2.bin`. Stage 2 answers
+  `0xb1b2b3b4` and speaks the payload's protocol below, with the nine commands
+  firebreak's donut client sends.
+- `0x6000` sets the fastboot flag, in the payload and not in flash, as on
+  hardware. The `0x3000` after it restarts into fastboot.
 
 ### The payload
 
@@ -447,7 +492,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   when it is booted, adb `unauthorized` too, as `Echo Dot (2nd Gen)` in TWRP
   3.7.0 and as `Echo Dot 2nd Gen` in TWRP 3.2.3, as `0e8d:0003` with no
   strings in its bootrom, as `0e8d:2000` `MediaTek` `MT65xx Preloader` in the
-  `preloader` mode, and lists nothing in any other mode. The two download ids
+  `preloader` mode, and lists nothing in any other mode. A donut is `AEODN`
+  when it is booted, and `Echo Dot (3rd Gen)` in its TWRP. Neither its ids
+  nor its TWRP's strings are read from one: firebreak names it by
+  `ro.product.device` and its hardware code. The two download ids
   are what firebreak reads the bootrom and preloader states from, so without
   them a run in either state read nothing on USB at all.
 - A Dot whose boot0 holds a preloader, and whose `lk_a` holds no LK this
@@ -474,6 +522,11 @@ The simulator accepts these, where a real Dot may not:
 - `-s` and `ANDROID_SERIAL`, which it records and ignores
 - `dd` past 2 GiB of `mmcblk0` under bboe2 and 3.7.0_9-0, where the Dot's
   `dd` answers `EINVAL`
+- a donut's ladder read answering status `0x0000`, where the first one
+  answers `0x0003` on hardware
+- a donut's trigger with no `sudo`: `authorize` answers yes and asks nothing,
+  though the run still prints the sudo note on macOS
+- a donut's TWRP with no decoy nodes, which no reading has looked for
 
 ## The port
 
@@ -500,6 +553,19 @@ The simulator accepts these, where a real Dot may not:
   block before this and now can.
 - The bootrom keeps the pseudo-terminal's other end open, so a tool can close
   and reopen the port.
+- `ports.py` also replaces `open_bootrom`, `trigger` and `authorize` in
+  `firebreak.mediatek.libusb`, and `ELEVATES` when `FIREBREAK_SIM_ELEVATES`
+  is set. `open_bootrom` hands back the bootrom's pseudo-terminal in an object
+  of `Usb`'s shape, with its control transfers sent as JSON lines on the
+  second pseudo-terminal. So a donut is named over the serial port and then
+  driven through that object on the same handshake, as on hardware. `trigger`
+  sends its transfer the same way and answers an empty string, as the real
+  one does through `sudo`, which swallows the transfer's error. It raises
+  `NotThereError` when the Echo is not in its bootrom, as `found` does.
+- The bootrom serves a control transfer while it waits for its next byte, so
+  a trigger can start stage 1 while the data stream is idle. The wait for a
+  reply is real time, 5 s: on the fast clock it was 0.25 s at the default
+  speed, short enough for a slow reply to be read by the next transfer.
 
 ## The clock
 
