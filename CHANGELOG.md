@@ -39,6 +39,14 @@ This project adheres to [Semantic Versioning](https://semver.org).
   A run that needs it and has not got it says so and names `brew install
   libusb`, in place of pyusb's own `No backend available`.
 
+- An Echo Dot (3rd Generation) unlocks from Linux, with no `sudo`. A Linux
+  kernel refuses the trigger that macOS sends, so every host but macOS starts
+  stage 1 with kamakiri-donut's own sequence: an overflowed `SET_LINE_CODING`
+  on interface 0, then command `0xDA`. The run detaches `cdc_acm` from that
+  interface first. On 2026-11-04 it ran from the bootrom to rooted Fire OS 6
+  8349 in 13 steps and 3m 22s, and from genuinely stock in 12 steps and
+  3m 07s.
+
 ### Changed
 
 - No error message calls an unlock a payload any more, which is this project's
@@ -104,17 +112,10 @@ This project adheres to [Semantic Versioning](https://semver.org).
   no run elevates, so a missing rule showed that way.
 - A bootrom reaches its unlock on Linux, where the kernel's `cdc_acm` driver
   held the interface libusb needs and the run stopped with `[Errno 16]
-  Resource busy`. A run detaches that driver first, and says so where it
-  cannot.
+  Resource busy`. A run off macOS detaches that driver first, and says so
+  where it cannot.
 - The exploit's trigger says what it answered where the payload does not come
-  up, in place of swallowing it, and names what a Linux kernel does with that
-  transfer: usbfs refuses a class request naming an interface it has no record
-  of, and being out of bounds is the exploit. So firebreak unlocks an Echo Dot
-  (3rd Generation) from macOS only, which the README now says, while every
-  other command reaches that Echo on Linux. kamakiri's own kit overflows a
-  `SET_LINE_CODING` to a real interface instead, which a kernel sends, and its
-  exploit has now run on Linux against the same Echo, so the limit is the
-  attack this carries rather than the Echo.
+  up, in place of swallowing it.
 - The password for the privileged call is asked for again once the bootrom has
   answered, because sudo's own timestamp can expire during the button hold and
   the download, which put the prompt back where it was.

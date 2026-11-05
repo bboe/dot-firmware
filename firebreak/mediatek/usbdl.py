@@ -36,6 +36,7 @@ class BootromCommand(enum.IntEnum):
     EXTENDED = 0xC8
     READ_WORDS = 0xD1
     WRITE_WORDS = 0xD4
+    ACCESS = 0xDA
     SEND_PAYLOAD = 0xE0
     HARDWARE_CODE = 0xFD
 
@@ -97,6 +98,29 @@ class Bootrom(Connection):
             label=label,
             received=self.read_exactly(label=label, length=len(expected)),
         )
+
+    def access(
+        self,
+        *,
+        address: int,
+        data: bytes = b"",
+        end_status: bool = True,
+        length: int = 0,
+    ) -> bytes:
+        length = len(data) if data else length
+        label = f"{'write' if data else 'read'} of {length} bytes at {address:#x}"
+        self._echo(data=bytes([BootromCommand.ACCESS]), label=label)
+        for word in (int(bool(data)), address, length):
+            self._echo(data=struct.pack(">I", word), label=label)
+        self._status(expected=READ_STATUS, label=f"{label}: argument status")
+        held = b""
+        if data:
+            self.port.write(data=data)
+        else:
+            held = self.read_exactly(label=label, length=length)
+        if end_status:
+            self._status(expected=READ_STATUS, label=f"{label}: end status")
+        return held
 
     def disable_caches(self) -> None:
         self.send_extended(subcommand=CACHE_DISABLE_SUBCOMMAND)

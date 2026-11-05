@@ -47,6 +47,7 @@ MEASURED_ENUMS = {
         ("EXTENDED", 0xC8),
         ("READ_WORDS", 0xD1),
         ("WRITE_WORDS", 0xD4),
+        ("ACCESS", 0xDA),
         ("SEND_PAYLOAD", 0xE0),
         ("HARDWARE_CODE", 0xFD),
     ],
@@ -56,6 +57,12 @@ MEASURED_ENUMS = {
 
 class FakeSerialError(Exception):
     pass
+
+
+def accessed(*, address: int, length: int, write: bool) -> bytes:
+    return bytes([usbdl.BootromCommand.ACCESS]) + struct.pack(
+        ">III", int(write), address, length
+    )
 
 
 def fake_serial(
@@ -92,6 +99,33 @@ def fake_serial(
 
 def port_entry(*, device: str, product: int | None, vendor: int | None) -> object:
     return types.SimpleNamespace(device=device, pid=product, vid=vendor)
+
+
+def test_access_reads_what_it_asks_for() -> None:
+    header = accessed(address=0xD2A4, length=4, write=False)
+    bootrom, port = shook(
+        replies=header + usbdl.READ_STATUS + b"abcd" + usbdl.READ_STATUS
+    )
+    assert bootrom.access(address=0xD2A4, length=4) == b"abcd"
+    assert bytes(port.written) == header
+    assert port.replies == bytearray()
+
+
+def test_access_refuses_a_status_that_is_not_zero() -> None:
+    header = accessed(address=0, length=1, write=False)
+    bootrom, _ = shook(replies=header + b"\x1d\x1a")
+    with pytest.raises(
+        expected_exception=usbdl.ProtocolMismatchError, match="argument status"
+    ):
+        bootrom.access(address=0, length=1)
+
+
+def test_access_writes_and_can_leave_the_end_status_unread() -> None:
+    header = accessed(address=0x100A00, length=2, write=True)
+    bootrom, port = shook(replies=header + usbdl.READ_STATUS)
+    assert bootrom.access(address=0x100A00, data=b"xy", end_status=False) == b""
+    assert bytes(port.written) == header + b"xy"
+    assert port.replies == bytearray()
 
 
 def test_constants_match_the_measured_values() -> None:

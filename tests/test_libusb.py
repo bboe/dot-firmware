@@ -28,6 +28,9 @@ class FakeDevice:
         self.transfers: list[tuple[int, int, int, int]] = []
         self.unsupported = False
 
+    def allow_claims(self) -> None:
+        self._ctx.managed_claim_interface = lambda *_: None
+
     def ctrl_transfer(
         self,
         request_type: int,
@@ -35,6 +38,7 @@ class FakeDevice:
         value: int,
         index: int,
         payload: object,
+        *_: int,
     ) -> object:
         self._ctx.managed_claim_interface(self, index & 0xFF)
         self.transfers.append((request_type, request, value, index))
@@ -217,6 +221,19 @@ def test_close_swallows_a_dispose_that_fails(
     port.close()
 
 
+def test_control_in_returns_bytes_and_control_out_goes_to_the_interface(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port, device, _ = ported(monkeypatch=monkeypatch)
+    device.allow_claims()
+    assert (
+        port.control_in(index=0, length=3, request=0x21, request_type=0xA1, value=0)
+        == b"\x00\x00\x00"
+    )
+    port.control_out(data=b"\x01\x02", index=0, request=0x20, value=0)
+    assert device.transfers == [(0xA1, 0x21, 0, 0), (libusb.TO_INTERFACE, 0x20, 0, 0)]
+
+
 def test_elevated_runs_the_helper_with_the_index(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -271,6 +288,18 @@ def test_endpoints_needs_a_pair_of_bulk_endpoints(
         libusb.endpoints(device=device)
 
 
+def test_open_bootrom_asks_nothing_of_a_driver_where_a_helper_sends_the_trigger(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    interface, device, _ = interfaced()
+    device.held = True
+    device.refuse_detach = True
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=True)
+    patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
+    assert libusb.open_bootrom() is not None
+    assert device.detached == []
+
+
 def test_open_bootrom_hands_back_a_port(*, monkeypatch: pytest.MonkeyPatch) -> None:
     interface, device, (inward, outward) = interfaced()
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
@@ -285,6 +314,7 @@ def test_open_bootrom_leaves_a_platform_with_no_detaching_alone(
 ) -> None:
     interface, device, _ = interfaced()
     device.unsupported = True
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=False)
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
     assert libusb.open_bootrom() is not None
     assert device.detached == []
@@ -341,19 +371,21 @@ def test_open_bootrom_says_when_the_kernel_will_not_let_the_interface_go(
     interface, device, _ = interfaced()
     device.held = True
     device.refuse_detach = True
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=False)
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
     with pytest.raises(expected_exception=libusb.NotPermittedError, match="udev rules"):
         libusb.open_bootrom()
 
 
-def test_open_bootrom_takes_the_interface_the_kernel_holds(
+def test_open_bootrom_takes_both_interfaces_where_no_helper_sends_the_trigger(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     interface, device, _ = interfaced()
     device.held = True
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=False)
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
     assert libusb.open_bootrom() is not None
-    assert device.detached == [interface.bInterfaceNumber]
+    assert device.detached == [libusb.CONTROL_INTERFACE, interface.bInterfaceNumber]
 
 
 def test_pyusb_imports_the_real_module() -> None:

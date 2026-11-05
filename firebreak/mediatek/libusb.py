@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 CDC_DATA_CLASS = 0x0A
+CONTROL_INTERFACE = 0
 DRAIN_TIMEOUT = 0.05
 ELEVATES = sys.platform == "darwin"
 FROM_DEVICE = 0x80
@@ -84,6 +85,22 @@ class Usb:
         self.held = b""
         with contextlib.suppress(core.core.USBError):
             core.util.dispose_resources(self.device)
+
+    def control_in(
+        self, *, index: int, length: int, request: int, request_type: int, value: int
+    ) -> bytes:
+        return bytes(
+            bytearray(
+                self.device.ctrl_transfer(
+                    request_type, request, value, index, length, self._milliseconds()
+                )
+            )
+        )
+
+    def control_out(self, *, data: bytes, index: int, request: int, value: int) -> None:
+        self.device.ctrl_transfer(
+            TO_INTERFACE, request, value, index, data, self._milliseconds()
+        )
 
     def read(self, *, size: int) -> bytes:
         if len(self.held) < size:
@@ -215,7 +232,9 @@ def open_bootrom(*, timeout: float = READ_TIMEOUT) -> Usb:
         with contextlib.suppress(core.core.USBError):
             core.util.dispose_resources(device)
         raise
-    detached(core=core, device=device, interface=data.bInterfaceNumber)
+    if not ELEVATES:
+        detached(core=core, device=device, interface=CONTROL_INTERFACE)
+        detached(core=core, device=device, interface=data.bInterfaceNumber)
     return Usb(device=device, inward=inward, outward=outward, timeout=timeout)
 
 

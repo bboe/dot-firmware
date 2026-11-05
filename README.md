@@ -58,14 +58,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uvx firebreak@latest
 ```
 
-**firebreak unlocks an Echo Dot (3rd Generation) from macOS only.** The
-exploit it carries needs one control transfer naming a table index where a
-Linux kernel expects an interface, and usbfs answers `EINVAL` rather than
-sending it. This is a limit of the attack firebreak chose, not of the Echo:
-kamakiri's own kit reaches the same bootrom another way, built from requests a
-kernel will send, and that one has been run on Linux against the same Echo.
-Everything else here reaches that Echo on Linux: `stock`, `fastboot`, `twrp`
-and the whole restore are measured there.
+An Echo Dot (3rd Generation) unlocks on Linux with no `sudo`. Linux uses a
+different exploit from macOS, because each host refuses the transfer the other
+exploit needs. `stock`, `fastboot`, `twrp` and the whole restore also run on
+Linux.
 
 ### Windows
 

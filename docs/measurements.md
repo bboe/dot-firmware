@@ -247,8 +247,10 @@ was written to its flash.
   carried its 12-byte `SET_LINE_CODING`, 7 of line coding, a zero and a 4-byte
   pointer, and reported all 12 delivered. So the host did not stop it, and
   where the overflow lands is the remaining suspect. The kit is developed on
-  Linux, which its own ModemManager check shows, so the same run there is what
-  would settle it.
+  Linux, which its own ModemManager check shows. The same run on Linux settled
+  it on 2026-11-04: the kit's attack works there, and firebreak now uses it on
+  every host but macOS. [unlocking.md](unlocking.md#echo-dot-3rd-generation)
+  has the reading.
 
 ## What a bootrom gives you before it is exploited
 

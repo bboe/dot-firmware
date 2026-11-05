@@ -2337,10 +2337,9 @@ again: its trigger is `ctrl_transfer(0xA1, 0, 0, self.var1, 0)` with `var1`
 brute-forced per SoC, and on Linux only a `var1` naming a real interface
 leaves the host.
 
-So **firebreak unlocks a donut from macOS only**, which the README says and
-the failure says again with this reading behind it. That is a limit of the
-attack firebreak carries, and **not of the Echo**, which is the part the first
-write-up of this got wrong.
+So, with that attack alone, **firebreak unlocked a donut from macOS only**.
+That is a limit of the attack, and **not of the Echo**, which is the part the
+first write-up of this got wrong.
 
 **The kit reaches the same bootrom with requests a kernel will send, which is
 why kamakiri is Linux tooling.** Read out of `modules/load_payload.py` in
@@ -2374,7 +2373,7 @@ fresh bootrom, with `cdc_acm` detached first:
 
 Three seconds from handshake to stage 2, then 512 KB of `misc` read off the
 eMMC at 0.43 MB/s, and nothing written. **So a donut's bootrom is exploitable
-on Linux**, and what is macOS-only is the attack firebreak carries.
+on Linux**, and what was macOS-only is mtkclient's attack.
 
 That also corrects the note above it. The kit's loader does not simply fail:
 it failed on macOS, which is where every donut reading before that day was
@@ -2383,15 +2382,44 @@ driver owns. The two attacks fail on opposite platforms, each needing what the
 other host will not give, which is why one tool carrying both is the thing
 worth building.
 
+**firebreak carries both now, chosen by host, and the Linux unlock has run.**
+macOS keeps mtkclient's trigger. Every other host takes the kit's sequence
+step for step: one `SET_LINE_CODING` at 115200 baud, a `GET_LINE_CODING`, and
+then three `0xDA` accesses, to read the send pointer, to write stage 1 at
+`0x100A00`, and to point the send routine at it. Before each access the kit
+sends a `0xDA` read of one byte and a word read at `0x10007050`, and then the
+six pointer walks. The kit ignores any error from that first pair, so
+firebreak ignores it too. Off macOS, the open also detaches `cdc_acm` from
+interface 0, as the kit does. On 2026-11-04, on kernel 6.8.0-147, an
+unprivileged run went from the bootrom to rooted Fire OS 6 8349 in 13 steps
+and 3m 22s, with no `sudo`. The same day a Linux restore took that Echo to
+stock 8349 in 16 steps and 5m 31s, and a Linux unlock took it from genuinely
+stock and locked to rooted again in 12 steps and 3m 07s. Both unlocks asked
+for the power cycle after boot-root. Windows also takes the kit's path, and is unread.
+
+**macOS detaches nothing.** The detach above was never run on macOS, and the
+first macOS unlock after it stopped at `waiting for the bootrom`:
+
+```text
+ERROR: the kernel holds the interface libusb needs to reach the bootrom, and
+firebreak cannot take it: [Errno 13] Access denied (insufficient permissions).
+```
+
+libusb 1.0.30 does answer a driver query on macOS, so `NotImplementedError`
+did not cover it. Unprivileged, it answers `EACCES` on both interfaces, as
+[the libusb readings](measurements.md#what-libusb-can-do-on-macos) found, and
+the data interface carries the payload protocol all the same. So only a host
+that takes the kit's path asks about a kernel driver. With that change, a
+macOS unlock on 2026-11-04 took the Echo from stock 8349 to rooted 8349 in 13
+steps and 5m 44s through mtkclient's trigger. It asked for the power cycle
+after boot-root as well, and the wait for it holds most of that time.
+
 The dump paid for itself twice. `misc`'s command field is all zeros, which is
 the self-clearing the fastboot route relies on, and `0x360` reads
 `00 41 42 42 01 00 8f 00` on an Echo freshly restored to stock: the same bytes
 as the rooted reading, so the restore leaves that block alone as intended and
 whatever zeroed slot a did it during the `--factory-reset` unlock rather than
 the restore.
-
-Windows is unread as well, and WinUSB validating no recipient is the reason to
-try the attack firebreak already carries there.
 
 **`--factory-reset` has run too, on 2026-11-04: 14 steps in 7m 14s**, from a
 donut genuinely stock and locked to rooted 8349 with an erased `/data`, and
@@ -2476,11 +2504,12 @@ transfers alone, are in
 [measurements.md](measurements.md#what-libusb-can-do-on-macos) and
 [measurements.md](measurements.md#an-echo-dot-3rd-generation-in-its-bootrom).
 
-The exploit in `firebreak/mediatek/kamakiri.py` is mtkclient's, not the kit's,
-and the two are different attacks on the same bootrom. The kit's own loader
-overflows `SET_LINE_CODING` and then walks a pointer with command `0xDA`; it
-was run against a donut and it fails, so firebreak does not carry it. What is
-here instead is four steps: one word to the watchdog's `0x50`, holding the
+`firebreak/mediatek/kamakiri.py` carries two attacks on the same bootrom, and
+the host picks one. Off macOS it is the kit's own loader, which overflows
+`SET_LINE_CODING` and then walks a pointer with command `0xDA`. That attack
+fails on macOS, where Apple's CDC driver owns interface 0, and the
+[donut section](#echo-dot-3rd-generation) has both readings. On macOS it is
+mtkclient's, in four steps: one word to the watchdog's `0x50`, holding the
 payload's load address **byte-reversed**; fifteen reads below that word, each
 starting one word higher and ending on it; command `0xE0` with a length, which
 answers whether the bootrom kept room and then takes the bytes; and a single
