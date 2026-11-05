@@ -500,7 +500,7 @@ def test_a_radar_takes_amonet_radars_chain_not_biscuits(
         name="target", target=route.ARGUMENTS, value=TARGETS[RADAR]["fireos6"]
     )
     unlocking = route.bootrom_chain().unlock
-    assert unlocking is radar.BOOTROM_UNLOCK
+    assert unlocking is radar.CONFIG.bootrom_unlock
     assert unlocking.device.product == "RADAR"
     assert unlocking.plan[0] == ClearBoot0Header()
     assert unlocking.plan[1:] == radar.AMONET_V1_0_1.plan

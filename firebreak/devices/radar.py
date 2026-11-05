@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING
 
 from firebreak.cache import Download
 from firebreak.devices.biscuit import BISCUIT, UNLOCK_TO_FIREOS6, WRITE_KAERU
-from firebreak.plugin import ClearBoot0Header, FireOs6, Target
+from firebreak.plugin import ClearBoot0Header, DeviceConfig, FireOs6, Target
 from firebreak.states import State
 from firebreak.targets import FIREOS6, STOCK
 from firebreak.updates import cdn_ota
-
-if TYPE_CHECKING:
-    from firebreak.targets import Deprecated
 
 BUILDS = {
     "4305": cdn_ota(
@@ -80,16 +76,6 @@ BUILDS = {
     ),
 }
 DEFAULT_BUILD = "8149"
-DEFAULT_TARGET = FIREOS6
-FIREOS5_BUILDS = frozenset({"5.5.5.4"})
-FIREOS5_CHAIN = None
-KAMAKIRI_UNLOCK = None
-LK_VALUES = frozenset({
-    "59779ca-20220524_183401",
-    "63cb91b-20221007_073612",
-    "41fb3ce-20221007_153017",
-    "2c3569d-20260617_051433",
-})
 
 
 RADAR = dataclasses.replace(
@@ -129,29 +115,41 @@ AMONET_V1_0_1 = dataclasses.replace(
     source=SOURCE,
     version="1.0.1",
 )
-BOOTROM_UNLOCK = dataclasses.replace(
-    AMONET_V1_0_1, plan=(ClearBoot0Header(), *AMONET_V1_0_1.plan)
-)
-FASTBRICK = AMONET_V1_0_1
-TARGETS = (
-    Target(
-        device=RADAR,
-        goal=State.STOCK_BOOTED,
-        installs=FireOs6(build=None),
-        name=STOCK,
-        summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
-        " which erases the whole Echo.",
-        unlock=None,
+CONFIG = DeviceConfig(
+    bootrom_unlock=dataclasses.replace(
+        AMONET_V1_0_1, plan=(ClearBoot0Header(), *AMONET_V1_0_1.plan)
     ),
-    Target(
-        device=RADAR,
-        goal=State.AMONET_BOOTED,
-        installs=FireOs6(build=DEFAULT_BUILD),
-        name=FIREOS6,
-        summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
-        " which keeps the Echo's setup; with --factory-reset, Fire OS 6"
-        f" {DEFAULT_BUILD}, with the Echo erased.",
-        unlock=AMONET_V1_0_1,
+    builds=BUILDS,
+    default_build=DEFAULT_BUILD,
+    default_target=FIREOS6,
+    device=RADAR,
+    fastbrick=AMONET_V1_0_1,
+    fireos5_builds=frozenset({"5.5.5.4"}),
+    lk_values=frozenset({
+        "59779ca-20220524_183401",
+        "63cb91b-20221007_073612",
+        "41fb3ce-20221007_153017",
+        "2c3569d-20260617_051433",
+    }),
+    targets=(
+        Target(
+            device=RADAR,
+            goal=State.STOCK_BOOTED,
+            installs=FireOs6(build=None),
+            name=STOCK,
+            summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
+            " which erases the whole Echo.",
+            unlock=None,
+        ),
+        Target(
+            device=RADAR,
+            goal=State.AMONET_BOOTED,
+            installs=FireOs6(build=DEFAULT_BUILD),
+            name=FIREOS6,
+            summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
+            " which keeps the Echo's setup; with --factory-reset, Fire OS 6"
+            f" {DEFAULT_BUILD}, with the Echo erased.",
+            unlock=AMONET_V1_0_1,
+        ),
     ),
 )
-WAS_CALLED: dict[str, Deprecated] = {}

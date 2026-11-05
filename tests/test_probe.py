@@ -36,7 +36,7 @@ def recoveries(*, monkeypatch: pytest.MonkeyPatch) -> None:
         probe.FIREOS5_CHAINS,
         BISCUIT,
         dataclasses.replace(
-            biscuit.FIREOS5_CHAIN,
+            biscuit.CONFIG.fireos5_chain,
             recovery=dataclasses.replace(
                 biscuit.BBOE_RECOVERY,
                 sha256=hashlib.sha256(TWRP_BBOE).hexdigest(),

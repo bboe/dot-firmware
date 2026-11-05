@@ -74,7 +74,7 @@ map is keyed by it, so the map's dates can be read against the image names.
 A name for one build that ships an LK would be a second fact to keep right,
 where one LK ships in as many as 34 builds.
 
-A device's `FIREOS5_CHAIN` is the earlier amonet it can be on, and the one
+A device's `fireos5_chain` is the earlier amonet it can be on, and the one
 place that LK is read. It is a `FireOs5Chain`: the LK, the TWRP version its
 unlock installs, that TWRP's download, and the unlock that writes the chain.
 Given an `lk_build_desc` and a `ro.twrp.version`, or a reader for `recovery`,
@@ -148,17 +148,16 @@ a TWRP version, says in its name which release it belongs to.
 `firebreak/devices/registry.py` gathers what the core asks for across devices,
 and the package re-exports it, so `DEVICES`, `TARGETS`, `DEPRECATED` and
 `DEFAULTS` are assembled from each module rather than listed twice. A device
-module declares its own `TARGETS`, `WAS_CALLED`, `DEFAULT_TARGET`, `LK_VALUES`,
-`FIREOS5_BUILDS`, which of its builds are Fire OS 5 and so show nothing on USB
-once they start, `FASTBRICK`, the unlock whose archive holds its fastbrick
-payloads, `FIREOS5_CHAIN`, the earlier amonet it can be on, and
-`BOOTROM_UNLOCK`, the chain to write to an Echo held in its bootrom; a
-device with no target or LK yet declares them empty, and names neither a
-fastbrick nor a bootrom chain, because every device a run can take anywhere is
-reachable from stock fastboot and so needs the first. A module that leaves
-`BOOTROM_UNLOCK` or `FIREOS5_CHAIN` out does not import, and one that declares
-either `None` has no such route: a run that finds a device with an erased boot0
-and no bootrom chain says so and writes nothing. Each plan is amonet's
+module declares one `CONFIG`, a `DeviceConfig` that names the device and
+whatever of these it has: `targets`, `was_called`, `default_target`,
+`lk_values`, `builds` and `default_build`, `fireos5_builds`, which of its builds
+are Fire OS 5 and so show nothing on USB once they start, `fastbrick`, the
+unlock whose archive holds its fastbrick payloads, `fireos5_chain`, the earlier
+amonet it can be on, `bootrom_unlock`, the chain to write to an Echo held in
+its bootrom, and `kamakiri_unlock`, the unlock that starts in the bootrom.
+A field left out is empty or `None`, and a device without it has no such
+route: a run that finds a device with an erased boot0 and no bootrom chain says
+so and writes nothing. crown names only its device. Each plan is amonet's
 `modules/main.py` and then its `fastboot-step.sh`, step for step. The Fire
 OS 5 unlock writes TWRP 3.7.0_9-bboe2, a download of its own, which is why
 an unlock carries `files` beside its archive. The bootrom route writes the

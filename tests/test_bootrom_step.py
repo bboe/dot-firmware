@@ -294,7 +294,7 @@ def test_a_bootloader_for_another_product_names_the_echo_the_unlock_is_for(
 ) -> None:
     bootrom_step.SESSION.short = True
     with pytest.raises(FatalError, match="product BISCUIT, not RADAR") as caught:
-        step(rig=rig, unlock=radar.BOOTROM_UNLOCK)
+        step(rig=rig, unlock=radar.CONFIG.bootrom_unlock)
     assert "not an Echo (2nd Generation)" in caught.value.message
     assert rig.written == []
 

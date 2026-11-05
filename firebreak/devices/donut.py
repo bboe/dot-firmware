@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from firebreak.cache import Download
 from firebreak.plugin import (
     BOOT0,
     Device,
+    DeviceConfig,
     FastbootFlash,
     Feature,
     FireOs6,
@@ -19,11 +18,7 @@ from firebreak.states import State
 from firebreak.targets import FIREOS6, STOCK
 from firebreak.updates import cdn_ota
 
-if TYPE_CHECKING:
-    from firebreak.targets import Deprecated
-
 BOOTONCE_BOOTLOADER = b"bootonce-bootloader"
-BOOTROM_UNLOCK = None
 BUILDS = {
     "8349": cdn_ota(
         path="2026/10/27/403ee71e-c316-4460-845b-3f50df862132/"
@@ -36,7 +31,6 @@ BUTTON_GESTURE = (
     " while still holding. Keep holding until the run says the bootrom answered."
 )
 DEFAULT_BUILD = "8349"
-DEFAULT_TARGET = FIREOS6
 FASTBOOT_MODE = (
     "Unplug the USB cable, press and hold the action button, the circle on top,"
     " and plug the cable back in while still holding. This Echo reaches its"
@@ -58,13 +52,6 @@ DONUT = Device(
     title="Echo Dot (3rd Generation)",
     unlock_keeps_misc=True,
 )
-FASTBRICK = None
-FIREOS5_BUILDS: frozenset[str] = frozenset()
-FIREOS5_CHAIN = None
-LK_VALUES = frozenset({
-    "0d18cf4-20181206_233555",
-    "6f7225e-20230407_013816",
-})
 SET_FASTBOOT_FLAG = 0x6000
 SOURCE = Download(
     browser=True,
@@ -108,26 +95,35 @@ KAMAKIRI_V1_0_0 = Unlock(
     source=SOURCE,
     version="1.0.0",
 )
-KAMAKIRI_UNLOCK = KAMAKIRI_V1_0_0
-TARGETS = (
-    Target(
-        device=DONUT,
-        goal=State.STOCK_BOOTED,
-        installs=FireOs6(build=None),
-        name=STOCK,
-        summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
-        " which erases the whole Echo and locks it again.",
-        unlock=None,
-    ),
-    Target(
-        device=DONUT,
-        goal=State.AMONET_BOOTED,
-        installs=FireOs6(build=DEFAULT_BUILD),
-        name=FIREOS6,
-        summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
-        " which keeps the Echo's setup; with --factory-reset, Fire OS 6"
-        f" {DEFAULT_BUILD}, with the Echo erased.",
-        unlock=KAMAKIRI_V1_0_0,
+CONFIG = DeviceConfig(
+    builds=BUILDS,
+    default_build=DEFAULT_BUILD,
+    default_target=FIREOS6,
+    device=DONUT,
+    kamakiri_unlock=KAMAKIRI_V1_0_0,
+    lk_values=frozenset({
+        "0d18cf4-20181206_233555",
+        "6f7225e-20230407_013816",
+    }),
+    targets=(
+        Target(
+            device=DONUT,
+            goal=State.STOCK_BOOTED,
+            installs=FireOs6(build=None),
+            name=STOCK,
+            summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
+            " which erases the whole Echo and locks it again.",
+            unlock=None,
+        ),
+        Target(
+            device=DONUT,
+            goal=State.AMONET_BOOTED,
+            installs=FireOs6(build=DEFAULT_BUILD),
+            name=FIREOS6,
+            summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
+            " which keeps the Echo's setup; with --factory-reset, Fire OS 6"
+            f" {DEFAULT_BUILD}, with the Echo erased.",
+            unlock=KAMAKIRI_V1_0_0,
+        ),
     ),
 )
-WAS_CALLED: dict[str, Deprecated] = {}

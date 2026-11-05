@@ -75,7 +75,7 @@ def test_a_bootloader_older_than_the_newest_known_is_let_through() -> None:
 def test_a_device_that_lists_no_bootloader_refuses_the_one_it_is_given(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    crowned = dataclasses.replace(radar.TARGETS[0], device=CROWN)
+    crowned = dataclasses.replace(radar.CONFIG.targets[0], device=CROWN)
     monkeypatch.setattr(name="target", target=unlock.ARGUMENTS, value=crowned)
     assert not unlock.LK_VALUES[CROWN]
     with pytest.raises(
@@ -620,15 +620,15 @@ def test_the_fastbrick_knows_only_the_bootloaders_the_device_lists() -> None:
         "41fb3ce-20221007_151724",
         "63cb91b-20221007_072309",
         "2c3569d-20260617_045829",
-    } == biscuit.LK_VALUES
+    } == biscuit.CONFIG.lk_values
     assert {
         "2c3569d-20260617_051433",
         "41fb3ce-20221007_153017",
         "59779ca-20220524_183401",
         "63cb91b-20221007_073612",
-    } == radar.LK_VALUES
-    assert radar.FASTBRICK.fastbricks.keys() <= radar.LK_VALUES
-    assert biscuit.FASTBRICK.fastbricks.keys() <= biscuit.LK_VALUES
+    } == radar.CONFIG.lk_values
+    assert radar.CONFIG.fastbrick.fastbricks.keys() <= radar.CONFIG.lk_values
+    assert biscuit.CONFIG.fastbrick.fastbricks.keys() <= biscuit.CONFIG.lk_values
 
 
 @pytest.mark.parametrize(

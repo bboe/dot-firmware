@@ -6,6 +6,7 @@ from firebreak.devices.biscuit import (
     UNLOCK_TO_FIREOS5,
     UNLOCK_TO_FIREOS6,
 )
+from firebreak.devices.registry import SUPPORTED
 from firebreak.plugin import FireOs5, FireOs6
 from firebreak.states import State
 
@@ -13,6 +14,18 @@ from firebreak.states import State
 def test_each_device_s_default_is_one_of_its_targets() -> None:
     assert set(DEFAULTS) <= set(TARGETS)
     assert all(DEFAULTS[device] in TARGETS[device] for device in DEFAULTS)
+
+
+def test_each_device_s_unlocks_and_default_build_are_its_own() -> None:
+    for config in SUPPORTED:
+        unlocks = (
+            config.bootrom_unlock,
+            config.fastbrick,
+            config.fireos5_chain and config.fireos5_chain.unlock,
+            config.kamakiri_unlock,
+        )
+        assert all(each.device == config.device for each in unlocks if each)
+        assert not config.builds or config.default_build in config.builds
 
 
 def test_each_device_with_a_target_names_the_unlock_its_fastbricks_are_in() -> None:

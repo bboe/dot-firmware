@@ -8,6 +8,7 @@ from firebreak.plugin import (
     BOOT0,
     ClearBoot0Header,
     Device,
+    DeviceConfig,
     FastbootFlash,
     Feature,
     FireOs5,
@@ -109,37 +110,18 @@ BUILDS = {
     ),
 }
 DEFAULT_BUILD = "8149"
-DEFAULT_TARGET = FIREOS6
 FASTBOOT_MODE = (
     "Unplug the USB cable, press and hold the action button (the one with a dot),"
     " plug the cable back in, and let go when the light ring turns green. A"
     " ring that stays solid blue can mean a cable that carries power but no"
     " data, or a bad USB connection: try another cable, then another port."
 )
-FIREOS5_BUILDS = frozenset({
-    "5.5.0.3",
-    "5.5.3.1",
-    "5.5.4.6",
-    "5.5.4.9",
-    "5.5.5.0",
-    "5.5.5.4",
-})
 FLASH_AMONET_TWRP = FastbootFlash(
     image="bin/twrp.img", label="write TWRP", target="recovery"
 )
 FLASH_BBOE_TWRP = FastbootFlash(
     image="twrp", label="write TWRP " + BBOE_TWRP_VERSION, target="recovery"
 )
-KAMAKIRI_UNLOCK = None
-LK_VALUES = frozenset({
-    "0e1d0d9-20161018_220224",
-    AMONET_V1_1_0_LK,
-    "a828f29-20210822_210511",
-    "beb022a-20211202_231918",
-    "41fb3ce-20221007_151724",
-    AMONET_V2_LK,
-    "2c3569d-20260617_045829",
-})
 PAYLOAD_SEEK = 223207
 SHORT_GESTURE = (
     "Open the base and short the eMMC data line at the passives beside R60,"
@@ -220,12 +202,6 @@ UNLOCK_FROM_BOOTROM = dataclasses.replace(
     ),
     version="1.1.0",
 )
-FIREOS5_CHAIN = FireOs5Chain(
-    little_kernel=AMONET_V1_1_0_LK,
-    recovery=BBOE_RECOVERY,
-    twrp_version=BBOE_TWRP_VERSION,
-    unlock=UNLOCK_FROM_BOOTROM,
-)
 V2_0_0_SOURCE = Download(
     browser=True,
     directory="v2.0.0",
@@ -247,20 +223,6 @@ V2_0_1_SOURCE = Download(
 
 
 V2_0_1_TWRP_VERSION = "3.7.0"
-WAS_CALLED = {
-    "amonet-biscuit-v1.1.0": Deprecated(
-        device=BISCUIT,
-        name=FIREOS5,
-        note=f"It now installs TWRP {BBOE_TWRP_VERSION} rather than amonet's own"
-        " TWRP 3.2.3.",
-    ),
-    "amonet-biscuit-v1.1.0-bboe": Deprecated(device=BISCUIT, name=FIREOS5),
-    "amonet-biscuit-v2.0.0": Deprecated(
-        device=BISCUIT,
-        name=FIREOS6,
-        note="It now writes amonet v2.0.1, whose kaeru boots the active slot.",
-    ),
-}
 WRITE_KAERU = Write(image="bin/biscuit-kaeru.bin", label="write kaeru", target="expdb")
 
 
@@ -300,45 +262,84 @@ UNLOCK_TO_FIREOS6 = Unlock(
     source=V2_0_1_SOURCE,
     version="2.0.1",
 )
-FASTBRICK = UNLOCK_TO_FIREOS6
-
-
-TARGETS = (
-    Target(
-        device=BISCUIT,
-        goal=State.STOCK_BOOTED,
-        installs=FireOs6(build=None),
-        name=STOCK,
-        summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
-        " which erases the whole Dot.",
-        unlock=None,
-    ),
-    Target(
-        device=BISCUIT,
-        goal=State.AMONET_FIREOS5_BBOE_BOOTED,
-        installs=FireOs5(package=BUILDS["5.5.5.4"]),
-        name=FIREOS5,
-        summary="rooted Fire OS 5.5.5.4 on amonet v1.1.0, with TWRP"
-        f" {BBOE_TWRP_VERSION}.",
-        unlock=UNLOCK_TO_FIREOS5,
-    ),
-    Target(
-        device=BISCUIT,
-        goal=State.AMONET_BOOTED,
-        installs=FireOs6(build=DEFAULT_BUILD),
-        name=FIREOS6,
-        summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
-        " which keeps the Dot's setup; with --factory-reset, Fire OS 6"
-        f" {DEFAULT_BUILD} with TWRP {V2_0_1_TWRP_VERSION}, with the Dot"
-        " erased.",
-        unlock=UNLOCK_TO_FIREOS6,
-    ),
-)
 
 
 UNLOCK_V2_FROM_BOOTROM = dataclasses.replace(
     UNLOCK_TO_FIREOS6, plan=(ClearBoot0Header(), *UNLOCK_TO_FIREOS6.plan)
 )
-
-
-BOOTROM_UNLOCK = UNLOCK_V2_FROM_BOOTROM
+CONFIG = DeviceConfig(
+    bootrom_unlock=UNLOCK_V2_FROM_BOOTROM,
+    builds=BUILDS,
+    default_build=DEFAULT_BUILD,
+    default_target=FIREOS6,
+    device=BISCUIT,
+    fastbrick=UNLOCK_TO_FIREOS6,
+    fireos5_builds=frozenset({
+        "5.5.0.3",
+        "5.5.3.1",
+        "5.5.4.6",
+        "5.5.4.9",
+        "5.5.5.0",
+        "5.5.5.4",
+    }),
+    fireos5_chain=FireOs5Chain(
+        little_kernel=AMONET_V1_1_0_LK,
+        recovery=BBOE_RECOVERY,
+        twrp_version=BBOE_TWRP_VERSION,
+        unlock=UNLOCK_FROM_BOOTROM,
+    ),
+    lk_values=frozenset({
+        "0e1d0d9-20161018_220224",
+        AMONET_V1_1_0_LK,
+        "a828f29-20210822_210511",
+        "beb022a-20211202_231918",
+        "41fb3ce-20221007_151724",
+        AMONET_V2_LK,
+        "2c3569d-20260617_045829",
+    }),
+    targets=(
+        Target(
+            device=BISCUIT,
+            goal=State.STOCK_BOOTED,
+            installs=FireOs6(build=None),
+            name=STOCK,
+            summary=f"Amazon's Fire OS BUILD, {DEFAULT_BUILD} when left out,"
+            " which erases the whole Dot.",
+            unlock=None,
+        ),
+        Target(
+            device=BISCUIT,
+            goal=State.AMONET_FIREOS5_BBOE_BOOTED,
+            installs=FireOs5(package=BUILDS["5.5.5.4"]),
+            name=FIREOS5,
+            summary="rooted Fire OS 5.5.5.4 on amonet v1.1.0, with TWRP"
+            f" {BBOE_TWRP_VERSION}.",
+            unlock=UNLOCK_TO_FIREOS5,
+        ),
+        Target(
+            device=BISCUIT,
+            goal=State.AMONET_BOOTED,
+            installs=FireOs6(build=DEFAULT_BUILD),
+            name=FIREOS6,
+            summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
+            " which keeps the Dot's setup; with --factory-reset, Fire OS 6"
+            f" {DEFAULT_BUILD} with TWRP {V2_0_1_TWRP_VERSION}, with the Dot"
+            " erased.",
+            unlock=UNLOCK_TO_FIREOS6,
+        ),
+    ),
+    was_called={
+        "amonet-biscuit-v1.1.0": Deprecated(
+            device=BISCUIT,
+            name=FIREOS5,
+            note=f"It now installs TWRP {BBOE_TWRP_VERSION} rather than amonet's own"
+            " TWRP 3.2.3.",
+        ),
+        "amonet-biscuit-v1.1.0-bboe": Deprecated(device=BISCUIT, name=FIREOS5),
+        "amonet-biscuit-v2.0.0": Deprecated(
+            device=BISCUIT,
+            name=FIREOS6,
+            note="It now writes amonet v2.0.1, whose kaeru boots the active slot.",
+        ),
+    },
+)

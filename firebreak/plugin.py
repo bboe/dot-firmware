@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from firebreak.cache import Download
     from firebreak.plan import Action
+    from firebreak.targets import Deprecated
 
 BOOT0 = "boot0"
 
@@ -37,6 +38,22 @@ class Device:
     short_gesture: str = ""
     twrp_models: frozenset[str] = frozenset()
     unlock_keeps_misc: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class DeviceConfig:
+    device: Device
+    bootrom_unlock: Unlock | None = None
+    builds: dict[str, Download] = dataclasses.field(default_factory=dict)
+    default_build: str | None = None
+    default_target: str | None = None
+    fastbrick: Unlock | None = None
+    fireos5_builds: frozenset[str] = frozenset()
+    fireos5_chain: FireOs5Chain | None = None
+    kamakiri_unlock: Unlock | None = None
+    lk_values: frozenset[str] = frozenset()
+    targets: tuple[Target, ...] = ()
+    was_called: dict[str, Deprecated] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
