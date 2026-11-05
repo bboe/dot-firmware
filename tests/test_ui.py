@@ -332,7 +332,10 @@ def test_status(
     assert capsys.readouterr().out == "waiting\n"
     tty(monkeypatch=monkeypatch)
     ui.status(text="waiting")
-    assert capsys.readouterr().out == "\r\033[33m" + "waiting".ljust(79) + "\033[0m"
+    assert capsys.readouterr().out == "\r\033[33mwaiting\033[0m\033[K"
+    monkeypatch.setenv(name="TERM", value="dumb")
+    ui.status(text="waiting")
+    assert capsys.readouterr().out == "\r" + "waiting".ljust(79)
 
 
 def test_stop_halts_progress_and_fills(

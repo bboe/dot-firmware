@@ -85,6 +85,8 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- A waiting line and the restore's `Starting now.` end at their last word on
+  a terminal that shows colour, in place of trailing spaces.
 - `survey` reads an OTA whose payload names two TEE partitions, where it
   refused such an OTA with `the OTA has no tee image`. Every Echo Dot
   (3rd Generation) OTA names `tee1` and `tee2` and writes the same image to

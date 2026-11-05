@@ -47,6 +47,7 @@ from firebreak.ui import (
     FatalError,
     Kind,
     again,
+    overwriting,
     paint,
     passed,
     show,
@@ -265,11 +266,9 @@ def confirm(*, build: str) -> None:
     starting = "Starting now."
     show(
         kind=Kind.WARN,
-        text="\r"
-        + paint(
-            code=ANSIColor.YELLOW,
-            text=starting if SESSION.no_wait else starting.ljust(33),
-        ),
+        text=f"\r{paint(code=ANSIColor.YELLOW, text=starting)}"
+        if SESSION.no_wait
+        else overwriting(text=starting, width=33),
     )
 
 

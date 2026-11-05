@@ -254,6 +254,12 @@ def mark() -> str:
     return "\u2705"
 
 
+def overwriting(*, text: str, width: int) -> str:
+    if color(stream=sys.stdout):
+        return f"\r{paint(code=ANSIColor.YELLOW, text=text)}\033[K"
+    return f"\r{text.ljust(width)}"
+
+
 def paint(*, code: ANSIColor, text: str) -> str:
     return f"\033[{code.value}m{text}\033[0m" if color(stream=sys.stdout) else text
 
@@ -296,12 +302,7 @@ def since(*, start: float) -> str:
 
 def status(*, text: str) -> None:
     if sys.stdout.isatty():
-        show(
-            end="",
-            flush=True,
-            kind=Kind.WARN,
-            text="\r" + paint(code=ANSIColor.YELLOW, text=text.ljust(79)),
-        )
+        show(end="", flush=True, kind=Kind.WARN, text=overwriting(text=text, width=79))
     else:
         warn(text=text)
 
