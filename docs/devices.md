@@ -191,6 +191,13 @@ does.
   that payload's tail predicted holds on an Echo, as biscuit's
   `fastbrick-20260617.img` did on a Dot, and it covers all three builds that
   share the LK.
+- Radars also ship builds that ftvdb lacks. One bought second-hand held Fire OS
+  6.5.7.0 (NS6570/6071) in slot b, read on 2026-11-04. Its stock fastboot gave
+  `63cb91b-20221007_073612` and anti-rollback 0x0005, 0x0102, 0x0001, the 4929
+  to 8149 row, and `fastbrick-20221007.img` unlocked it. Its stock preloader
+  was not read before the unlock replaced it. firebreak has no OTA for 6071,
+  so `unlock` refuses to root it in place, and `--factory-reset` took it to
+  rooted 8149 in 4 min 12 s.
 - `fastbrick-20221007.img` unlocked a radar on `63cb91b-20221007_073612`,
   2026-11-01, on the first flash: a locked 8149 reached TWRP 32 s after a 13 s
   fastbrick and rooted in place in 1 min 16 s. v1.0.0 gave that LK the default

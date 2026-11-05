@@ -494,7 +494,7 @@ def twrp_entry(*, force: bool) -> None:
         confirm(
             force=force,
             what=f"the {device.title} is locked, so reaching a TWRP unlocks it"
-            " first, which erases everything on it",
+            " first, which rewrites its bootloaders, its TEE and its recovery",
         )
         stage_fastbrick()
 

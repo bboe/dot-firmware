@@ -90,6 +90,9 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- `firebreak twrp` on a locked Echo says the unlock rewrites its bootloaders,
+  its TEE and its recovery, in place of saying it erases everything. On a
+  radar it kept userdata; no other device has been read.
 - A waiting line and the restore's `Starting now.` end at their last word on
   a terminal that shows colour, in place of trailing spaces.
 - `survey` reads an OTA whose payload names two TEE partitions, where it

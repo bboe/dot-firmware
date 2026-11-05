@@ -612,7 +612,10 @@ def test_a_twrp_entry_asks_before_it_unlocks_a_locked_echo(
     )
     entry.twrp_entry(force=False)
     assert done[1] == "stage_fastbrick"
-    assert "unlocks it first, which erases everything on it" in done[0]
+    assert (
+        "unlocks it first, which rewrites its bootloaders, its TEE and its recovery"
+        in done[0]
+    )
     assert "asked: the Echo Dot (2nd Generation) is locked" in done[0]
 
 

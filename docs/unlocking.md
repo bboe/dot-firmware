@@ -529,7 +529,9 @@ reaching its state by hand first.
   in 90 s means that recovery is not one, and the run says to power cycle and
   come back with `--force`, which writes the device's own TWRP as the unlock
   route does. A locked Echo has no such hope: `twrp` runs the fastbrick there,
-  which unlocks it and erases everything. `bootrom` clears boot0's header, or
+  which unlocks it by rewriting its bootloaders, its TEE and its recovery. The
+  prompt says that and no more, because whether userdata survives is read on
+  one device only, in its own section. `bootrom` clears boot0's header, or
   erases boot0 from fastboot, which is what leaves an Echo startable from its
   bootrom alone.
 - `reboot` is the way back out, and writes nothing. It reboots a TWRP with
@@ -2207,6 +2209,13 @@ a restore, every whole-run timing, and where the time goes.
 radar declares no Fire OS 5 chain, so it has two targets: `unlock fireos6`,
 which the process above covers whole, and `stock`. Its unlock is amonet-radar
 v1.0.1, whose fastbrick payloads and preloader are its own.
+
+**A radar's unlock keeps userdata.** On 2026-11-04 `firebreak twrp` unlocked a
+second-hand radar from locked stock Fire OS 6 6071, and its TWRP mounted
+userdata with the previous owner's setup, Wi-Fi and accounts still in it. So
+on a radar, `twrp` is the way to a backup of a locked Echo. No other device
+has been read this way: back up a locked Echo with data to keep before relying
+on it.
 
 #### In its bootrom
 
