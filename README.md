@@ -164,10 +164,11 @@ is. Only the `stock` target takes it.
 ## One command per entry point
 
 A target run starts wherever the device is, so testing one stage means
-reaching its state first. Three commands do only that, and stop there.
+reaching its state first. These commands do only that, and stop there.
 
 | command | where it leaves the device | writes |
 | --- | --- | --- |
+| `firebreak reboot` | its firmware, as an ordinary power-on starts it | nothing |
 | `firebreak fastboot` | the fastboot its bootloader gives | nothing |
 | `firebreak twrp` | its TWRP | nothing, where the bootloader is unlocked and its recovery holds a TWRP; `--force` writes one |
 | `firebreak bootrom` | its bootrom, with amonet's payload holding it | boot0's header from a recovery, all of boot0 from fastboot |

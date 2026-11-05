@@ -498,9 +498,10 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
 
 ## One command per entry point
 
-`firebreak fastboot`, `firebreak twrp` and `firebreak bootrom` reach one state
-and stop there. A target walks from wherever the Echo is to a goal, which makes
-testing a single stage mean reaching its state by hand first.
+`firebreak reboot`, `firebreak fastboot`, `firebreak twrp` and
+`firebreak bootrom` reach one state and stop there. A target walks from
+wherever the Echo is to a goal, which makes testing a single stage mean
+reaching its state by hand first.
 
 - Each walks the states it can act on and waits out the rest. Where adb
   answers, that is a reboot; where it does not, the device's own gesture, which
@@ -531,6 +532,27 @@ testing a single stage mean reaching its state by hand first.
   which unlocks it and erases everything. `bootrom` clears boot0's header, or
   erases boot0 from fastboot, which is what leaves an Echo startable from its
   bootrom alone.
+- `reboot` is the way back out, and writes nothing. It reboots a TWRP with
+  `adb reboot` and any fastboot with `fastboot reboot`, and any state that
+  runs the firmware is its goal, `stock-booted` among them. It does not leave
+  a bootrom: with boot0 intact a power cycle starts the firmware, and with
+  boot0 erased nothing does, so it says to power cycle and names `unlock` and
+  `stock` for the erased case. On a rooted
+  donut on Linux on 2026-11-04 it reached the firmware from TWRP in 24 s and
+  from kaeru's fastboot in 24 s, and a second run on the booted Echo did
+  nothing. So the `bootonce-bootloader` that reached that fastboot does not
+  bring the Echo back to it.
+- A locked fastboot takes the same command. On 2026-11-04 a radar on its
+  stock Fire OS 6 LK, `63cb91b-20221007_073612`, restarted from stock
+  fastboot at `fastboot reboot`, and then showed nothing on USB for 576 s,
+  when the run was stopped. The likely reason is adb: stock Fire OS turns it
+  off once an Echo is registered, and this radar was second-hand. An Echo
+  that runs its firmware with adb off reads as `none`, the same as one
+  rebooting, so `reboot` stops after 2 minutes of nothing on USB and says
+  that, where a wait of 10 minutes would have sent the user to the test
+  point.
+- An empty system reads as `no-system`, which `reboot` cannot leave, so it
+  says that `unlock` or `stock` installs one.
 - No command but `short` takes `--device`, and a run that cannot name the Echo
   stops rather than ask for one. Every state these commands write from names
   the device itself: a fastboot answers `getvar product`, a TWRP gives its

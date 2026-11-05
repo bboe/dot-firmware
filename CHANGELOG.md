@@ -46,6 +46,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
   interface first. On 2026-11-04 it ran from the bootrom to rooted Fire OS 6
   8349 in 13 steps and 3m 22s, and from genuinely stock in 12 steps and
   3m 07s.
+- `firebreak reboot` starts the Echo's firmware, as an ordinary power-on
+  does. It reboots a TWRP or a fastboot, leaves an Echo that already runs its
+  firmware alone, and says to power cycle one held in its bootrom. It writes
+  nothing. An Echo that shows nothing on USB for 2 minutes is said to be
+  possibly running with adb off, as stock Fire OS is once registered.
 
 ### Changed
 

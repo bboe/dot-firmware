@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import types
 from typing import TYPE_CHECKING
 
@@ -493,6 +494,68 @@ def test_a_marker_from_another_echo_is_corrected_not_obeyed(
     monkeypatch.setattr(name="payload_device", target=entry, value=lambda **_: RADAR)
     entry.bootrom_entry(force=False)
     assert SESSION.device is RADAR
+
+
+def test_a_reboot_entry_leaves_a_running_echo_alone(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = reads(monkeypatch=monkeypatch, states=[State.ROOTED])
+    entry.reboot_entry()
+    assert done == []
+    assert "runs its firmware, read as rooted" in capsys.readouterr().out
+
+
+def test_a_reboot_entry_reboots_a_fastboot(*, monkeypatch: pytest.MonkeyPatch) -> None:
+    done = reads(
+        monkeypatch=monkeypatch,
+        states=[State.STOCK_FASTBOOT, State.NONE, State.STOCK_BOOTED],
+    )
+    monkeypatch.setattr(
+        name="run",
+        target=entry,
+        value=lambda **options: done.append(" ".join(options["arguments"])),
+    )
+    entry.reboot_entry()
+    assert done == ["fastboot reboot"]
+
+
+def test_a_reboot_entry_reboots_a_twrp(*, monkeypatch: pytest.MonkeyPatch) -> None:
+    done = reads(
+        monkeypatch=monkeypatch,
+        states=[State.AMONET_TWRP, State.STARTING, State.ROOTED],
+    )
+    entry.reboot_entry()
+    assert done == ["reboot "]
+
+
+def test_a_reboot_entry_says_a_bootrom_needs_a_power_cycle(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    with pytest.raises(FatalError, match="plug it back in"):
+        entry.reboot_entry()
+
+
+def test_a_reboot_entry_says_an_empty_system_needs_an_install(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads(monkeypatch=monkeypatch, states=[State.NO_SYSTEM])
+    with pytest.raises(FatalError, match="holds no Fire OS"):
+        entry.reboot_entry()
+
+
+def test_a_reboot_entry_says_what_an_echo_with_adb_off_looks_like(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = reads(
+        monkeypatch=monkeypatch, states=[State.STOCK_FASTBOOT, State.NONE, State.NONE]
+    )
+    monkeypatch.setattr(name="run", target=entry, value=lambda **_: done.append("ran"))
+    clock = itertools.count(step=entry.QUIET // 2 + 1)
+    monkeypatch.setattr(name="monotonic", target=entry.time, value=lambda: next(clock))
+    with pytest.raises(FatalError, match="turns adb off"):
+        entry.reboot_entry()
+    assert done == ["ran"]
 
 
 def test_a_short_asks_for_no_short_where_a_payload_already_holds_one(

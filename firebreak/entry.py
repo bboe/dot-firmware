@@ -69,7 +69,17 @@ HARDWARE_CODES = {
 }
 LOCKED_FASTBOOTS = frozenset({State.STOCK_FASTBOOT, State.STOCK_FIREOS5_FASTBOOT})
 NAMELESS = frozenset({State.BOOTROM, State.NONE, State.PRELOADER})
+QUIET = 120
+REBOOT = "reboot"
 RECOVERY_WAIT = 90
+RUNNING = frozenset({
+    State.AMONET_BOOTED,
+    State.AMONET_FIREOS5_BBOE_BOOTED,
+    State.BOOTED,
+    State.EMOS,
+    State.ROOTED,
+    State.STOCK_BOOTED,
+})
 SHORT = "short"
 STUCK = 600
 TO_FASTBOOT = (
@@ -92,6 +102,8 @@ TRIES = 5
 TWRP = "twrp"
 WAITS = frozenset({State.NONE, State.PRELOADER, State.STARTING})
 WAYS_OUT = {
+    State.NO_SYSTEM: " Its system partition holds no Fire OS:"
+    " `firebreak unlock` or `firebreak stock` installs one.",
     State.NONE: " An Echo that shows no light never comes back on its own:"
     " `firebreak short` reaches that one through its test point.",
     State.BOOTROM: " A chain written through the payload there is the way out:"
@@ -274,7 +286,7 @@ def checked_device(*, live: Client) -> None:
 
 
 def entries() -> tuple[str, ...]:
-    return (FASTBOOT, TWRP, BOOTROM, SHORT)
+    return (REBOOT, FASTBOOT, TWRP, BOOTROM, SHORT)
 
 
 def fastboot_entry() -> None:
@@ -287,6 +299,15 @@ def fastboot_entry() -> None:
         patient=frozenset({State.STOCK_BOOTED}),
         what=FASTBOOT,
     )
+
+
+def firmware_from_fastboot() -> None:
+    run(arguments=["fastboot", "reboot"], check=True, timeout=60)
+    PROGRESS.begin(estimate="60 s", label="starting its firmware")
+
+
+def firmware_from_twrp() -> None:
+    reboot(estimate="60 s", into="", label="starting its firmware")
 
 
 def gesture() -> None:
@@ -325,6 +346,26 @@ def parked(*, live: Client) -> None:
     )
 
 
+def power_cycle() -> None:
+    raise FatalError(
+        message=f"the {known()} waits in its bootrom, and nothing here restarts"
+        " it from there. Unplug it and plug it back in, which starts the"
+        " firmware boot0 holds. Nothing was written. An Echo whose boot0 a run"
+        " erased starts its bootrom again, and `firebreak unlock` or"
+        " `firebreak stock` writes a chain through it."
+    )
+
+
+def quiet() -> str:
+    return (
+        f"the {known()} has shown nothing on USB for {QUIET // 60} minutes."
+        " Stock Fire OS turns adb off once an Echo is registered, so one that"
+        " runs its firmware can show nothing: if its light ring says it has"
+        " started, it is running. An Echo that shows no light never comes back"
+        f" on its own: `firebreak {SHORT}` reaches that one."
+    )
+
+
 def reached(*, erase: Callable[[], str] | None) -> Client:
     payload = amonet_payload()
     if SESSION.short:
@@ -351,6 +392,20 @@ def reached(*, erase: Callable[[], str] | None) -> Client:
     if not SESSION.short:
         PROGRESS.begin(estimate="15 s", label="starting amonet's payload")
     return exploit(client=client, payload=payload)
+
+
+def reboot_entry() -> None:
+    walk(
+        acts={
+            **dict.fromkeys(FASTBOOTS, firmware_from_fastboot),
+            **dict.fromkeys(TWRPS, firmware_from_twrp),
+            State.BOOTROM: power_cycle,
+        },
+        goal=RUNNING,
+        patient=frozenset(),
+        silent=quiet,
+        what="firmware",
+    )
 
 
 def registered(*, holding: dict[Device, object], what: str) -> Device:
@@ -458,6 +513,28 @@ def twrp_entry(*, force: bool) -> None:
     )
 
 
+def unseen(
+    *, said: bool, silent: Callable[[], str] | None, since: float, what: str
+) -> bool:
+    if SESSION.boot0_erased:
+        raise FatalError(
+            message=f"boot0 is erased, so this {known()} starts nothing but"
+            f" its bootrom and reaches no {what} until a chain is written"
+            " through it: run `firebreak unlock` or `firebreak stock`."
+            " Waiting here would wait for a state it cannot reach."
+        )
+    if silent is not None and time.monotonic() - since > QUIET:
+        raise FatalError(message=silent())
+    if said or PROGRESS.open:
+        return said
+    say(
+        text=f"Waiting for the {known()} on USB. A reboot reads this way"
+        " until it comes back. An Echo that shows no light never does:"
+        f" `firebreak {SHORT}` reaches that one."
+    )
+    return True
+
+
 def waiting(*, erase: Callable[[], str] | None) -> float:
     if erase is not None:
         return MINUTE
@@ -469,6 +546,7 @@ def walk(
     acts: dict[State, Callable[[], None]],
     goal: frozenset[State],
     patient: frozenset[State],
+    silent: Callable[[], str] | None = None,
     what: str,
 ) -> State:
     acted: set[State] = set()
@@ -486,7 +564,8 @@ def walk(
             noticed()
         if current in goal:
             PROGRESS.end()
-            passed(message=f"The {known()} is in {shown(current=current)}.")
+            arrived = "runs its firmware, read as" if current in RUNNING else "is in"
+            passed(message=f"The {known()} {arrived} {shown(current=current)}.")
             return current
         act = acts.get(current)
         if act is None and current not in WAITS:
@@ -495,20 +574,8 @@ def walk(
                 f" which nothing here can reach a {what} from."
                 + WAYS_OUT.get(current, "")
             )
-        if current == State.NONE and SESSION.boot0_erased:
-            raise FatalError(
-                message=f"boot0 is erased, so this {known()} starts nothing but"
-                f" its bootrom and reaches no {what} until a chain is written"
-                " through it: run `firebreak unlock` or `firebreak stock`."
-                " Waiting here would wait for a state it cannot reach."
-            )
-        if current == State.NONE and not (said or PROGRESS.open):
-            said = True
-            say(
-                text=f"Waiting for the {known()} on USB. A reboot reads this way"
-                " until it comes back. An Echo that shows no light never does:"
-                f" `firebreak {SHORT}` reaches that one."
-            )
+        if current == State.NONE:
+            said = unseen(said=said, silent=silent, since=since, what=what)
         if act is not None and current not in acted:
             acted.add(current)
             act()

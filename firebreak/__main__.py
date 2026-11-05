@@ -37,12 +37,14 @@ from firebreak.emos import child_emos
 from firebreak.entry import (
     BOOTROM,
     FASTBOOT,
+    REBOOT,
     SHORT,
     TWRP,
     bootrom_device,
     bootrom_entry,
     entries,
     fastboot_entry,
+    reboot_entry,
     short_entry,
     twrp_entry,
 )
@@ -118,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
         FASTBOOT: "start the Echo's fastboot, whichever bootloader it holds. It"
         " reboots an Echo that answers adb, and asks for the button gesture"
         " where it cannot. It writes nothing.",
+        REBOOT: "start the Echo's firmware, as an ordinary power-on does. It"
+        " reboots an Echo in its TWRP or its fastboot, and leaves one that"
+        " already runs its firmware alone. An Echo held in its bootrom needs a"
+        " power cycle, and it says so. It writes nothing.",
         REPORT: "print what the Echo and this computer are, and the Echo's"
         " partition table, for a support request. It starts the Echo's recovery"
         " to read them and writes no partition.",
@@ -148,6 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
     uses = {
         BOOTROM: navigating,
         FASTBOOT: ["--no-update-check", "--verbose"],
+        REBOOT: ["--no-update-check", "--verbose"],
         REPORT: ["--no-update-check", "--verbose"],
         SHORT: ["--device", "--no-update-check", "--verbose"],
         STOCK: restoring,
@@ -320,6 +327,7 @@ def cli() -> None:
     command = {
         BOOTROM: functools.partial(bootrom_entry, force=options.force),
         FASTBOOT: fastboot_entry,
+        REBOOT: reboot_entry,
         REPORT: report,
         SHORT: short_entry,
         TWRP: functools.partial(twrp_entry, force=options.force),
