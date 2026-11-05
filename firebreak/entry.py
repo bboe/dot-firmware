@@ -22,6 +22,7 @@ from firebreak.devices import (
 )
 from firebreak.host import run
 from firebreak.identify import POLL, identify
+from firebreak.mediatek.usbdl import UsbdlError
 from firebreak.probe import state
 from firebreak.route import TWRPS
 from firebreak.states import State, shown
@@ -49,9 +50,11 @@ from firebreak.unlock import (
 )
 
 if TYPE_CHECKING:
+    import pathlib
     from collections.abc import Callable
 
     from firebreak.amonet.biscuit_v2_0_0 import Client
+    from firebreak.mediatek.usbdl import Bootrom
     from firebreak.plugin import Device
 
 BOOTROM = "bootrom"
@@ -285,6 +288,10 @@ def checked_device(*, live: Client) -> None:
     SESSION.device = found or SESSION.device
 
 
+def deferred(*, erase: Callable[[], str] | None) -> bool:
+    return erase is None and not SESSION.short and SESSION.device not in FASTBRICKS
+
+
 def entries() -> tuple[str, ...]:
     return (REBOOT, FASTBOOT, TWRP, BOOTROM, SHORT)
 
@@ -313,6 +320,22 @@ def firmware_from_twrp() -> None:
 def gesture() -> None:
     device = known_device()
     say(text=f"Start the {device.title}'s fastboot.\n\n" + device.fastboot_mode)
+
+
+def held_payload(*, client: Bootrom) -> pathlib.Path:
+    try:
+        client.disable_watchdog()
+        PROGRESS.end()
+        return amonet_payload()
+    except (FatalError, OSError, UsbdlError) as error:
+        with contextlib.suppress(OSError):
+            client.port.close()
+        why = error.message if isinstance(error, FatalError) else str(error)
+        raise FatalError(
+            message=f"the {known()} waits in its bootrom for amonet's payload,"
+            f" which this run could not ready: {why.rstrip('.')}. {unwritten()} Unplug"
+            f" the {known()} and run this again."
+        ) from error
 
 
 def known() -> str:
@@ -367,7 +390,7 @@ def quiet() -> str:
 
 
 def reached(*, erase: Callable[[], str] | None) -> Client:
-    payload = amonet_payload()
+    payload = None if deferred(erase=erase) else amonet_payload()
     if SESSION.short:
         ask_for_short()
     if erase is not None:
@@ -389,6 +412,8 @@ def reached(*, erase: Callable[[], str] | None) -> Client:
         with contextlib.suppress(OSError):
             client.port.close()
         raise NotAmonetError(device=named)
+    if payload is None:
+        payload = held_payload(client=client)
     if not SESSION.short:
         PROGRESS.begin(estimate="15 s", label="starting amonet's payload")
     return exploit(client=client, payload=payload)

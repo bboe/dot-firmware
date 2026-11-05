@@ -2499,6 +2499,30 @@ catches that and returns the device instead of a payload. The code separates
 donut from the rest and nothing more: a biscuit and a radar are both `0x8163`,
 and their bootloader in flash still tells them apart.
 
+**So amonet's archive waits for the code.** `reached` fetched it before the
+handshake, which on 2026-11-04 cost a Linux run 74 MB to name a donut that
+never uses it. An Echo the run does not yet know now fetches it only once the
+code says the chip is amonet's. The bootrom's watchdog would take it about 40
+seconds after power-on, so the run writes the watchdog off first, the same
+write `exploit` makes, and then fetches. Two runs still fetch first: one that
+knows an amonet device and one that holds a short, because there the operator
+waits on the test point, and a download in that window is time they hold it.
+A run that erases boot0 knows its device, so it still has the payload before
+the erase. A fetch or a watchdog write that fails there says the Echo waits in
+its bootrom with nothing written, and closes the port. That an amonet bootrom
+holds its session through a download with the watchdog off is not yet
+measured: no biscuit or radar has met this path, and the donut runs that
+prompted it leave before it.
+
+The donut half is measured. On 2026-11-05, on Windows 11, a stock donut that
+the host could not see was held into its bootrom while `firebreak stock` waited
+to be told which Echo it was. The run read the hardware code over the
+bootrom's COM port, named it an Echo Dot (3rd Generation), and went on with
+no download line, and the cache still held no `amonet-biscuit-v2.0.1.zip`
+afterwards. That cache was a biscuit's, without the archive, which is the case
+that cost 74 MB on Linux. A later unlock on the same host named the donut the
+same way and went on through the bootrom.
+
 **The one handshake is the whole design, and the first attempt got it wrong.**
 A bootrom answers one handshake per power-on, measured over both transports:
 afterwards `0xa0` draws no `0x5f` until the Echo is replugged, which is what

@@ -90,6 +90,9 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- An Echo the run cannot name yet, held in its bootrom, fetches amonet's
+  archive only once its bootrom's hardware code says the chip is amonet's. A
+  donut was named that way after a 74 MB download it never used.
 - `firebreak twrp` on a locked Echo says the unlock rewrites its bootloaders,
   its TEE and its recovery, in place of saying it erases everything. On a
   radar it kept userdata; no other device has been read.

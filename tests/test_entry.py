@@ -41,7 +41,10 @@ def bootrom(*, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]) -> list
                 "looked for the bootrom" + (" to erase for" if options["erase"] else "")
             ),
             (
-                types.SimpleNamespace(port=types.SimpleNamespace(close=lambda: None)),
+                types.SimpleNamespace(
+                    disable_watchdog=lambda: done.append("disabled the watchdog"),
+                    port=types.SimpleNamespace(close=lambda: None),
+                ),
                 None,
             ),
         )[1],
@@ -118,11 +121,17 @@ def test_a_bootrom_device_names_a_donut_by_its_hardware_code(
 ) -> None:
     done = bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
     monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(
+        name="amonet_payload",
+        target=entry,
+        value=lambda: (done.append("fetched the payload"), "payload.bin")[1],
+    )
     monkeypatch.setattr(name="hardware_code", target=SESSION, value=DONUT.hardware_code)
     monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
     assert entry.bootrom_device() is DONUT
     assert SESSION.device is DONUT
     assert "ran the payload" not in done
+    assert "fetched the payload" not in done
 
 
 def test_a_bootrom_device_reads_nothing_in_another_state(
@@ -139,10 +148,63 @@ def test_a_bootrom_device_reads_the_bootloader_and_holds_the_bootrom(
     done = bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
     monkeypatch.setattr(name="device", target=SESSION, value=None)
     monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
+    monkeypatch.setattr(
+        name="amonet_payload",
+        target=entry,
+        value=lambda: (done.append("fetched the payload"), "payload.bin")[1],
+    )
     monkeypatch.setattr(name="payload_device", target=entry, value=lambda **_: RADAR)
     assert entry.bootrom_device() is RADAR
-    assert done == ["looked for the bootrom", "ran the payload"]
+    assert done == [
+        "looked for the bootrom",
+        "disabled the watchdog",
+        "fetched the payload",
+        "ran the payload",
+    ]
     assert SESSION.device is RADAR
+
+
+def test_a_bootrom_device_that_cannot_fetch_amonet_says_the_echo_is_held(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
+
+    def unreachable() -> str:
+        message = "no mirror answered."
+        raise FatalError(message=message)
+
+    monkeypatch.setattr(name="amonet_payload", target=entry, value=unreachable)
+    with pytest.raises(FatalError, match=r"no mirror answered\. Nothing was written"):
+        entry.bootrom_device()
+
+
+def test_a_bootrom_device_whose_watchdog_write_fails_says_so(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refused() -> None:
+        message = "[Errno 5] Input/output error"
+        raise OSError(message)
+
+    bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    closed: list[bool] = []
+    monkeypatch.setattr(
+        name="bootrom_client",
+        target=entry,
+        value=lambda **_: (
+            types.SimpleNamespace(
+                disable_watchdog=refused,
+                port=types.SimpleNamespace(close=lambda: closed.append(True)),
+            ),
+            None,
+        ),
+    )
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(name="answering_payload", target=entry, value=lambda: None)
+    with pytest.raises(FatalError, match="Input/output error"):
+        entry.bootrom_device()
+    assert closed == [True]
 
 
 def test_a_bootrom_entry_asks_before_it_erases_boot0(
@@ -378,7 +440,11 @@ def test_a_bootrom_entry_waits_for_an_echo_it_cannot_see(
     said = " ".join(done[0].split())
     assert "boot0 is erased, so this Echo starts nothing" in said
     assert "its bootrom answers for about 40 seconds" in said
-    assert done[1:3] == ["looked for the bootrom", "ran the payload"]
+    assert done[1:4] == [
+        "looked for the bootrom",
+        "disabled the watchdog",
+        "ran the payload",
+    ]
 
 
 def test_a_bootrom_entry_with_no_bootrom_to_find(
