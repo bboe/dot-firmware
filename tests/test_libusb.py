@@ -10,7 +10,7 @@ from usb.backend import libusb1
 from firebreak.mediatek import libusb
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 PACKET = 8
 
@@ -114,6 +114,14 @@ class Unconfigured(FakeDevice):
 
     def set_configuration(self) -> None:
         self.configured = True
+
+
+@pytest.fixture(autouse=True)
+def fresh_backend() -> Iterator[None]:
+    cached = libusb.backend
+    cached.cache_clear()
+    yield
+    cached.cache_clear()
 
 
 def claim_refused(device: object, interface: int) -> None:
@@ -226,12 +234,64 @@ def test_a_backend_on_windows_asks_libusb_for_usbdk(
     assert options == [("context", libusb.USE_USBDK)]
 
 
-def test_a_backend_on_windows_with_no_libusb_is_none(
+def test_a_backend_on_windows_asks_libusb_for_usbdk_once(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+
+    class SetOption:
+        def __init__(self) -> None:
+            self.argtypes: list[object] = []
+
+        def __call__(self, *_: object) -> int:
+            calls.append(1)
+            return 0
+
+    chosen = types.SimpleNamespace(
+        ctx="context", lib=types.SimpleNamespace(libusb_set_option=SetOption())
+    )
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: chosen)
+    assert libusb.backend() is libusb.backend() is chosen
+    assert calls == [1]
+
+
+def test_a_backend_on_windows_refuses_a_libusb_too_old_for_usbdk(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = types.SimpleNamespace(ctx="context", lib=types.SimpleNamespace())
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: old)
+    with pytest.raises(expected_exception=libusb.NoLibusbError, match=r"1\.0\.22"):
+        libusb.backend()
+
+
+def test_a_backend_on_windows_says_when_usbdk_does_not_answer(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Refused:
+        def __init__(self) -> None:
+            self.argtypes: list[object] = []
+
+        def __call__(self, *_: object) -> int:
+            return -5
+
+    chosen = types.SimpleNamespace(
+        ctx="context", lib=types.SimpleNamespace(libusb_set_option=Refused())
+    )
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: chosen)
+    with pytest.raises(expected_exception=libusb.NotPermittedError, match="UsbDk"):
+        libusb.backend()
+
+
+def test_a_backend_on_windows_with_no_libusb_says_how_to_install_it(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(name="USBDK", target=libusb, value=True)
     monkeypatch.setattr(name="get_backend", target=libusb1, value=lambda: None)
-    assert libusb.backend() is None
+    with pytest.raises(expected_exception=libusb.NoLibusbError, match="#windows"):
+        libusb.backend()
 
 
 def test_a_device_with_no_cdc_interface_is_named() -> None:
@@ -359,6 +419,7 @@ def test_open_bootrom_configures_a_bootrom_usbdk_hands_over_unset(
     interface, _, (inward, outward) = interfaced()
     device = Unconfigured(data=interface)
     monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="backend", target=libusb, value=lambda: None)
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
     port = libusb.open_bootrom()
     assert device.configured
@@ -409,6 +470,45 @@ def test_open_bootrom_lets_go_of_a_device_it_cannot_use(
     with pytest.raises(expected_exception=libusb.NotThereError, match="bulk endpoints"):
         libusb.open_bootrom()
     assert device.disposed
+
+
+def test_open_bootrom_on_windows_points_at_usbdk_when_it_cannot_open(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def denied(**_: object) -> object:
+        message = "[Errno 13] Access denied (insufficient permissions)"
+        raise FakeUsbError(message)
+
+    device = FakeDevice()
+    monkeypatch.setattr(name="get_active_configuration", target=device, value=denied)
+    monkeypatch.setattr(
+        name="set_configuration", raising=False, target=device, value=denied
+    )
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="backend", target=libusb, value=lambda: None)
+    patch_usb(device=device, monkeypatch=monkeypatch)
+    with pytest.raises(expected_exception=libusb.NotPermittedError, match="UsbDk"):
+        libusb.open_bootrom()
+
+
+def test_open_bootrom_on_windows_retries_only_an_unset_configuration(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def denied(**_: object) -> object:
+        message = "[Errno 13] Access denied (insufficient permissions)"
+        raise FakeUsbError(message)
+
+    interface, _, _ = interfaced()
+    device = Unconfigured(data=interface)
+    monkeypatch.setattr(name="get_active_configuration", target=device, value=denied)
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    monkeypatch.setattr(name="backend", target=libusb, value=lambda: None)
+    patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
+    with pytest.raises(
+        expected_exception=libusb.NotPermittedError, match="Access denied"
+    ):
+        libusb.open_bootrom()
+    assert not device.configured
 
 
 def test_open_bootrom_says_when_libusb_is_missing(

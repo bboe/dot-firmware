@@ -95,7 +95,9 @@ Store keeps firebreak's files where adb and fastboot cannot see them, and
 firebreak stops on it.
 
 An Echo Dot (3rd Generation) also needs UsbDk and libusb, because its bootrom
-is driven over raw USB. Install UsbDk from an administrator PowerShell:
+is driven over raw USB. UsbDk has run on Windows 11 23H2; mtkclient reports
+it broken on build 26200, which is 25H2. Install it from an administrator
+PowerShell:
 
 ```powershell
 curl.exe -fLo $env:TEMP\UsbDk.msi https://github.com/daynix/UsbDk/releases/download/v1.00-22/UsbDk_1.0.22_x64.msi
@@ -103,7 +105,9 @@ msiexec /i $env:TEMP\UsbDk.msi /qn
 ```
 
 Then put libusb on your PATH, not as administrator, and open a new
-PowerShell:
+PowerShell. Windows 11 23H2's `tar` unpacks libusb's `.7z`; on an older
+Windows, unpack the same `VS2022\MS64\dll\libusb-1.0.dll` into that folder
+with 7-Zip, keeping its folders, before the last line.
 
 ```powershell
 $d = "$env:LOCALAPPDATA\Programs\libusb"

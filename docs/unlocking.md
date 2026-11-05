@@ -2447,7 +2447,8 @@ steps and 5m 44s through mtkclient's trigger. It asked for the power cycle
 after boot-root as well, and the wait for it holds most of that time.
 
 **Windows reaches the bootrom through UsbDk.** Windows libusb cannot open a
-device that a kernel driver holds, and MediaTek's `cdc-acm` holds the bootrom
+device that a kernel driver holds, and MediaTek's serial driver, the
+`cdc-acm.inf` the README installs, holds the bootrom
 there, which is what gives it a COM port. UsbDk, a filter driver, detours the
 device from that driver for as long as libusb holds it, as the `cdc_acm`
 detach does on Linux. The kit turns it on with libusb's

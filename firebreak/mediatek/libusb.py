@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import functools
 import subprocess
 import sys
 import types
@@ -38,6 +39,7 @@ try:
 except usb.core.USBError:
     pass
 """
+UNCONFIGURED = "Configuration not set"
 USBDK = sys.platform == "win32"
 USE_USBDK = 1
 
@@ -136,15 +138,29 @@ def authorize() -> bool:
     )
 
 
+@functools.cache
 def backend() -> Any:  # ruff: ignore[any-type]
     if not USBDK:
         return None
     from usb.backend import libusb1  # ruff: ignore[import-outside-top-level]
 
     chosen = libusb1.get_backend()
-    if chosen is not None:
-        chosen.lib.libusb_set_option.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        chosen.lib.libusb_set_option(chosen.ctx, USE_USBDK)
+    if chosen is None:
+        raise NoLibusbError(missing(why="no libusb-1.0.dll on the PATH loaded"))
+    try:
+        option = chosen.lib.libusb_set_option
+    except AttributeError as error:
+        why = "the libusb-1.0.dll on the PATH is older than 1.0.22"
+        raise NoLibusbError(missing(why=why)) from error
+    option.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    answered = option(chosen.ctx, USE_USBDK)
+    if answered:
+        message = (
+            "UsbDk did not answer libusb, which needs it to take the bootrom"
+            f" from its serial driver (libusb answered {answered}). The steps at"
+            " https://github.com/bboe/firebreak#windows install it."
+        )
+        raise NotPermittedError(message)
     return chosen
 
 
@@ -157,8 +173,8 @@ def chunked(*, data: bytes, limit: int) -> Iterator[bytes]:
 def configured(*, core: Any, device: Any) -> Any:  # ruff: ignore[any-type]
     try:
         return device.get_active_configuration()
-    except core.core.USBError:
-        if not USBDK:
+    except core.core.USBError as error:
+        if not USBDK or UNCONFIGURED not in str(error):
             raise
     device.set_configuration()
     return device.get_active_configuration()
@@ -201,10 +217,13 @@ def endpoints(*, device: Any) -> tuple[Any, Any, Any]:  # ruff: ignore[any-type]
     try:
         configuration = configured(core=core, device=device)
     except core.core.USBError as error:
-        message = (
-            f"libusb cannot open the bootrom it can see: {error}. On Linux the"
-            " udev rules from https://github.com/bboe/firebreak#linux give this"
-            " user access to it, and a run needs no root with them in place."
+        message = f"libusb cannot open the bootrom it can see: {error}." + (
+            " On Windows UsbDk takes it from its serial driver, and the steps at"
+            " https://github.com/bboe/firebreak#windows install it."
+            if USBDK
+            else " On Linux the udev rules from https://github.com/bboe/firebreak#linux"
+            " give this user access to it, and a run needs no root with them in"
+            " place."
         )
         raise NotPermittedError(message) from error
     data = core.util.find_descriptor(configuration, bInterfaceClass=CDC_DATA_CLASS)
@@ -236,17 +255,21 @@ def found(*, core: Any) -> Any:  # ruff: ignore[any-type]
             backend=backend(), idProduct=ProductId.BOOTROM, idVendor=MEDIATEK_VENDOR_ID
         )
     except core.core.NoBackendError as error:
-        message = (
-            f"libusb is not installed, so this run cannot speak raw USB: {error}."
-            " On macOS `brew install libusb` provides it, and on Linux it is the"
-            " libusb-1.0 package. On Windows it is libusb-1.0.dll from libusb's"
-            " release in a folder on the PATH, with UsbDk installed beside it."
-        )
-        raise NoLibusbError(message) from error
+        raise NoLibusbError(missing(why=str(error))) from error
     if device is None:
         message = f"no {MEDIATEK_VENDOR_ID:04x}:{ProductId.BOOTROM:04x} answered libusb"
         raise NotThereError(message)
     return device
+
+
+def missing(*, why: str) -> str:
+    return (
+        f"this run cannot load libusb, so it cannot speak raw USB: {why}."
+        " On macOS `brew install libusb` provides it, and on Linux it is the"
+        " libusb-1.0 package. On Windows it is libusb-1.0.dll from libusb's"
+        " release in a folder on the PATH, as"
+        " https://github.com/bboe/firebreak#windows says."
+    )
 
 
 def open_bootrom(*, timeout: float = READ_TIMEOUT) -> Usb:
