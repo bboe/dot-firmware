@@ -153,7 +153,7 @@ def test_a_bootrom_build_restores_with_the_bootrom_s_downloads_and_steps(
     *, build: str, extra: int, monkeypatch: pytest.MonkeyPatch, steps: int
 ) -> None:
     monkeypatch.setattr(name="build", target=route.ARGUMENTS, value=build)
-    stage = route.restore_stages()[route.State.AMONET_TWRP]
+    stage = route.restore_stages()[route.State.UNLOCKED_TWRP]
     assert stage.needs[1:] == (biscuit.V2_0_1_SOURCE,)[:extra]
     assert stage.steps == steps
 
@@ -285,7 +285,7 @@ def test_a_dot_at_v2_0_0_s_goal_says_it_has_root_adb(
 ) -> None:
     run.target(name="fireos6")
     run.said["getprop ro.build.version.name"] = "Fire OS 6.5.7.4"
-    run.states = [route.State.AMONET_BOOTED]
+    run.states = [route.State.UNLOCKED_BOOTED]
     route.root()
     assert "rooted: Fire OS 6.5.7.4, with root adb" in said(capsys=capsys)
 
@@ -295,12 +295,12 @@ def test_a_dot_that_stays_dark_after_boot_root_asks_for_a_power_cycle(
 ) -> None:
     run.target(name="fireos6")
     table = {
-        route.State.AMONET_TWRP: route.Stage(
-            run=lambda: None, steps=1, then=route.State.AMONET_BOOTED
+        route.State.UNLOCKED_TWRP: route.Stage(
+            run=lambda: None, steps=1, then=route.State.UNLOCKED_BOOTED
         )
     }
     monkeypatch.setattr(name="stages", target=route, value=lambda: table)
-    run.states = [route.State.AMONET_TWRP, *[route.State.NONE] * 6]
+    run.states = [route.State.UNLOCKED_TWRP, *[route.State.NONE] * 6]
     run.tick = route.POWER_CYCLE
     with pytest.raises(RanOutError):
         route.root()
@@ -313,7 +313,7 @@ def test_a_dot_that_stays_dark_after_boot_root_asks_for_a_power_cycle(
         (
             "fireos6",
             [route.State.STOCK_BOOTED],
-            [route.State.AMONET_TWRP],
+            [route.State.UNLOCKED_TWRP],
             "boot-root.zip did not take",
         ),
         ("fireos5", [route.State.BOOTED], [], "has not finished"),
@@ -349,7 +349,7 @@ def test_a_fire_os_5_restore_left_in_twrp_is_not_reported_as_written(
     *, monkeypatch: pytest.MonkeyPatch, run: Run
 ) -> None:
     run.target(build="5.5.5.4", name="stock")
-    twrp = route.State.AMONET_TWRP
+    twrp = route.State.UNLOCKED_TWRP
     table = {
         twrp: route.Stage(
             passes=frozenset({twrp}), run=lambda: None, steps=1, then=None
@@ -411,7 +411,7 @@ def test_a_fire_os_5_route_fetches_what_it_needs_and_builds_the_system(
     )
     table = route.stages()
     route.prefetch(needs=route.needed(start=route.State.STOCK_FASTBOOT, table=table))
-    route.prefetch(needs=route.needed(start=route.State.AMONET_TWRP, table=table))
+    route.prefetch(needs=route.needed(start=route.State.UNLOCKED_TWRP, table=table))
     prebuilder.join(timeout=5)
     assert (
         fetched
@@ -449,7 +449,7 @@ def test_a_fire_os_6_prefetch_downloads_its_build(
         name="download", target=route.updates, value=lambda **o: got.append(o["build"])
     )
     route.prefetch(
-        needs=route.needed(start=route.State.AMONET_TWRP, table=route.stages())
+        needs=route.needed(start=route.State.UNLOCKED_TWRP, table=route.stages())
     )
     assert got == [downloaded]
 
@@ -466,7 +466,7 @@ def test_a_kamakiri_route_runs_the_stage_its_target_asks_for_from_twrp(
     )
     monkeypatch.setattr(name="build", target=route.ARGUMENTS, value="8349")
     table = route.stages()
-    assert table[route.State.AMONET_TWRP].run.__name__ == run
+    assert table[route.State.UNLOCKED_TWRP].run.__name__ == run
     assert table[route.State.BOOTROM].run.__name__ == "stage_kamakiri"
 
 
@@ -515,7 +515,7 @@ def test_a_reset_route_takes_five_steps(*, monkeypatch: pytest.MonkeyPatch) -> N
         target=route.ARGUMENTS,
         value=TARGETS[BISCUIT]["fireos6"],
     )
-    assert route.stages()[route.State.AMONET_TWRP].steps == 5
+    assert route.stages()[route.State.UNLOCKED_TWRP].steps == 5
 
 
 def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
@@ -534,7 +534,7 @@ def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
     [
         (
             "fireos5",
-            route.State.AMONET_FASTBOOT,
+            route.State.UNLOCKED_FASTBOOT,
             [
                 biscuit.V1_1_0_SOURCE,
                 biscuit.V2_0_1_SOURCE,
@@ -593,7 +593,7 @@ def test_a_run_after_boot0_was_erased_goes_through_the_bootrom(
         target=route,
         value=lambda **_: run.fetched.append("v2.0.1 recovery"),
     )
-    run.states = [route.State.NONE, route.State.AMONET_BOOTED]
+    run.states = [route.State.NONE, route.State.UNLOCKED_BOOTED]
     run.said["getprop ro.build.version.name"] = "Fire OS 6.5.7.4"
     route.root()
     assert run.fetched == ["v2.0.1 recovery"]
@@ -692,7 +692,7 @@ def test_a_run_refuses_another_device_before_it_downloads(
 
 @pytest.mark.parametrize(
     argnames=("then", "said_so"),
-    argvalues=[(route.State.AMONET_TWRP, True), (route.State.STOCK_BOOTED, False)],
+    argvalues=[(route.State.UNLOCKED_TWRP, True), (route.State.STOCK_BOOTED, False)],
     ids=["twrp", "stock"],
 )
 def test_a_run_says_a_port_cannot_power_twrp_only_while_twrp_is_what_is_next(
@@ -785,9 +785,9 @@ def test_a_run_waiting_for_the_gesture_downloads_the_fastboot_route(
             needs=(biscuit.V2_0_1_SOURCE,),
             run=lambda: None,
             steps=2,
-            then=route.State.AMONET_TWRP,
+            then=route.State.UNLOCKED_TWRP,
         ),
-        route.State.AMONET_TWRP: route.Stage(
+        route.State.UNLOCKED_TWRP: route.Stage(
             needs=(biscuit.V2_0_1_SOURCE, BUILDS["5.5.5.4"]),
             run=lambda: None,
             steps=2,
@@ -850,7 +850,7 @@ def test_a_stage_counts_its_passes_unless_it_returns_false(
 ) -> None:
     ran: list[str] = []
     states = iter([
-        route.State.AMONET_FASTBOOT,
+        route.State.UNLOCKED_FASTBOOT,
         route.State.AMONET_TWRP_BOOT_MOVED,
     ])
 
@@ -861,7 +861,7 @@ def test_a_stage_counts_its_passes_unless_it_returns_false(
         return found
 
     table = {
-        route.State.AMONET_FASTBOOT: route.Stage(
+        route.State.UNLOCKED_FASTBOOT: route.Stage(
             passes=frozenset({route.State.AMONET_TWRP_BOOT_MOVED}),
             run=lambda: ran.append("first") or returned,
             steps=1,
@@ -899,7 +899,7 @@ def test_a_stock_fire_os_5_run_ends_after_the_restore(
 ) -> None:
     run.target(build="5.5.5.4", name="stock")
     monkeypatch.setattr(name="stages", target=route, value=dict)
-    run.states = [route.State.AMONET_TWRP, route.State.NONE]
+    run.states = [route.State.UNLOCKED_TWRP, route.State.NONE]
     route.root()
     out = said(capsys=capsys)
     assert "Stock 5.5.5.4 is written" in out
@@ -910,7 +910,7 @@ def test_a_stock_fire_os_5_run_ends_after_the_restore(
     ("states", "message"),
     [
         ([route.State.STOCK_BOOTED], "nothing to restore"),
-        ([route.State.AMONET_TWRP, route.State.STOCK_BOOTED], "runs stock 8146"),
+        ([route.State.UNLOCKED_TWRP, route.State.STOCK_BOOTED], "runs stock 8146"),
     ],
 )
 def test_a_stock_run_ends_on_stock(
@@ -971,7 +971,7 @@ def test_a_stock_run_that_parks_in_fastboot_says_so(
     run.target(build="5.5.5.4", name="stock")
     monkeypatch.setattr(name="stages", target=route, value=dict)
     monkeypatch.setattr(name="fastboot", target=route.SESSION, value=True)
-    run.states = [route.State.AMONET_TWRP, route.State.STOCK_FASTBOOT]
+    run.states = [route.State.UNLOCKED_TWRP, route.State.STOCK_FASTBOOT]
     route.root()
     out = said(capsys=capsys)
     assert "waits in fastboot" in out
@@ -983,10 +983,10 @@ def test_a_v2_0_0_dot_is_restarted_into_its_own_twrp(
 ) -> None:
     run.target(build="8146", name="stock")
     table = route.stages() | {
-        route.State.AMONET_BOOTED: route.Stage(run=lambda: None, steps=1, then=None)
+        route.State.UNLOCKED_BOOTED: route.Stage(run=lambda: None, steps=1, then=None)
     }
     monkeypatch.setattr(name="stages", target=route, value=lambda: table)
-    run.states = [route.State.AMONET_FASTBOOT, route.State.AMONET_BOOTED]
+    run.states = [route.State.UNLOCKED_FASTBOOT, route.State.UNLOCKED_BOOTED]
     with pytest.raises(RanOutError):
         route.root()
     out = said(capsys=capsys)
@@ -1006,7 +1006,7 @@ def test_a_v2_0_0_dot_that_refuses_the_restart_is_told_about_its_button(
         value=lambda **_: types.SimpleNamespace(returncode=1, stdout=""),
     )
     monkeypatch.setattr(name="in_fastboot", target=unlock, value=lambda: True)
-    run.states = [route.State.AMONET_FASTBOOT]
+    run.states = [route.State.UNLOCKED_FASTBOOT]
     with pytest.raises(RanOutError):
         route.root()
     assert "hold the + button while you plug it back in" in said(capsys=capsys)
@@ -1023,23 +1023,23 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
             state.AMONET_FIREOS5_BBOE_TWRP,
             frozenset(),
         ),
-        state.AMONET_FASTBOOT: (
+        state.UNLOCKED_FASTBOOT: (
             route.stage_amonet_recovery,
             1,
-            state.AMONET_TWRP,
+            state.UNLOCKED_TWRP,
             frozenset(),
         ),
         state.EMOS: (route.stage_emos, 1, None, frozenset()),
         state.NO_SYSTEM: (to_recovery, 1, None, frozenset()),
     } | dict.fromkeys(
         (state.STOCK_FASTBOOT, state.STOCK_FIREOS5_FASTBOOT),
-        (route.stage_fastbrick, 2, state.AMONET_TWRP, frozenset()),
+        (route.stage_fastbrick, 2, state.UNLOCKED_TWRP, frozenset()),
     )
     reboots = {
-        state.AMONET_BOOTED: (
+        state.UNLOCKED_BOOTED: (
             to_twrp,
             1,
-            state.AMONET_TWRP,
+            state.UNLOCKED_TWRP,
             frozenset(),
         ),
         state.BOOTED: (to_recovery, 1, None, frozenset()),
@@ -1066,25 +1066,25 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
             state.AMONET_FIREOS5_BBOE_TWRP: (
                 install,
                 4,
-                state.AMONET_TWRP,
+                state.UNLOCKED_TWRP,
                 frozenset(),
             ),
             state.AMONET_FIREOS5_TWRP: (
                 install,
                 4,
-                state.AMONET_TWRP,
+                state.UNLOCKED_TWRP,
                 frozenset(),
             ),
-            state.AMONET_TWRP: (
+            state.UNLOCKED_TWRP: (
                 route.stage_install_fireos6,
                 None,
-                state.AMONET_BOOTED,
+                state.UNLOCKED_BOOTED,
                 frozenset(),
             ),
             state.AMONET_TWRP_BOOT_MOVED: (
                 install,
                 4,
-                state.AMONET_TWRP,
+                state.UNLOCKED_TWRP,
                 frozenset(),
             ),
         }
@@ -1131,19 +1131,19 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
                     state.AMONET_FIREOS5_BBOE_TWRP,
                     frozenset(),
                 ),
-                state.AMONET_BOOTED: reboots[state.AMONET_BOOTED],
-                state.AMONET_FASTBOOT: (
+                state.UNLOCKED_BOOTED: reboots[state.UNLOCKED_BOOTED],
+                state.UNLOCKED_FASTBOOT: (
                     route.stage_downgrade,
                     2,
                     state.AMONET_FIREOS5_BBOE_TWRP,
                     frozenset({
                         state.AMONET_FIREOS5_FASTBOOT,
-                        state.AMONET_FASTBOOT,
-                        state.AMONET_TWRP,
+                        state.UNLOCKED_FASTBOOT,
+                        state.UNLOCKED_TWRP,
                         state.AMONET_TWRP_BOOT_MOVED,
                     }),
                 ),
-                state.AMONET_TWRP: (
+                state.UNLOCKED_TWRP: (
                     chain,
                     2,
                     state.AMONET_TWRP_BOOT_MOVED,
@@ -1196,7 +1196,7 @@ def test_fastboot_counts_the_steps_the_route_takes(
     )
     table = route.stages()
     starts = {
-        state.AMONET_TWRP: totals["twrp"],
+        state.UNLOCKED_TWRP: totals["twrp"],
         state.AMONET_TWRP_BOOT_MOVED: totals["v1.1.0"],
         state.STOCK_FASTBOOT: totals["stock"],
         state.STOCK_FIREOS5_FASTBOOT: totals["stock"],
@@ -1210,7 +1210,7 @@ def test_stock_that_does_not_start_after_the_restore_stops_the_run(
     *, monkeypatch: pytest.MonkeyPatch, run: Run
 ) -> None:
     run.target(build="8146", name="stock")
-    twrp = route.State.AMONET_TWRP
+    twrp = route.State.UNLOCKED_TWRP
     table = {
         twrp: route.Stage(
             passes=frozenset({twrp}), run=lambda: None, steps=1, then=None

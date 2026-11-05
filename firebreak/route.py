@@ -94,7 +94,7 @@ FIREOS5_ROOTED = {
     State.ROOTED,
     State.AMONET_FIREOS5_BBOE_BOOTED,
 }
-KAMAKIRI_REBOOTS = frozenset({State.AMONET_BOOTED, State.BOOTED})
+KAMAKIRI_REBOOTS = frozenset({State.UNLOCKED_BOOTED, State.BOOTED})
 NO_FASTBOOT_DRIVER = (
     "Windows sees an Echo in fastboot mode, but fastboot does not, so its driver"
     " is missing. Install the drivers from"
@@ -105,7 +105,7 @@ POWER_CYCLE = 60
 RESTARTS = 5
 TWRPS = frozenset({
     State.AMONET_FIREOS5_TWRP,
-    State.AMONET_TWRP,
+    State.UNLOCKED_TWRP,
     State.AMONET_TWRP_BOOT_MOVED,
     State.AMONET_FIREOS5_BBOE_TWRP,
 })
@@ -142,8 +142,8 @@ def bootrom_chain() -> Chain:
     return Chain(
         after=functools.partial(stage_amonet_recovery, carries_twrp=False),
         little_kernel="",
-        state=State.AMONET_FASTBOOT,
-        then=State.AMONET_TWRP,
+        state=State.UNLOCKED_FASTBOOT,
+        then=State.UNLOCKED_TWRP,
         unlock=BOOTROM_UNLOCKS[ARGUMENTS.target.device],
     )
 
@@ -154,10 +154,10 @@ def bootrom_needs(*, unlock: Unlock) -> tuple[Need, ...]:
 
 def fireos5_stages() -> dict[State, Stage]:
     downgrades = frozenset({
-        State.AMONET_TWRP,
+        State.UNLOCKED_TWRP,
         State.AMONET_TWRP_BOOT_MOVED,
         State.AMONET_FIREOS5_FASTBOOT,
-        State.AMONET_FASTBOOT,
+        State.UNLOCKED_FASTBOOT,
     })
     goal = ARGUMENTS.target.goal
     unlock = ARGUMENTS.target.unlock
@@ -190,7 +190,7 @@ def fireos5_stages() -> dict[State, Stage]:
             steps=1,
             then=State.AMONET_FIREOS5_BBOE_TWRP,
         ),
-        State.AMONET_TWRP: Stage(
+        State.UNLOCKED_TWRP: Stage(
             needs=chained,
             run=chain,
             steps=2,
@@ -205,8 +205,8 @@ def fireos5_stages() -> dict[State, Stage]:
             steps=4,
             then=State.AMONET_FIREOS5_BBOE_BOOTED,
         ),
-        State.AMONET_BOOTED: reboot_stages()[State.AMONET_BOOTED],
-        State.AMONET_FASTBOOT: Stage(
+        State.UNLOCKED_BOOTED: reboot_stages()[State.UNLOCKED_BOOTED],
+        State.UNLOCKED_FASTBOOT: Stage(
             needs=(
                 *bootrom_needs(unlock=FIREOS5_CHAINS[ARGUMENTS.target.device].unlock),
                 TWRP,
@@ -237,22 +237,22 @@ def fireos6_stages() -> dict[State, Stage]:
             needs=(*installed, *amonet_sources()),
             run=install,
             steps=4,
-            then=State.AMONET_TWRP,
+            then=State.UNLOCKED_TWRP,
         ),
-        State.AMONET_TWRP: Stage(
+        State.UNLOCKED_TWRP: Stage(
             needs=(unlock.source, ota_build, BOOT_ROOT),
             run=stage_install_fireos6,
             steps=5 if ARGUMENTS.factory_reset else None,
-            then=State.AMONET_BOOTED,
+            then=State.UNLOCKED_BOOTED,
         ),
         State.AMONET_TWRP_BOOT_MOVED: Stage(
-            needs=installed, run=install, steps=4, then=State.AMONET_TWRP
+            needs=installed, run=install, steps=4, then=State.UNLOCKED_TWRP
         ),
         State.AMONET_FIREOS5_BBOE_TWRP: Stage(
             needs=(*installed, *amonet_sources()),
             run=install,
             steps=4,
-            then=State.AMONET_TWRP,
+            then=State.UNLOCKED_TWRP,
         ),
     } | {
         state: stage
@@ -272,13 +272,13 @@ def kamakiri_stages() -> dict[State, Stage]:
             needs=(unlock.source,),
             run=stage_kamakiri,
             steps=None,
-            then=State.AMONET_FASTBOOT,
+            then=State.UNLOCKED_FASTBOOT,
         ),
-        State.AMONET_FASTBOOT: Stage(
+        State.UNLOCKED_FASTBOOT: Stage(
             needs=(unlock.source,),
             run=stage_kamakiri_recovery,
             steps=1,
-            then=State.AMONET_TWRP,
+            then=State.UNLOCKED_TWRP,
         ),
     }
     if ARGUMENTS.target.unlock is None:
@@ -286,11 +286,11 @@ def kamakiri_stages() -> dict[State, Stage]:
     return (
         table
         | {
-            State.AMONET_TWRP: Stage(
+            State.UNLOCKED_TWRP: Stage(
                 needs=(unlock.source, ota_build, BOOT_ROOT),
                 run=stage_install_kamakiri,
                 steps=5 if ARGUMENTS.factory_reset else None,
-                then=State.AMONET_BOOTED,
+                then=State.UNLOCKED_BOOTED,
             )
         }
         | {
@@ -378,7 +378,7 @@ def reboot_stages() -> dict[State, Stage]:
     to_recovery = functools.partial(reboot, label="restarting into recovery")
     to_twrp = functools.partial(reboot, label="restarting into TWRP")
     return {
-        State.AMONET_BOOTED: Stage(run=to_twrp, steps=1, then=State.AMONET_TWRP),
+        State.UNLOCKED_BOOTED: Stage(run=to_twrp, steps=1, then=State.UNLOCKED_TWRP),
         State.BOOTED: Stage(run=to_recovery, steps=1, then=None),
         State.ROOTED: Stage(run=to_recovery, steps=1, then=State.AMONET_FIREOS5_TWRP),
         State.AMONET_FIREOS5_BBOE_BOOTED: Stage(
@@ -435,7 +435,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
     since = 0.0
     while True:
         current = state()
-        installed = target.goal == State.AMONET_BOOTED and State.AMONET_TWRP in done
+        installed = target.goal == State.UNLOCKED_BOOTED and State.UNLOCKED_TWRP in done
         restored = target.unlock is None and bool(done & TWRPS)
         ahead = AHEAD.get(current)
         if (
@@ -546,7 +546,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 guided = True
                 password_first(device=target.device)
                 say(text=unlock_ask(device=target.device))
-            elif current == State.AMONET_FASTBOOT and not done:
+            elif current == State.UNLOCKED_FASTBOOT and not done:
                 say(
                     text=f"This {title()} is in its unlocked fastboot."
                     " Starting its recovery."
@@ -562,13 +562,13 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     " start. Rebooting it into recovery."
                 )
             elif (
-                current == State.AMONET_BOOTED
+                current == State.UNLOCKED_BOOTED
                 and current not in done
                 and current != target.goal
             ):
                 say(
-                    text=f"This {title()} runs rooted Fire OS 6 on amonet's bootloader."
-                    " Rebooting it into TWRP."
+                    text=f"This {title()} runs rooted Fire OS 6 on an unlocked"
+                    " bootloader. Rebooting it into TWRP."
                 )
             elif current == State.NONE and not done and not PROGRESS.open and guided:
                 line = waiting_line(device=target.device)
@@ -578,7 +578,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 guided = True
                 password_first(device=target.device)
                 say(text=usb_ask(device=target.device))
-        if current == State.AMONET_BOOTED == target.goal:
+        if current == State.UNLOCKED_BOOTED == target.goal:
             version = adb_shell(command="getprop ro.build.version.name")
             warn(text=f"The {title()} is rooted: {version}, with root adb.")
             cache_note()
@@ -694,7 +694,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     warn(text=NO_FASTBOOT_DRIVER)
             if (
                 current == State.NONE
-                and awaiting == State.AMONET_BOOTED
+                and awaiting == State.UNLOCKED_BOOTED
                 and not prompted
                 and time.monotonic() - since > POWER_CYCLE
             ):
@@ -730,11 +730,11 @@ def stages() -> dict[State, Stage]:
     table = {
         State.EMOS: Stage(needs=(), run=stage_emos, steps=1, then=None),
         State.NO_SYSTEM: reboot_stages()[State.BOOTED],
-        State.AMONET_FASTBOOT: Stage(
+        State.UNLOCKED_FASTBOOT: Stage(
             needs=(FASTBRICKS[ARGUMENTS.target.device].source,),
             run=stage_amonet_recovery,
             steps=1,
-            then=State.AMONET_TWRP,
+            then=State.UNLOCKED_TWRP,
         ),
     } | dict.fromkeys(
         (State.STOCK_FASTBOOT, State.STOCK_FIREOS5_FASTBOOT),
@@ -742,7 +742,7 @@ def stages() -> dict[State, Stage]:
             needs=(FASTBRICKS[ARGUMENTS.target.device].source,),
             run=stage_fastbrick,
             steps=2,
-            then=State.AMONET_TWRP,
+            then=State.UNLOCKED_TWRP,
         ),
     )
     if chain is not None:

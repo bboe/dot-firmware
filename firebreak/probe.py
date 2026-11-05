@@ -47,7 +47,7 @@ def probe() -> State:  # ruff: ignore[complex-structure, too-many-return-stateme
         found = recognised(
             ask=lambda chain: chain.fastboot(little_kernel=little_kernel, unlocked=True)
         )
-        return State.AMONET_FASTBOOT if found is None else found
+        return State.UNLOCKED_FASTBOOT if found is None else found
     connected = adb_state()
     if "unauthorized" in connected:
         return State.STOCK_BOOTED
@@ -67,7 +67,7 @@ def probe() -> State:  # ruff: ignore[complex-structure, too-many-return-stateme
             return found
         if "boot_a_x" in partition_table():
             return State.AMONET_TWRP_BOOT_MOVED
-        return State.AMONET_TWRP
+        return State.UNLOCKED_TWRP
     if connected == "device":
         completed = adb_shell(command="getprop sys.boot_completed", timeout=30)
         if NO_SHELL in completed:
@@ -77,7 +77,7 @@ def probe() -> State:  # ruff: ignore[complex-structure, too-many-return-stateme
             "Fire OS 6"
         ):
             if "uid=0" in adb_shell(command="id; su -c id", timeout=30):
-                return State.AMONET_BOOTED
+                return State.UNLOCKED_BOOTED
             return State.STOCK_BOOTED
         if booted and "uid=0" in adb_shell(command="su -c id", timeout=30):
             return rooted()

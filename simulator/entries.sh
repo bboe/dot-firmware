@@ -76,8 +76,8 @@ check() {
     run "$name-2" "$secs" "$want2" "$@"
 }
 
-A="is in amonet-fastboot."
-T="is in amonet-twrp."
+A="is in unlocked fastboot."
+T="is in TWRP."
 H="waits in its bootrom."
 AH="already waits in its bootrom."
 LOCKED="is locked, so reaching a TWRP unlocks it"

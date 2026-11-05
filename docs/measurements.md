@@ -69,7 +69,9 @@ night showed the same, except that the fastbrick ring read white:
 Each row's state is the one the run started from, and each run went with no
 one touching the device unless the row says otherwise. A row naming several
 builds is that many runs, whose totals agreed inside the range given unless the
-row gives one of its own.
+row gives one of its own. The rows name states as those runs printed them:
+`amonet-booted`, `amonet-fastboot` and `amonet-twrp` are `unlocked-booted`,
+`unlocked-fastboot` and `unlocked-twrp` since 2026-11-05.
 
 | from | to | took |
 | --- | --- | --- |

@@ -16,10 +16,10 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
 | preloader | no adb or fastboot, and USB holds `0e8d:2000` | waits: every boot passes through this for about 0.8 s. One that never leaves it needs the test point |
 | emos | no adb or fastboot, and one serial port with USB ID `1949:2007` | `/init recovery` at emOS's serial console |
 | no-system | adb answers as `device`, and `adb shell` fails with `exec '/system/bin/sh' failed` | `adb reboot recovery`, for every target |
-| amonet-booted | Fire OS 6, and `id` or `su -c id` answers uid 0 | `adb reboot recovery`, into the device's own TWRP; ends an `unlock fireos6` run |
-| amonet-twrp | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's, `mtp` in `sys.usb.config` | moves boot in the table to make room for that chain, then reboots so the kernel rereads it |
-| amonet-twrp-boot-moved | amonet-twrp, and `sgdisk --print` lists `boot_a_x`, the boot moved layout's name | writes the Fire OS 5 chain and Fire OS 5.5.5.4, preloader last |
-| amonet-fastboot | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's | starts the device's own TWRP where the bootloader is the one its unlock declares, and downgrades to its Fire OS 5 chain through the bootrom where it is not |
+| unlocked-booted | Fire OS 6, and `id` or `su -c id` answers uid 0 | `adb reboot recovery`, into the device's own TWRP; ends an `unlock fireos6` run |
+| unlocked-twrp | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's, `mtp` in `sys.usb.config` | moves boot in the table to make room for that chain, then reboots so the kernel rereads it |
+| amonet-twrp-boot-moved | unlocked-twrp, and `sgdisk --print` lists `boot_a_x`, the boot moved layout's name | writes the Fire OS 5 chain and Fire OS 5.5.5.4, preloader last |
+| unlocked-fastboot | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's | starts the device's own TWRP where the bootloader is the one its unlock declares, and downgrades to its Fire OS 5 chain through the bootrom where it is not |
 | amonet-fireos5-fastboot | `unlock_status` is `true`, and `lk_build_desc` is the Fire OS 5 chain's | that chain's TEE and its TWRP, 3.7.0_9-bboe2 on a Dot, then recovery |
 | amonet-fireos5-twrp | recovery, the Fire OS 5 chain's `lk_build_desc`, a `ro.twrp.version` that is not the chain's, `mtp` in `sys.usb.config` | writes the chain's TWRP to `recovery`, reboots into it |
 | amonet-fireos5-bboe-twrp | recovery, the Fire OS 5 chain's `lk_build_desc` and its `ro.twrp.version`, `mtp` in `sys.usb.config` | Fire OS 5.5.5.4, boot and /system patches, Magisk 17.3 |
@@ -263,7 +263,7 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
   Dot's serial number. Measured on a Dot with emOS 0.10 on amonet v2.0.0.
 - That shell's `/init recovery` reboots into the bootloader's TWRP, and the
   port goes away within a second. From v2.0.0's TWRP, 20 s later, the root
-  continues as from amonet-twrp. `stock` takes the same path: from emOS
+  continues as from unlocked-twrp. `stock` takes the same path: from emOS
   0.10 on amonet v1.1.0 with TWRP 3.7.0_9-bboe2 it restored 8146 in 3 min
   3 s.
 - Finding the port by USB ID needs pyserial, so the probe runs a child that
@@ -1144,7 +1144,7 @@ reaching its state by hand first.
   `fastboot reboot-recovery`, so every target starts it from there rather than
   asking for the + button, which is left for a bootloader that takes neither
   that command nor the oem one. Both are asked for, in that order, because
-  `State.AMONET_FASTBOOT` is any unlocked LK that is not v1.1.0's: biscuit's
+  `State.UNLOCKED_FASTBOOT` is any unlocked LK that is not v1.1.0's: biscuit's
   older ones and radar's, where neither command is measured. The transition
   sits beside v1.1.0's fastboot in the table every target shares.
 - The stage writes the device's own TWRP to `recovery` first, as amonet's
@@ -1335,7 +1335,7 @@ reaching its state by hand first.
 | target | ends in | stops at |
 | --- | --- | --- |
 | `unlock fireos5` | amonet v1.1.0, TWRP 3.7.0_9-bboe2, rooted Fire OS 5.5.5.4 | amonet-fireos5-bboe-booted |
-| `unlock fireos6 [--factory-reset]`, the default | amonet v2.0.1's TWRP, `boot-root.zip` on the Fire OS 6 installed; with `--factory-reset`, or no Fire OS 6 installed, on 8149 in both slots | amonet-booted |
+| `unlock fireos6 [--factory-reset]`, the default | amonet v2.0.1's TWRP, `boot-root.zip` on the Fire OS 6 installed; with `--factory-reset`, or no Fire OS 6 installed, on 8149 in both slots | unlocked-booted |
 | `stock [BUILD]` | Amazon's Fire OS 6 `BUILD`, 8149 when left out, the whole Echo erased | stock-booted |
 
 - Each poll picks the stage for the state found and the target, so a run
@@ -1728,12 +1728,12 @@ and a recovery image carries its own kernel, so the two must agree.
   `unlock fireos5` path, and on one other state, `amonet-fireos5-fastboot`,
   where the LK is v1.1.0's and the recovery there cannot be trusted, so any
   target writes a known arm64 TWRP to reach a TWRP at all.
-- `amonet-twrp` and `amonet-twrp-boot-moved` are a pair, not a loop: a run
+- `unlocked-twrp` and `amonet-twrp-boot-moved` are a pair, not a loop: a run
   takes one or the other, never both. `unlock fireos5` cuts amonet v1.1.0's
   partitions in, and `unlock fireos6` puts the stock table back on a Dot found
   part way through that. The chain under both is amonet v2's, so only the table
   differs.
-- A booted Dot reaches a TWRP by one reboot: `amonet-booted` into v2's TWRP,
+- A booted Dot reaches a TWRP by one reboot: `unlocked-booted` into v2's TWRP,
   `amonet-fireos5-bboe-booted` into bboe2's, and `rooted` into whatever
   `recovery` holds, which the route predicts as amonet's 3.2.3. `rooted` is the
   exception to the reboot: `unlock fireos5` writes bboe2 there through `su` and
@@ -1772,7 +1772,7 @@ and a recovery image carries its own kernel, so the two must agree.
   `0e8d:2000`, takes boot0 as intact: it stops the bootrom step, deletes the
   marker, and continues polling. On a Dot rebooted from Fire OS 6 with the
   marker set by hand, the run said so 2 s later and ended at
-  amonet-booted, with nothing written.
+  unlocked-booted, with nothing written.
 - An amonet v1.1.0 Dot started in fastboot reads as stock-fireos5-fastboot,
   and the fastbrick leaves it in v2.0.0's TWRP on amonet v1.1.0's partition
   table. The probe reads that as amonet-twrp-boot-moved, and for
@@ -1868,7 +1868,7 @@ either amonet v1.1.0 TWRP, and amonet v1.1.0's from v2.0.0's TWRP.
   stock LK and keeps its build string, so an amonet v2.0.0 Dot and a locked
   stock 8146 both read `63cb91b-20221007_072309`; `unlock_status` is in
   fastboot only. The `stock` target writes no `recovery`, so a restored Dot
-  keeps the TWRP it had, and the probe would read that as amonet-twrp.
+  keeps the TWRP it had, and the probe would read that as unlocked-twrp.
 - A locked Dot cannot reach that state, so the reading above is a gap in the
   logic and not a route. Measured twice on a Dot restored to stock 8146 with an
   amonet TWRP left in `recovery`, v2.0.0's and 3.7.0_9-bboe2's:
@@ -1940,7 +1940,7 @@ either amonet v1.1.0 TWRP, and amonet v1.1.0's from v2.0.0's TWRP.
   not `true`, or whose `product` is not `BISCUIT`. Every unlocked amonet LK
   answers this fastboot. Without the `product` check, an Echo (2nd
   Generation) on amonet-radar, whose LK says `RADAR`, would read as
-  amonet-fastboot, and a run would erase its boot0 and write
+  unlocked-fastboot, and a run would erase its boot0 and write
   biscuit's preloader and LK to it. This is read from the code and the LK
   images, not seen on a radar.
 - It runs `fastboot erase boot0` and `fastboot reboot`, and the Dot drops into
@@ -2799,25 +2799,22 @@ went, each for a reason worth keeping:
   arrived in, and it reads as news only when the run starts there, so it is
   now printed on an empty `done` alone. The run that put the Echo in that
   fastboot has a step line for it already.
-- `amonet-fastboot` and `amonet-twrp`, the state names themselves, which
-  every closing message and every stuck-state refusal printed raw. A donut's
-  fastboot is kaeru's and its recovery came from the kamakiri kit, and the
-  first fix for that rendered those states as `kamakiri-` instead. That was
-  the wrong axis. **Nothing in this project branches on which exploit wrote a
-  bootloader**: it routes on `FASTBOOTS`, `LOCKED_FASTBOOTS` and `TWRPS`, so
-  the distinction that matters to a reader is stock against unlocked, and
-  provenance was a second naming scheme with no user. `states.shown` renders
-  a locked fastboot as `stock fastboot`, any other as `unlocked fastboot`,
-  every recovery as `TWRP`, which is the command's own name and what every one
-  of those states holds, and everything else by its own name. The step that
-  starts a recovery from a fastboot says `restarting into TWRP` for the same
-  reason, because it waits for a state in `TWRPS` and refuses anything else.
-  `restarting into recovery` stays where a run reboots a Fire OS that may hold
-  Amazon's recovery rather than this project's. It needs
-  no device, and it corrects the same jargon for a biscuit, which was reading
-  `amonet-fireos5-bboe-twrp` at a user. The values themselves do not change,
-  and `--verbose` still prints them, because they are what the code reasons
-  about.
+
+**A state's name in what a run prints says stock or unlocked, never which
+exploit wrote the bootloader.** Nothing in this project branches on that: it
+routes on `FASTBOOTS`, `LOCKED_FASTBOOTS` and `TWRPS`. `states.shown` renders a
+locked fastboot as `stock fastboot`, any other as `unlocked fastboot`, every
+recovery as `TWRP`, which is the command's own name and what every one of those
+states holds, the booted state every unlocked device shares as `rooted Fire OS
+6`, and everything else by its own name. The step that starts a
+recovery from a fastboot says `restarting into TWRP` for the same reason,
+because it waits for a state in `TWRPS` and refuses anything else, and
+`restarting into recovery` stays where a run reboots a Fire OS that may hold
+Amazon's recovery rather than this project's. `--verbose` prints the values
+themselves, because they are what the code reasons about. The states every
+unlocked device shares are `unlocked-booted`, `unlocked-fastboot` and
+`unlocked-twrp`. The Fire OS 5 states and `amonet-twrp-boot-moved` keep
+amonet's name, because they are amonet v1.1.0's own chain and layout.
 
 **A refusal for a device with no bootrom chain comes before the reboot
 now.** `firebreak bootrom` on a rooted

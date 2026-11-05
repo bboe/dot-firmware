@@ -54,7 +54,7 @@ def test_each_target_names_its_goal_its_install_and_its_unlock() -> None:
             UNLOCK_TO_FIREOS5,
         ),
         "fireos6": (
-            State.AMONET_BOOTED,
+            State.UNLOCKED_BOOTED,
             FireOs6(build="8149"),
             UNLOCK_TO_FIREOS6,
         ),

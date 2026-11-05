@@ -54,6 +54,13 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- The states every unlocked device shares are renamed `unlocked-booted`,
+  `unlocked-fastboot` and `unlocked-twrp`, from `amonet-booted`,
+  `amonet-fastboot` and `amonet-twrp`. A donut never runs amonet, yet
+  `--verbose` and `firebreak reboot` named it there. The Fire OS 5 states and
+  `amonet-twrp-boot-moved` keep their names. What a run prints says
+  `rooted Fire OS 6` for the booted one, as it says `unlocked fastboot` and
+  `TWRP` for the other two.
 - No error message calls an unlock a payload any more, which is this project's
   word and not an owner's. Only an OTA's own `payload.bin` keeps the name,
   because that is what Amazon calls the file. The refusal for a bootloader

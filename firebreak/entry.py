@@ -60,7 +60,7 @@ if TYPE_CHECKING:
 BOOTROM = "bootrom"
 FASTBOOT = "fastboot"
 FASTBOOTS = frozenset({
-    State.AMONET_FASTBOOT,
+    State.UNLOCKED_FASTBOOT,
     State.AMONET_FIREOS5_FASTBOOT,
     State.STOCK_FASTBOOT,
     State.STOCK_FIREOS5_FASTBOOT,
@@ -76,7 +76,7 @@ QUIET = 120
 REBOOT = "reboot"
 RECOVERY_WAIT = 90
 RUNNING = frozenset({
-    State.AMONET_BOOTED,
+    State.UNLOCKED_BOOTED,
     State.AMONET_FIREOS5_BBOE_BOOTED,
     State.BOOTED,
     State.EMOS,
@@ -87,7 +87,7 @@ SHORT = "short"
 STUCK = 600
 TO_FASTBOOT = (
     frozenset({
-        State.AMONET_BOOTED,
+        State.UNLOCKED_BOOTED,
         State.AMONET_FIREOS5_BBOE_BOOTED,
         State.BOOTED,
         State.NO_SYSTEM,
@@ -96,7 +96,7 @@ TO_FASTBOOT = (
     | TWRPS
 )
 TO_TWRP = frozenset({
-    State.AMONET_BOOTED,
+    State.UNLOCKED_BOOTED,
     State.AMONET_FIREOS5_BBOE_BOOTED,
     State.NO_SYSTEM,
     State.ROOTED,
@@ -528,7 +528,7 @@ def twrp_entry(*, force: bool) -> None:
             **dict.fromkeys(TO_TWRP, to_twrp),
             **dict.fromkeys(LOCKED_FASTBOOTS, unlocking),
             State.BOOTED: to_fastboot,
-            State.AMONET_FASTBOOT: amonet_recovery if force else restarted,
+            State.UNLOCKED_FASTBOOT: amonet_recovery if force else restarted,
             State.AMONET_FIREOS5_FASTBOOT: fireos5_recovery if force else restarted,
             State.STOCK_BOOTED: gesture,
         },

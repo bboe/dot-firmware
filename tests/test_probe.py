@@ -75,7 +75,7 @@ def recovery(
 @pytest.mark.parametrize(
     ("name", "root", "found"),
     [
-        ("Fire OS 6.5.7.4", "uid=0(root)", State.AMONET_BOOTED),
+        ("Fire OS 6.5.7.4", "uid=0(root)", State.UNLOCKED_BOOTED),
         ("Fire OS 6.5.7.4", "Permission denied", State.STOCK_BOOTED),
         ("Fire OS 5.5.5.4", "Permission denied", State.BOOTED),
     ],
@@ -94,21 +94,21 @@ def test_a_booting_fire_os_5_is_not_yet_rooted(*, dot: FakeAdb) -> None:
     assert dot.commands(holding="exec-out") == []
 
 
-def test_a_device_with_no_fire_os_5_chain_reads_the_amonet_states(
+def test_a_device_with_no_fire_os_5_chain_reads_the_unlocked_states(
     *, dot: FakeAdb, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
         name="target", target=probe.ARGUMENTS, value=TARGETS[RADAR]["fireos6"]
     )
     fastboot(dot=dot, little_kernel="f379dba-20170906_000423", unlock="true")
-    assert probe.probe() == State.AMONET_FASTBOOT
+    assert probe.probe() == State.UNLOCKED_FASTBOOT
     dot.answers.clear()
     recovery(
         dot=dot,
         little_kernel="f379dba-20170906_000423",
         version=biscuit.BBOE_TWRP_VERSION,
     )
-    assert probe.probe() == State.AMONET_TWRP
+    assert probe.probe() == State.UNLOCKED_TWRP
     dot.answers.clear()
     booted(dot=dot, name="Fire OS 5.5.5.4")
     dot.raw = TWRP_BBOE
@@ -181,7 +181,7 @@ def test_an_unauthorized_dot_is_stock(*, dot: FakeAdb) -> None:
         ("", "f379dba-20170906_000423", State.STARTING),
         ("true", "", State.STARTING),
         ("true", "f379dba-20170906_000423", State.AMONET_FIREOS5_FASTBOOT),
-        ("TRUE", "63cb91b-20221007_072309", State.AMONET_FASTBOOT),
+        ("TRUE", "63cb91b-20221007_072309", State.UNLOCKED_FASTBOOT),
     ],
 )
 def test_fastboot_is_read_from_its_unlock_and_bootloader(
@@ -255,7 +255,7 @@ def test_the_recovery_read_names_the_partition_by_name(*, dot: FakeAdb) -> None:
             "boot_a",
             State.AMONET_FIREOS5_BBOE_TWRP,
         ),
-        ("3.7.0_9-0", "63cb91b-20221007_072309", "boot_a", State.AMONET_TWRP),
+        ("3.7.0_9-0", "63cb91b-20221007_072309", "boot_a", State.UNLOCKED_TWRP),
         (
             "3.7.0_9-0",
             "63cb91b-20221007_072309",

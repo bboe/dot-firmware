@@ -143,7 +143,7 @@ CONFIG = DeviceConfig(
         ),
         Target(
             device=RADAR,
-            goal=State.AMONET_BOOTED,
+            goal=State.UNLOCKED_BOOTED,
             installs=FireOs6(build=DEFAULT_BUILD),
             name=FIREOS6,
             summary="boot-root.zip's root adb on the Fire OS 6 already installed,"

@@ -210,7 +210,7 @@ def test_a_bootrom_device_whose_watchdog_write_fails_says_so(
 def test_a_bootrom_entry_asks_before_it_erases_boot0(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
     entry.bootrom_entry(force=False)
     assert "asked: erasing boot0 leaves" in done[0]
     assert done[1:3] == ["erased", "looked for the bootrom to erase for"]
@@ -219,7 +219,7 @@ def test_a_bootrom_entry_asks_before_it_erases_boot0(
 
 
 @pytest.mark.parametrize(
-    "state", [State.AMONET_TWRP, State.AMONET_FASTBOOT], ids=["twrp", "fastboot"]
+    "state", [State.UNLOCKED_TWRP, State.UNLOCKED_FASTBOOT], ids=["twrp", "fastboot"]
 )
 def test_a_bootrom_entry_clears_no_boot0_it_cannot_write_back(
     *, monkeypatch: pytest.MonkeyPatch, state: State
@@ -234,7 +234,7 @@ def test_a_bootrom_entry_clears_no_boot0_it_cannot_write_back(
 
 
 @pytest.mark.parametrize(
-    "state", [State.AMONET_TWRP, State.AMONET_FASTBOOT], ids=["twrp", "fastboot"]
+    "state", [State.UNLOCKED_TWRP, State.UNLOCKED_FASTBOOT], ids=["twrp", "fastboot"]
 )
 def test_a_bootrom_entry_clears_no_boot0_on_an_echo_that_names_no_device(
     *, monkeypatch: pytest.MonkeyPatch, state: State
@@ -251,7 +251,7 @@ def test_a_bootrom_entry_clears_no_boot0_on_an_echo_that_names_no_device(
 def test_a_bootrom_entry_erases_no_boot0_it_cannot_fetch_a_payload_for(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
 
     def missing() -> str:
         message = "payload.bin does not hash to the pin"
@@ -267,7 +267,7 @@ def test_a_bootrom_entry_erases_no_boot0_it_cannot_fetch_a_payload_for(
 def test_a_bootrom_entry_fetches_the_payload_before_it_clears_boot0(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_TWRP])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_TWRP])
     monkeypatch.setattr(
         name="amonet_payload",
         target=entry,
@@ -280,7 +280,7 @@ def test_a_bootrom_entry_fetches_the_payload_before_it_clears_boot0(
 def test_a_bootrom_entry_from_a_recovery_clears_the_header(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_TWRP])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_TWRP])
     entry.bootrom_entry(force=True)
     assert done[1:4] == ["cleared", "rebooted", "looked for the bootrom"]
 
@@ -312,10 +312,10 @@ def test_a_bootrom_entry_reboots_a_booted_echo_into_its_twrp(
     done = bootrom(
         monkeypatch=monkeypatch,
         states=[
-            State.AMONET_BOOTED,
-            State.AMONET_BOOTED,
-            State.AMONET_TWRP,
-            State.AMONET_TWRP,
+            State.UNLOCKED_BOOTED,
+            State.UNLOCKED_BOOTED,
+            State.UNLOCKED_TWRP,
+            State.UNLOCKED_TWRP,
         ],
     )
     entry.bootrom_entry(force=True)
@@ -327,7 +327,7 @@ def test_a_bootrom_entry_reboots_a_booted_echo_into_its_twrp(
 def test_a_bootrom_entry_refuses_a_device_with_no_chain_before_it_reboots(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_BOOTED])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_BOOTED])
     monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
     monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
     with pytest.raises(FatalError, match="no bootrom chain for the Echo Dot"):
@@ -400,7 +400,7 @@ def test_a_bootrom_entry_reports_a_hold_it_finds(
 def test_a_bootrom_entry_stops_where_the_erase_fails(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    done = bootrom(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    done = bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
     monkeypatch.setattr(
         name="erase_by_fastboot",
         target=entry,
@@ -450,7 +450,7 @@ def test_a_bootrom_entry_waits_for_an_echo_it_cannot_see(
 def test_a_bootrom_entry_with_no_bootrom_to_find(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bootrom(monkeypatch=monkeypatch, states=[State.AMONET_TWRP])
+    bootrom(monkeypatch=monkeypatch, states=[State.UNLOCKED_TWRP])
     monkeypatch.setattr(
         name="bootrom_client", target=entry, value=lambda **_: (None, None)
     )
@@ -503,7 +503,7 @@ def test_a_fastboot_entry_asks_a_donuts_bootloader_through_its_misc(
 ) -> None:
     done = reads(
         monkeypatch=monkeypatch,
-        states=[State.AMONET_BOOTED, State.STARTING, State.AMONET_FASTBOOT],
+        states=[State.UNLOCKED_BOOTED, State.STARTING, State.UNLOCKED_FASTBOOT],
     )
     monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
     monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
@@ -521,7 +521,7 @@ def test_a_fastboot_entry_reboots_an_echo_that_answers_adb(
 ) -> None:
     done = reads(
         monkeypatch=monkeypatch,
-        states=[State.AMONET_BOOTED, State.STARTING, State.AMONET_FASTBOOT],
+        states=[State.UNLOCKED_BOOTED, State.STARTING, State.UNLOCKED_FASTBOOT],
     )
     entry.fastboot_entry()
     assert done == ["reboot bootloader"]
@@ -588,7 +588,7 @@ def test_a_reboot_entry_reboots_a_fastboot(*, monkeypatch: pytest.MonkeyPatch) -
 def test_a_reboot_entry_reboots_a_twrp(*, monkeypatch: pytest.MonkeyPatch) -> None:
     done = reads(
         monkeypatch=monkeypatch,
-        states=[State.AMONET_TWRP, State.STARTING, State.ROOTED],
+        states=[State.UNLOCKED_TWRP, State.STARTING, State.ROOTED],
     )
     entry.reboot_entry()
     assert done == ["reboot "]
@@ -667,7 +667,7 @@ def test_a_twrp_entry_asks_before_it_unlocks_a_locked_echo(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     done = reads(
-        monkeypatch=monkeypatch, states=[State.STOCK_FASTBOOT, State.AMONET_TWRP]
+        monkeypatch=monkeypatch, states=[State.STOCK_FASTBOOT, State.UNLOCKED_TWRP]
     )
     monkeypatch.setattr(name="device", target=SESSION, value=None)
     monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
@@ -697,7 +697,7 @@ def test_a_twrp_entry_from_the_fireos5_fastboot_writes_that_chain_s_twrp(
 
 
 def test_a_twrp_entry_reboots_a_rooted_echo(*, monkeypatch: pytest.MonkeyPatch) -> None:
-    done = reads(monkeypatch=monkeypatch, states=[State.ROOTED, State.AMONET_TWRP])
+    done = reads(monkeypatch=monkeypatch, states=[State.ROOTED, State.UNLOCKED_TWRP])
     entry.twrp_entry(force=False)
     assert done == ["reboot recovery"]
 
@@ -707,7 +707,7 @@ def test_a_twrp_entry_restarts_an_unlocked_echo_without_a_write(
 ) -> None:
     done = reads(
         monkeypatch=monkeypatch,
-        states=[State.AMONET_FASTBOOT, State.AMONET_TWRP, State.AMONET_TWRP],
+        states=[State.UNLOCKED_FASTBOOT, State.UNLOCKED_TWRP, State.UNLOCKED_TWRP],
     )
     entry.twrp_entry(force=False)
     assert done == ["restarted"]
@@ -716,7 +716,7 @@ def test_a_twrp_entry_restarts_an_unlocked_echo_without_a_write(
 def test_a_twrp_entry_says_what_to_do_where_the_recovery_is_not_a_twrp(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    reads(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    reads(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
     monkeypatch.setattr(name="RECOVERY_WAIT", target=entry, value=-1)
     with pytest.raises(FatalError, match="what its recovery holds is not one"):
         entry.twrp_entry(force=False)
@@ -736,7 +736,7 @@ def test_a_twrp_entry_unlocks_nothing_it_has_no_fastbrick_for(
 def test_a_twrp_entry_where_neither_restart_command_is_taken(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    reads(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    reads(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
     monkeypatch.setattr(
         name="restart_refusals", target=entry, value=lambda: [("reboot", "refused")]
     )
@@ -751,9 +751,9 @@ def test_a_twrp_entry_will_not_reach_amazon_s_recovery(
         monkeypatch=monkeypatch,
         states=[
             State.BOOTED,
-            State.AMONET_FASTBOOT,
-            State.AMONET_TWRP,
-            State.AMONET_TWRP,
+            State.UNLOCKED_FASTBOOT,
+            State.UNLOCKED_TWRP,
+            State.UNLOCKED_TWRP,
         ],
     )
     entry.twrp_entry(force=False)
@@ -764,7 +764,7 @@ def test_a_twrp_entry_with_force_writes_the_recovery(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     done = reads(
-        monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT, State.AMONET_TWRP]
+        monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT, State.UNLOCKED_TWRP]
     )
     entry.twrp_entry(force=True)
     assert done == ["stage_amonet_recovery"]
@@ -773,7 +773,7 @@ def test_a_twrp_entry_with_force_writes_the_recovery(
 def test_a_twrp_entry_writes_no_recovery_it_has_none_for(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    reads(monkeypatch=monkeypatch, states=[State.AMONET_FASTBOOT])
+    reads(monkeypatch=monkeypatch, states=[State.UNLOCKED_FASTBOOT])
     monkeypatch.setattr(name="device", target=SESSION, value=CROWN)
     monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
     with pytest.raises(FatalError, match="no fastbrick for the Echo Show 8"):
@@ -810,7 +810,7 @@ def test_a_walk_stops_a_state_it_keeps_acting_on(
 
     done = reads(
         monkeypatch=monkeypatch,
-        states=[State.AMONET_TWRP, State.NONE] * (entry.TRIES + 3),
+        states=[State.UNLOCKED_TWRP, State.NONE] * (entry.TRIES + 3),
     )
     monkeypatch.setattr(name="monotonic", target=entry.time, value=monotonic)
     with pytest.raises(FatalError, match="minutes, so this run stops"):
@@ -852,16 +852,16 @@ def test_an_entry_gives_up_on_a_state_that_will_not_move(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clock = iter([0.0, 0.0, 0.0, entry.STUCK + 1])
-    reads(monkeypatch=monkeypatch, states=[State.AMONET_BOOTED] * 3)
+    reads(monkeypatch=monkeypatch, states=[State.UNLOCKED_BOOTED] * 3)
     monkeypatch.setattr(name="monotonic", target=entry.time, value=lambda: next(clock))
-    with pytest.raises(FatalError, match="has read as amonet-booted for 10 minutes"):
+    with pytest.raises(FatalError, match="has read as rooted Fire OS 6 for 10 minutes"):
         entry.fastboot_entry()
 
 
 def test_an_entry_names_the_echo_that_answers_it(
     *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    reads(monkeypatch=monkeypatch, states=[State.AMONET_TWRP])
+    reads(monkeypatch=monkeypatch, states=[State.UNLOCKED_TWRP])
     monkeypatch.setattr(name="device", target=SESSION, value=None)
     monkeypatch.setattr(
         name="identify",
@@ -898,11 +898,11 @@ def test_an_entry_waits_out_the_reboot_it_asked_for(
     done = reads(
         monkeypatch=monkeypatch,
         states=[
-            State.AMONET_BOOTED,
+            State.UNLOCKED_BOOTED,
             State.NONE,
             State.NONE,
             State.STARTING,
-            State.AMONET_FASTBOOT,
+            State.UNLOCKED_FASTBOOT,
         ],
     )
     monkeypatch.setattr(name="monotonic", target=entry.time, value=lambda: 0.0)
@@ -918,10 +918,10 @@ def test_an_entry_waits_through_the_preloader_a_boot_shows(
     done = reads(
         monkeypatch=monkeypatch,
         states=[
-            State.AMONET_BOOTED,
+            State.UNLOCKED_BOOTED,
             State.PRELOADER,
             State.NONE,
-            State.AMONET_TWRP,
+            State.UNLOCKED_TWRP,
         ],
     )
     monkeypatch.setattr(name="monotonic", target=entry.time, value=lambda: 0.0)
