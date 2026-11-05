@@ -25,9 +25,9 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   `python3 simulator/dot.py create` stays until `python3 simulator/dot.py destroy`.
 - `run.sh` passes its pid to `create`. `create` refuses while the `run.sh`
   that the state names still runs.
-- It needs Docker, `timeout` (coreutils, on macOS too), and the downloads in
-  `~/.cache/firebreak`. The image build downloads busybox, pigz and toybox
-  source and checks each by SHA-256.
+- It needs Docker, `uv`, `timeout` (coreutils, on macOS too), and the
+  downloads in `~/.cache/firebreak`. The image build downloads busybox, pigz
+  and toybox source and checks each by SHA-256.
 - firebreak's cache is `~/.cache/firebreak-sim-cache`. `dot.py create` copies
   each download into its `firebreak` folder, as an APFS clone on macOS and
   with `--reflink=auto` elsewhere. Where a clone fails, as off APFS, it copies
@@ -45,7 +45,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   folder is a link. firebreak would otherwise write the real cache.
 - `START=fastboot`, the default, starts in stock fastboot. `START=no-light`
   erases boot0 and leaves the Dot unplugged. `run.sh` plugs it in when
-  firebreak prints "Short the Dot's test point".
+  firebreak asks for the short, asks for the bootrom as the start of an
+  unlock, waits for an Echo on USB, or waits for an Echo to say which device
+  it is. The last two are runs that start with nothing plugged in, where a
+  real Dot that shows no light would be shorted as it is plugged in.
 - `START=stock-booted` starts the stock Fire OS it was created with. Nothing
   there answers adb, so a command that needs a reboot asks for the button
   gesture and waits: the simulator performs no gesture, which is the one entry
@@ -66,16 +69,19 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   full unlock run would get to.
 - `simulator/entries.sh OUT` runs each entry command twice on a fresh Echo,
   once to act and once to find the state it left, and checks what each run
-  says. It is the grid the entry commands are held to, 16 cases over both
+  says. It is the grid the entry commands are held to, 23 cases over both
   devices: `fastboot` and `twrp` from an amonet TWRP, from stock fastboot and
-  from a stock boot; `twrp --force` from the locked fastboot it fastbricks;
-  `bootrom --force` from an amonet TWRP, from an amonet fastboot, from the
-  locked fastboot that refuses it and from the stock boot that has no way in;
-  and `short` from no light. The second run of each is the no-op: `fastboot`
-  and `twrp` report the state they are in, `bootrom` and `short` report a hold
-  they join, and `twrp --force` writes no second fastbrick. It found the one
-  that did not hold: `short` asked for the short again on a bootrom already
-  held, with the case open and a wire in hand for nothing.
+  from a stock boot; `twrp` from an amonet fastboot; `twrp --force` from the
+  locked fastboot it fastbricks; `bootrom --force` from an amonet TWRP, from
+  an amonet fastboot, from the locked fastboot that refuses it and from the
+  stock boot that has no way in; `reboot` from an amonet TWRP, from either
+  fastboot, from a held bootrom and from a stock boot; and `short` from no
+  light. The second run of each is the no-op: `fastboot` and `twrp` report the
+  state they are in, `bootrom` and `short` report a hold they join, `reboot`
+  reports the firmware it finds running, or the bootrom it cannot leave, and
+  `twrp --force` writes no second fastbrick. It found the one that did not
+  hold: `short` asked for the short again on a bootrom already held, with the
+  case open and a wire in hand for nothing.
 - `DEVICE=biscuit`, the default, makes an Echo Dot (2nd Generation).
   `DEVICE=radar` makes an Echo (2nd Generation): adb and fastboot name radar,
   and the stock LK, the model and the USB ids are radar's. firebreak names the
@@ -107,7 +113,8 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   for byte the same in amonet-biscuit v2.0.0, v2.0.1 and amonet-radar v1.0.1.
   A radar started this way needs `--device radar`, because a Dot with no light
   answers neither adb nor fastboot, so nothing names it.
-- firebreak's stdin is `/dev/null`. Its stdout must be unbuffered: without
+- `run.sh` passes `--no-update-check`, so a run never asks PyPI for a newer
+  firebreak. firebreak's stdin is `/dev/null`. Its stdout must be unbuffered: without
   `PYTHONUNBUFFERED=1`, the prompt reached the log only at exit, and the Dot
   was never plugged in.
 - `run.sh` stops if `adb` or `fastboot` on its PATH is not the simulator's, or
@@ -470,7 +477,10 @@ The simulator accepts these, where a real Dot may not:
 
 ## The port
 
-- `dot.py create` makes a virtualenv in `~/.cache/firebreak-sim/venv`. A
+- `dot.py create` makes a virtualenv in `~/.cache/firebreak-sim/venv` and
+  installs firebreak's pinned dependencies there with `uv`. Without pyserial
+  there, every run that reached a bootrom stopped with `No module named
+  'serial'`, and only the runs that never left fastboot passed. A
   `.pth` file there imports `ports.py` at every start, so the children that a
   tool starts with `sys.executable` see the port too, whatever their
   `PYTHONPATH`.

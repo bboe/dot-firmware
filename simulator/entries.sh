@@ -57,7 +57,7 @@ check() {
     if [ "$start" = no-light ]; then
         (
             trap 'exit 0' TERM
-            until grep -q "test point and plug it in" "$out.$name-1.log" 2>/dev/null
+            until grep -qE "test point and plug it in|start it in its bootrom" "$out.$name-1.log" 2>/dev/null
             do
                 sleep 0.2
             done
@@ -84,13 +84,16 @@ LOCKED="is locked, so reaching a TWRP unlocks it"
 REFUSED="locked, and a locked bootloader"
 NO_WAY="reads as stock-booted, which nothing here"
 GESTURE="Start the Echo Dot (2nd Generation)'s fastboot"
+RUNS="runs its firmware, read as stock-booted."
+CYCLE="waits in its bootrom, and nothing here restarts it"
 
 check fb-twrp       biscuit twrp         ""         600 "$A" "$A" -- fastboot
-check fb-stockfb    biscuit fastboot     ""         600 "is in stock-fastboot." \
-    "is in stock-fastboot." -- fastboot
+check fb-stockfb    biscuit fastboot     ""         600 "is in stock fastboot." \
+    "is in stock fastboot." -- fastboot
 check twrp-twrp     biscuit twrp         ""         600 "$T" "$T" -- twrp
 check twrp-stockfb  biscuit fastboot     ""         600 "$LOCKED" "$LOCKED" -- twrp
 check twrpf-stockfb biscuit fastboot     ""         600 "$T" "$T" -- twrp --force
+check twrp-amonetfb biscuit twrp         "fastboot" 600 "$T" "$T" -- twrp
 check brom-twrp     biscuit twrp         ""         600 "$H" "$AH" -- bootrom --force
 check brom-stockfb  biscuit fastboot     ""         600 "$REFUSED" "$REFUSED" \
     -- bootrom --force
@@ -102,11 +105,18 @@ check brom-booted   biscuit stock-booted ""         600 "$NO_WAY" "$NO_WAY" \
 check fb-booted     biscuit stock-booted ""          60 "$GESTURE" "$GESTURE" \
     -- fastboot
 check twrp-booted   biscuit stock-booted ""          60 "$GESTURE" "$GESTURE" -- twrp
+check rb-twrp       biscuit twrp         ""         600 "$RUNS" "$RUNS" -- reboot
+check rb-stockfb    biscuit fastboot     ""         600 "$RUNS" "$RUNS" -- reboot
+check rb-amonetfb   biscuit twrp         "fastboot" 600 "$RUNS" "$RUNS" -- reboot
+check rb-brom       biscuit twrp         "bootrom --force" 600 "$CYCLE" "$CYCLE" \
+    -- reboot
+check rb-booted     biscuit stock-booted ""         600 "$RUNS" "$RUNS" -- reboot
 check r-fb-twrp     radar   twrp         ""         600 "$A" "$A" -- fastboot
 check r-twrp-twrp   radar   twrp         ""         600 "$T" "$T" -- twrp
 check r-brom-twrp   radar   twrp         ""         600 "$H" "$AH" -- bootrom --force
 check r-short-dark  radar   no-light     ""         600 "$H" "$AH" \
     -- short --device radar
+check r-rb-twrp     radar   twrp         ""         600 "$RUNS" "$RUNS" -- reboot
 
 echo
 echo "passed $passed, failed $failed"

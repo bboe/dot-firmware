@@ -32,7 +32,7 @@ FIREBREAK_SIM_SPEED=${FIREBREAK_SIM_SPEED:-20}
 export FIREBREAK_SIM_SPEED
 python3 "$here/dot.py" create --device "$device" --runner $$ --start "$start" >/dev/null || exit 1
 python=$work/venv/bin/python
-set -- env PYTHONPATH="$here/.." "$python" -m firebreak "$target" "$@"
+set -- env PYTHONPATH="$here/.." "$python" -m firebreak "$target" --no-update-check "$@"
 PATH="$here/bin:$PATH"
 export PATH
 [ "$(command -v adb)" = "$here/bin/adb" ] || { echo "adb is not the simulator's" >&2; exit 2; }
@@ -44,7 +44,7 @@ command -v timeout >/dev/null || { echo "run.sh needs timeout (coreutils)" >&2; 
 if [ "$start" = no-light ]; then
     (
         trap 'exit 0' TERM
-        until grep -q "test point and plug it in" "$out.log"; do sleep 0.5; done
+        until grep -qE "test point and plug it in|start it in its bootrom|on USB. Connect it|Waiting for an Echo to appear" "$out.log"; do sleep 0.5; done
         "$python" "$here/dot.py" plug >/dev/null
     ) &
     plugger=$!
@@ -61,5 +61,5 @@ cp "$work/trace.jsonl" "$out.jsonl"
 python3 "$here/trace.py" "$out.jsonl" > "$out.txt"
 "$python" "$here/dot.py" snapshot > "$out.snapshot"
 "$python" "$here/dot.py" table "$out.table"
-echo "$target: exit $status, $(grep -c '"tool"' "$out.jsonl") calls, $(grep -m1 -oE 'The Echo[A-Za-z0-9 ()]* (is [a-z]*|runs [a-z]* [0-9.]*)' "$out.log" || echo 'no verdict')"
+echo "$target: exit $status, $(grep -c '"tool"' "$out.jsonl") calls, $(grep -m1 -oE '[Tt]he Echo[A-Za-z0-9 ()]* (is [a-z]*|runs [a-z]* [0-9.]*|runs its firmware, read as [A-Za-z0-9 -]*|(already )?waits in its bootrom)' "$out.log" || echo 'no verdict')"
 exit $status

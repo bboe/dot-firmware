@@ -863,6 +863,19 @@ def make_venv() -> None:
             [sys.executable, "-m", "venv", "--clear", "--without-pip", str(venv)],
             check=True,
         )
+    subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--quiet",
+            "--python",
+            str(python),
+            "-r",
+            str(HERE.parent / "pyproject.toml"),
+        ],
+        check=True,
+    )
     packages = pathlib.Path(
         subprocess.run(
             [
