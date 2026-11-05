@@ -2807,8 +2807,16 @@ went, each for a reason worth keeping:
   appends the gesture, so for a donut the clause was the correction. That
   caller is amonet's, and a donut cannot use it — its bootrom does not answer
   that payload, which is why `firebreak bootrom` refuses the device outright.
-  `firebreak short` reaches it all the same and now reads as though a donut
-  had a test point, so that entry wants the same refusal `bootrom` gives.
+  `firebreak short` asked for a test point on a donut all the same, and the
+  simulator found where that ends: on a bootrom a run had already spent, the
+  second run asked again and then failed on the handshake. So `short` now
+  refuses a device in `KAMAKIRI_UNLOCKS` at its first line, before it asks
+  for anything, and names `firebreak unlock fireos6`. `bootrom` does the same
+  for such a device already in its bootrom; from any other state its
+  `chainable` refusal comes first. An Echo the run cannot name meets the
+  refusal one step later only on a fresh bootrom, from its hardware code. On
+  a bootrom whose handshake is spent, nothing can name it, and the run fails
+  on the handshake.
 - The whole wait line for a device in `KAMAKIRI_UNLOCKS`. It said to keep
   holding, which the gesture had just said, and the progress line `waiting for
   the bootrom` appears directly below it. `waiting_line` returns an empty

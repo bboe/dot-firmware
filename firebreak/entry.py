@@ -203,6 +203,7 @@ def bootrom_entry(*, force: bool) -> None:
     noticed()
     current = awaited()
     if current == State.BOOTROM:
+        refuse_kamakiri()
         if already_held():
             return
         parked(live=reached(erase=None))
@@ -433,6 +434,11 @@ def reboot_entry() -> None:
     )
 
 
+def refuse_kamakiri() -> None:
+    if SESSION.device in KAMAKIRI_UNLOCKS:
+        raise NotAmonetError(device=SESSION.device)
+
+
 def registered(*, holding: dict[Device, object], what: str) -> Device:
     device = known_device()
     if device not in holding:
@@ -481,6 +487,7 @@ def short_entry() -> None:
     PROGRESS.steps = None
     SESSION.short = True
     noticed()
+    refuse_kamakiri()
     if already_held():
         return
     parked(live=reached(erase=None))

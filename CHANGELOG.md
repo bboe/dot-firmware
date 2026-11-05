@@ -102,6 +102,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- `firebreak short` on an Echo Dot (3rd Generation) refuses at once and names
+  `firebreak unlock fireos6`. So does `firebreak bootrom` on a donut that is
+  already in its bootrom. Before, `short` asked for a test point that a donut
+  does not have. A second run, on a bootrom whose one handshake was spent,
+  then failed on that handshake.
 - An Echo the run cannot name yet, held in its bootrom, fetches amonet's
   archive only once its bootrom's hardware code says the chip is amonet's. A
   donut was named that way after a 74 MB download it never used.

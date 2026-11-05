@@ -335,6 +335,16 @@ def test_a_bootrom_entry_refuses_a_device_with_no_chain_before_it_reboots(
     assert done == []
 
 
+def test_a_bootrom_entry_refuses_a_donut_already_in_its_bootrom(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = bootrom(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    with pytest.raises(entry.NotAmonetError, match="unlock fireos6"):
+        entry.bootrom_entry(force=True)
+    assert done == []
+
+
 def test_a_bootrom_entry_refuses_a_held_echo_that_is_not_the_one_named(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -661,6 +671,35 @@ def test_a_short_bootrom_entry_opens_no_step_to_write_over_its_messages(
     bootrom(monkeypatch=monkeypatch, states=[])
     entry.short_entry()
     assert entry.PROGRESS.line == ""
+
+
+def test_a_short_refuses_a_donut_before_it_asks_for_a_test_point(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = bootrom(monkeypatch=monkeypatch, states=[])
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    monkeypatch.setattr(
+        name="ask_for_short", target=entry, value=lambda: pytest.fail("asked")
+    )
+    with pytest.raises(entry.NotAmonetError, match="unlock fireos6"):
+        entry.short_entry()
+    assert done == []
+
+
+def test_a_short_refuses_a_donut_that_usb_names(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = bootrom(monkeypatch=monkeypatch, states=[])
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(
+        name="identify", target=entry, value=lambda: types.SimpleNamespace(device=DONUT)
+    )
+    monkeypatch.setattr(
+        name="ask_for_short", target=entry, value=lambda: pytest.fail("asked")
+    )
+    with pytest.raises(entry.NotAmonetError, match="unlock fireos6"):
+        entry.short_entry()
+    assert done == []
 
 
 def test_a_twrp_entry_asks_before_it_unlocks_a_locked_echo(
