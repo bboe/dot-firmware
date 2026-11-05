@@ -154,6 +154,16 @@ def chunked(*, data: bytes, limit: int) -> Iterator[bytes]:
         yield data[index : index + step]
 
 
+def configured(*, core: Any, device: Any) -> Any:  # ruff: ignore[any-type]
+    try:
+        return device.get_active_configuration()
+    except core.core.USBError:
+        if not USBDK:
+            raise
+    device.set_configuration()
+    return device.get_active_configuration()
+
+
 def detached(*, core: Any, device: Any, interface: int) -> None:  # ruff: ignore[any-type]
     try:
         if not device.is_kernel_driver_active(interface):
@@ -189,7 +199,7 @@ def elevated(*, index: int) -> None:
 def endpoints(*, device: Any) -> tuple[Any, Any, Any]:  # ruff: ignore[any-type]
     core = pyusb()
     try:
-        configuration = device.get_active_configuration()
+        configuration = configured(core=core, device=device)
     except core.core.USBError as error:
         message = (
             f"libusb cannot open the bootrom it can see: {error}. On Linux the"

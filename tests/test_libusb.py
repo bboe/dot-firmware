@@ -101,6 +101,21 @@ class FakeTimeoutError(FakeUsbError):
     pass
 
 
+class Unconfigured(FakeDevice):
+    def __init__(self, *, data: object) -> None:
+        super().__init__(data=data)
+        self.configured = False
+
+    def get_active_configuration(self) -> object:
+        if not self.configured:
+            message = "Configuration not set"
+            raise FakeUsbError(message)
+        return self.data
+
+    def set_configuration(self) -> None:
+        self.configured = True
+
+
 def claim_refused(device: object, interface: int) -> None:
     message = f"no interface {interface} to claim on {device}"
     raise FakeUsbError(message)
@@ -338,6 +353,19 @@ def test_open_bootrom_asks_nothing_of_a_driver_where_a_helper_sends_the_trigger(
     assert device.detached == []
 
 
+def test_open_bootrom_configures_a_bootrom_usbdk_hands_over_unset(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    interface, _, (inward, outward) = interfaced()
+    device = Unconfigured(data=interface)
+    monkeypatch.setattr(name="USBDK", target=libusb, value=True)
+    patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
+    port = libusb.open_bootrom()
+    assert device.configured
+    assert port.inward is inward
+    assert port.outward is outward
+
+
 def test_open_bootrom_hands_back_a_port(*, monkeypatch: pytest.MonkeyPatch) -> None:
     interface, device, (inward, outward) = interfaced()
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
@@ -356,6 +384,20 @@ def test_open_bootrom_leaves_a_platform_with_no_detaching_alone(
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
     assert libusb.open_bootrom() is not None
     assert device.detached == []
+
+
+def test_open_bootrom_leaves_an_unconfigured_bootrom_alone_off_windows(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    interface, _, _ = interfaced()
+    device = Unconfigured(data=interface)
+    monkeypatch.setattr(name="USBDK", target=libusb, value=False)
+    patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
+    with pytest.raises(
+        expected_exception=libusb.NotPermittedError, match="Configuration not set"
+    ):
+        libusb.open_bootrom()
+    assert not device.configured
 
 
 def test_open_bootrom_lets_go_of_a_device_it_cannot_use(
