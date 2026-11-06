@@ -80,12 +80,16 @@ clients follow its protocol.
   https://github.com/xyzz/amonet
 k4y0z made the first port of amonet to the Echo Dot (2nd Generation).
   https://github.com/chaosmaster
-Rortiz2 continued that port, released it with TWRP, and keeps the XDA thread.
+Rortiz2 continued that port, released it with TWRP, and keeps its XDA thread.
 The bboe TWRP is a fork of their TWRP tree.
   https://github.com/R0rt1z2
   https://github.com/R0rt1z2/amonet/tree/mt8163-biscuit
   https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/
   https://github.com/R0rt1z2/twrp_device_amazon_echo-mt8163
+Rortiz2 also wrote amonet-radar and kamakiri-donut, the unlocks for the Echo
+(2nd Generation) and the Echo Dot (3rd Generation).
+  https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-2nd-gen-2017-radar.4801290/
+  https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-3rd-gen-2018-donut.4801400/
 AntiEngineer helped find the pins and bring up UART on a Dot.
 topjohnwu wrote Magisk, which roots Fire OS 5.
   https://github.com/topjohnwu/Magisk

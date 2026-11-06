@@ -5,9 +5,15 @@ Generation) or an Echo Dot (3rd Generation) over USB, or returns it to stock.
 Run it again with another target to move the device. A stopped run picks up
 where it left off.
 
+All of this is possible because of Rortiz2's work. firebreak runs the unlocks
+they publish on XDA, one thread for each Echo:
+
+- [Echo Dot (2nd Generation), biscuit](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/)
+- [Echo (2nd Generation), radar](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-2nd-gen-2017-radar.4801290/)
+- [Echo Dot (3rd Generation), donut](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-3rd-gen-2018-donut.4801400/)
+
 Unlocking a stock Echo Dot (2nd Generation) needs
-`amonet-biscuit-v2.0.1.zip`, which amonet publishes only on
-[its XDA thread](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/).
+`amonet-biscuit-v2.0.1.zip`, which Rortiz2 publishes only on its thread above.
 A run downloads it unattended. If that fails, the run says so and opens your
 browser for the thread instead, because the thread itself refuses an
 unattended download. Either way the zip is checked against a pinned hash.
@@ -303,8 +309,12 @@ firebreak automates work that other people did first.
   Echo Dot (2nd Generation).
 - [Rortiz2](https://github.com/R0rt1z2) continued
   [that port](https://github.com/R0rt1z2/amonet/tree/mt8163-biscuit), released
-  it with TWRP, and keeps
-  [the XDA thread](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/).
+  it with TWRP, and keeps its
+  [XDA thread](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/).
+  Rortiz2 also wrote amonet-radar and kamakiri-donut, the unlocks for the
+  [Echo (2nd Generation)](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-2nd-gen-2017-radar.4801290/)
+  and the
+  [Echo Dot (3rd Generation)](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-3rd-gen-2018-donut.4801400/).
   The `bboe` TWRP is a fork of
   [their TWRP tree](https://github.com/R0rt1z2/twrp_device_amazon_echo-mt8163).
 - AntiEngineer helped find the pins and bring up UART on a Dot.

@@ -59,6 +59,9 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- README opens by crediting Rortiz2, whose unlocks firebreak runs, and links
+  their XDA thread for each of the three Echoes. Credits and `--credits` name
+  amonet-radar and kamakiri-donut as theirs too.
 - README, the package description and the contributor notes name all three
   Echoes firebreak supports, not only the Echo Dot (2nd Generation), and the
   README's target table gives an Echo Dot (3rd Generation)'s results. README
