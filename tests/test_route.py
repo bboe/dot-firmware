@@ -719,6 +719,7 @@ def test_a_run_says_a_port_cannot_power_twrp_only_while_twrp_is_what_is_next(
     out = " ".join(said(capsys=capsys).split())
     assert out.count("cannot power TWRP") == (1 if said_so else 0)
     assert ("hold the + button while it powers up" in out) is said_so
+    assert ("A USB 3 port on the computer itself" in out) is said_so
 
 
 @pytest.mark.parametrize(

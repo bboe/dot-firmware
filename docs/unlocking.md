@@ -1517,6 +1517,16 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   then rebooted, is resumed through the bootrom step and amonet v2.0.1's TWRP,
   and restored again. The resume reads the bootrom it finds, not a record of
   the run that left it.
+- So a stop with boot0 erased tells the user what to do if the next run fails
+  the same way: unplug the Echo, run firebreak again, then plug it into another
+  port. Moving the Echo cuts its power, and in this window that is a resume,
+  not a brick. It asks for a run in place first, because a resume from a power
+  cut at every step is not measured. Measured on Windows 11, 2026-11-05: two
+  Dots on one USB 2 port dropped off USB during TWRP writes, one of them three
+  runs in a row. Moved to a USB 3 port on the same PC, one of them, still with
+  boot0 erased, came up in its bootrom and restored stock 8149 in 29 steps,
+  then unlocked to rooted 8149. USB 2 promises 500 mA and USB 3 900 mA, which
+  fits, but the draw was not measured.
 - A resume clears the TWRP states from the run's acted-on set, so a run
   that started in TWRP acts on TWRP again after the bootrom step.
 - A bootrom that answers is reason enough on its own: a run resumes through it

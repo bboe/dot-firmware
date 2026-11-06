@@ -139,6 +139,15 @@ def test_color_needs_windows_terminal(*, monkeypatch: pytest.MonkeyPatch) -> Non
     assert ui.color(stream=sys.stdout)
 
 
+def test_explained_gives_the_replug_once_when_the_message_has_it() -> None:
+    ui.SESSION.boot0_erased = True
+    said = ui.explained(
+        error=ui.FatalError(message=f"stopped. To retry, {ui.replug()}", prefix="")
+    )
+    assert " ".join(said.split()).count(ui.MOST_RELIABLE) == 1
+    assert "If it fails the same way again" not in said
+
+
 def test_explained_keeps_a_url_whole() -> None:
     error = ui.FatalError(message="no download link on " + URL)
     assert ui.explained(error=error).split("\n") == [
@@ -164,8 +173,22 @@ def test_explained_says_the_dot_cannot_start_while_boot0_is_empty() -> None:
         error=ui.FatalError(message="stopped", prefix="")
     ).partition("\n\n")
     assert first == "stopped"
-    assert " ".join(note.split()) == ui.BOOT0_EMPTY + "."
+    assert " ".join(note.split()) == (
+        f"{ui.BOOT0_EMPTY}. If it fails the same way again, {ui.replug()}"
+    )
     assert max(len(line) for line in note.split("\n")) <= 79
+
+
+def test_explained_says_to_replug_into_another_port_while_boot0_is_empty(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(name="argv", target=sys, value=["firebreak", "stock"])
+    ui.SESSION.boot0_erased = True
+    note = " ".join(
+        ui.explained(error=ui.FatalError(message="stopped", prefix="")).split()
+    )
+    assert f"unplug the {ui.title()}, run firebreak stock again, then plug" in note
+    assert "into another USB port. A USB 3 port on the computer itself" in note
 
 
 def test_invocation_names_uvx_for_a_uvx_run(*, monkeypatch: pytest.MonkeyPatch) -> None:

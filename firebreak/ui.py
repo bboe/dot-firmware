@@ -23,6 +23,10 @@ BOOT0_EMPTY = (
     " computer"
 )
 MINUTE = 60
+MOST_RELIABLE = (
+    "A USB 3 port on the computer itself, with nothing else on it, is the most"
+    " reliable."
+)
 RELEASES = "https://github.com/bboe/firebreak/releases/latest"
 SPINNER = "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
 SUPPORT = (
@@ -217,10 +221,15 @@ def explained(*, error: FatalError) -> str:
             break_long_words=False, break_on_hyphens=False, text=text, width=79
         )
     if SESSION.boot0_erased:
+        retry = (
+            ""
+            if replug() in error.message
+            else f" If it fails the same way again, {replug()}"
+        )
         text += "\n\n" + textwrap.fill(
             break_long_words=False,
             break_on_hyphens=False,
-            text=BOOT0_EMPTY + ".",
+            text=f"{BOOT0_EMPTY}.{retry}",
             width=79,
         )
     return text
@@ -273,6 +282,13 @@ def program() -> list[str]:
     if pathlib.Path(sys.argv[0]).name == "__main__.py":
         return [sys.executable, "-m", "firebreak"]
     return [sys.executable, sys.argv[0]]
+
+
+def replug() -> str:
+    return (
+        f"unplug the {title()}, run {invocation(options=sys.argv[1:])} again,"
+        f" then plug the {title()} into another USB port. {MOST_RELIABLE}"
+    )
 
 
 def reseat() -> str:

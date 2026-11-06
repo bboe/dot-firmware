@@ -57,6 +57,14 @@ night showed the same, except that the fastbrick ring read white:
   reached white, and a port directly on the PC then carried the run through.
   The port that failed had run disc drives. Why TWRP is where this shows up is
   not measured.
+- A port too weak for the Echo also drops it off USB during TWRP writes. On
+  Windows 11, 2026-11-05, two Dots on one USB 2 port did that, and one of them
+  then restored stock and unlocked from a USB 3 port on the same PC. So every
+  stop or note that names a port that cannot power the Echo gives one retry:
+  another USB port, of which a USB 3 port on the computer itself, with nothing
+  else on it, is the most reliable. A powered hub may give more current; none
+  was tried. While boot0 is erased, that retry comes only after a run in place,
+  as [unlocking.md](unlocking.md) says beside the restore's boot0 window.
 - The ring turns orange before the boot is done. On a Dot, 2026-10-04, the
   setup app started and the ring turned orange 30 s before `BOOT_COMPLETED`
   went out, and the first `su` came 13 s after that. The last step ended about

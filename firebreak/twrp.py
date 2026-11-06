@@ -28,6 +28,7 @@ from firebreak.ui import (
     FatalError,
     again,
     asked_for,
+    replug,
     reseat,
     say,
     title,
@@ -326,9 +327,9 @@ def wait_for_twrp() -> None:
         raise FatalError(
             message=f"the {title()} did not reach recovery (TWRP) within 5"
             " minutes. A ring that keeps restarting there is a USB port that"
-            " cannot power TWRP: try a port on the computer itself with"
-            " nothing else on it, or a USB wall charger with the + button"
-            f" held, which starts TWRP if the {title()} can run it at all."
+            " cannot power TWRP. To tell, a USB wall charger with the + button"
+            f" held starts TWRP if the {title()} can run it at all. To retry,"
+            f" {replug()}"
         ) from None
     wait_for_twrp_start(version_timeout=30)
 
@@ -345,7 +346,9 @@ def wait_for_twrp_start(
                 return
         if time.monotonic() > deadline:
             raise FatalError(
-                message=f"TWRP did not finish starting within {TWRP_START_WAIT} seconds"
+                message=f"TWRP did not finish starting within {TWRP_START_WAIT}"
+                f" seconds. A USB port that cannot power the {title()} can cause"
+                f" this. To retry, {replug()}"
             )
         time.sleep(1)
 

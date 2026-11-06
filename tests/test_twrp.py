@@ -656,13 +656,15 @@ def test_twrp_that_does_not_finish_starting_stops_it(
     monkeypatch.setattr(name="monotonic", target=time, value=lambda: next(clock))
     adb.answers["ro.twrp.version"] = ["3.7.0_9-0"]
     adb.answers["sys.usb.config"] = ["adb"]
-    with pytest.raises(FatalError, match="within 30 seconds"):
+    with pytest.raises(FatalError, match="within 30 seconds") as stopped:
         twrp.wait_for_twrp()
+    assert f"To retry, {twrp.replug()}" in stopped.value.message
 
 
 def test_twrp_that_never_comes_up_stops_it(*, adb: FakeAdb) -> None:
     adb.answers["wait-for-recovery"] = [
         subprocess.TimeoutExpired(cmd=["adb"], timeout=300)
     ]
-    with pytest.raises(FatalError, match="within 5 minutes"):
+    with pytest.raises(FatalError, match="within 5 minutes") as stopped:
         twrp.wait_for_twrp()
+    assert f"To retry, {twrp.replug()}" in stopped.value.message

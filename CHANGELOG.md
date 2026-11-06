@@ -59,6 +59,13 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- A run that stops while boot0 holds no preloader says what to do if the
+  next run fails the same way: unplug the Echo, run firebreak again, then plug
+  it into another USB port, best a USB 3 port on the computer itself. A TWRP
+  that never comes up, keeps restarting, or never finishes starting gives
+  the same retry. On Windows 11 on 2026-11-05, two Dots dropped off a USB 2
+  port during TWRP writes, and one then restored stock and unlocked from a
+  USB 3 port on the same PC.
 - The states every unlocked device shares are renamed `unlocked-booted`,
   `unlocked-fastboot` and `unlocked-twrp`, from `amonet-booted`,
   `amonet-fastboot` and `amonet-twrp`. A donut never runs amonet, yet

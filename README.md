@@ -127,8 +127,12 @@ tar -xf $env:TEMP\libusb.7z -C $d VS2022/MS64/dll/libusb-1.0.dll
 - A ring that restarts instead of reaching TWRP, blue with about a second of
   turning cyan and little or no white, has been a USB port that cannot power
   it. To tell, hold the + button with the device on a USB wall charger: a ring
-  that reaches white there means TWRP runs. Then use a port on the computer
-  itself, with nothing else on it.
+  that reaches white there means TWRP runs. Then use another port. A USB 3
+  port on the computer itself, with nothing else on it, is the most reliable.
+- An Echo that drops off USB during a TWRP step, more than once, has also been
+  a port that cannot power it. Where the run says boot0 may hold no
+  preloader, run firebreak again first. If it fails the same way, unplug the
+  Echo, run firebreak again, and plug it into another port.
 - A `/system` write that keeps failing with `failed to read copy response: EOF`
   can mean a poor USB connection. Unplug both ends of the cable, plug them back
   in firmly, and try another cable if it fails again.

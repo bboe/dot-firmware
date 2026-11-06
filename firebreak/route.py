@@ -52,6 +52,7 @@ from firebreak.twrp import reboot
 from firebreak.ui import (
     ARGUMENTS,
     MINUTE,
+    MOST_RELIABLE,
     PROGRESS,
     SESSION,
     WAIT,
@@ -308,8 +309,9 @@ def keeps_restarting() -> str:
         " port that cannot power TWRP does that, and TWRP is the step where it"
         f" has shown up.\n\nTo tell, plug this {title()} into a USB wall"
         " charger and hold the + button while it powers up. A ring that reaches"
-        " white there means TWRP runs and the port is the problem. Use a port"
-        " on the computer itself, and unplug whatever else is on it."
+        " white there means TWRP runs and the port is the problem. To retry,"
+        f" move this {title()} to another USB port: this run waits for it."
+        f" {MOST_RELIABLE}"
     )
 
 
