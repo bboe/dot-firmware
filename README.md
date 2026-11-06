@@ -5,40 +5,34 @@ Generation) or an Echo Dot (3rd Generation) over USB, or returns it to stock.
 Run it again with another target to move the device. A stopped run picks up
 where it left off.
 
-All of this is possible because of Rortiz2's work. firebreak runs the unlocks
-they publish on XDA, one thread for each Echo:
+> [!NOTE]
+> All of this is possible because of Rortiz2's work. firebreak runs the
+> unlocks they publish on XDA, one thread for each Echo:
+>
+> - [Echo Dot (2nd Generation), biscuit](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/)
+> - [Echo (2nd Generation), radar](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-2nd-gen-2017-radar.4801290/)
+> - [Echo Dot (3rd Generation), donut](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-3rd-gen-2018-donut.4801400/)
 
-- [Echo Dot (2nd Generation), biscuit](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/)
-- [Echo (2nd Generation), radar](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-2nd-gen-2017-radar.4801290/)
-- [Echo Dot (3rd Generation), donut](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-3rd-gen-2018-donut.4801400/)
+## Quick start
 
-Unlocking a stock Echo Dot (2nd Generation) needs
-`amonet-biscuit-v2.0.1.zip`, which Rortiz2 publishes only on its thread above.
-A run downloads it unattended. If that fails, the run says so and opens your
-browser for the thread instead, because the thread itself refuses an
-unattended download. Either way the zip is checked against a pinned hash.
-Moving an already-unlocked Echo Dot (2nd Generation) between targets
-needs that zip too, because the run checks the bootloader against the copy in
-it, and so do the runs that go through its bootrom: `firebreak bootrom`, a
-resume after `boot0` was erased, and `stock 5.5.0.3`.
+> [!CAUTION]
+> Avoid connecting a stock Echo to Wi-Fi before you unlock it. Amazon can
+> update the device to a build firebreak does not support.
 
-| target | the device ends with | time |
-| --- | --- | --- |
-| `unlock fireos6` (default) | rooted Fire OS 6 [8149][fireos-8149] on amonet v2.0.1, TWRP 3.7.0; also needs `boot-root.zip`. On an Echo (2nd Generation), rooted Fire OS 6 [8149][fireos-radar-8149] on amonet-radar v1.0.1. On an Echo Dot (3rd Generation), the Fire OS 6 already installed rooted with kamakiri-donut v1.0.0, or Fire OS 6 8349 with `--factory-reset` | about 5 min from `unlock fireos5`; on an Echo Dot (3rd Generation), about 3.5 min from stock |
-| `unlock fireos5` | rooted Fire OS [5.5.5.4][fireos-5554] on amonet v1.1.0, TWRP 3.7.0_9-bboe2 | about 9 min from stock |
-| `stock [BUILD]` | stock Fire OS at that build, with the device erased: Fire OS 6 [8149][fireos-8149] when left out, or Fire OS 5 from [5.5.0.3][fireos-5503] to [5.5.5.4][fireos-5554]. On an Echo (2nd Generation), Fire OS 6 [8149][fireos-radar-8149] when left out, any Fire OS 6 from [4305][fireos-radar-4305] to 8349, or Fire OS [5.5.5.4][fireos-radar-5554]. On an Echo Dot (3rd Generation), Fire OS 6 8349, with its bootloader locked again | about 3 min from `unlock fireos5` |
+Install firebreak's [prerequisites](#install). Then plug your Echo into your
+computer, and run:
 
-`unlock` takes the newest unlock that firebreak supports for that Fire OS, so
-a target names no amonet version. `unlock` with no target takes `fireos6`.
+```sh
+uvx firebreak@latest unlock
+```
 
-## Run it
+On Windows, run `uvx --managed-python firebreak@latest unlock` instead, as
+[Windows](#windows) says. Follow any instructions that may appear.
 
-It needs `adb` and `fastboot` from Android platform-tools, and
-[uv](https://docs.astral.sh/uv/), which runs firebreak from PyPI and fetches a
-Python for it when needed.
+## Install
 
-`uvx firebreak@latest` asks PyPI for the newest release on each run. Without a
-network it fails, and `uvx firebreak` runs the copy uv already has.
+firebreak needs `adb` and `fastboot` from Android platform-tools, and
+[uv](https://docs.astral.sh/uv/), which runs firebreak from PyPI.
 
 ### macOS
 
@@ -48,8 +42,6 @@ These commands use [Homebrew](https://brew.sh). Without it, download Google's
 ```sh
 brew install --cask android-platform-tools uv
 brew install libusb               # for an Echo Dot (3rd Generation)
-uvx firebreak@latest unlock       # fireos6
-uvx firebreak@latest stock        # 8149, or name 8344, 8338, 8146, 8142, 8138, 6302, 5041, 4405, 4315, 5.5.5.4, 5.5.5.0, 5.5.4.9, 5.5.4.6, 5.5.3.1, 5.5.0.3
 ```
 
 ### Linux
@@ -85,219 +77,168 @@ adb kill-server
 ```
 <!-- markdownlint-enable MD013 -->
 
-Then log in again, so your shell has the `plugdev` group, and run it:
-
-```sh
-uvx firebreak@latest unlock       # fireos6
-uvx firebreak@latest stock        # the device's default build, or name one
-```
-
-An Echo Dot (3rd Generation) unlocks on Linux with no `sudo`. Linux uses a
-different exploit from macOS, because each host refuses the transfer the other
-exploit needs. `stock`, `fastboot`, `twrp` and the whole restore also run on
-Linux.
+Then log in again, so your shell has the `plugdev` group.
 
 ### Windows
 
-Install the drivers from an administrator PowerShell:
+> [!WARNING]
+> firebreak has been tested on Windows only from an administrator PowerShell,
+> for both the setup and the run.
 
 ```powershell
+winget install Google.PlatformTools
+winget install astral-sh.uv
 cd $env:TEMP
 curl.exe -fo fastboot.cab https://catalog.s.download.windowsupdate.com/d/msdownload/update/driver/drvs/2016/10/20940218_0ae8695c01fb84d1fdea5c9a04baf336ec5b1ba7.cab
 curl.exe -fo mtk.cab https://catalog.s.download.windowsupdate.com/d/msdownload/update/driver/drvs/2016/07/20896845_fdc6bb5aa9a9bac99adf85d931d6c21d1130a96e.cab
+curl.exe -fLo UsbDk.msi https://github.com/daynix/UsbDk/releases/download/v1.00-22/UsbDk_1.0.22_x64.msi
+curl.exe -fLo libusb.7z https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.7z
 mkdir -Force fastboot, mtk
 expand -F:* fastboot.cab fastboot
 expand -F:* mtk.cab mtk
 pnputil /add-driver fastboot\tplink_winusb.inf /install
 pnputil /add-driver mtk\cdc-acm.inf /install
-Remove-Item -Recurse fastboot.cab, mtk.cab, fastboot, mtk
-```
-
-The drivers have x86 and x64 builds only, so on Windows on ARM the steps that
-use fastboot or the bootrom cannot run.
-
-Then open a new PowerShell, not as administrator, and run these:
-
-```powershell
-winget install Google.PlatformTools
-winget install astral-sh.uv
-uvx --managed-python firebreak@latest
-```
-
-`--managed-python` has uv use its own Python. A Python from the Microsoft
-Store keeps firebreak's files where adb and fastboot cannot see them, and
-firebreak stops on it.
-
-An Echo Dot (3rd Generation) also needs UsbDk and libusb, because its bootrom
-is driven over raw USB. UsbDk has run on Windows 11 23H2; mtkclient reports
-it broken on build 26200, which is 25H2. Install it from an administrator
-PowerShell:
-
-```powershell
-curl.exe -fLo $env:TEMP\UsbDk.msi https://github.com/daynix/UsbDk/releases/download/v1.00-22/UsbDk_1.0.22_x64.msi
-msiexec /i $env:TEMP\UsbDk.msi /qn
-```
-
-Then put libusb on your PATH, not as administrator, and open a new
-PowerShell. Windows 11 23H2's `tar` unpacks libusb's `.7z`; on an older
-Windows, unpack the same `VS2022\MS64\dll\libusb-1.0.dll` into that folder
-with 7-Zip, keeping its folders, before the last line.
-
-```powershell
 $d = "$env:LOCALAPPDATA\Programs\libusb"
 mkdir -Force $d
-curl.exe -fLo $env:TEMP\libusb.7z https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.7z
-tar -xf $env:TEMP\libusb.7z -C $d VS2022/MS64/dll/libusb-1.0.dll
+tar -xf libusb.7z -C $d VS2022/MS64/dll/libusb-1.0.dll
+Remove-Item -Recurse fastboot.cab, mtk.cab, fastboot, mtk
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$d\VS2022\MS64\dll", "User")
+Start-Process msiexec -Wait -ArgumentList "/i $env:TEMP\UsbDk.msi /qn"
+Remove-Item UsbDk.msi
 ```
 
-## Notes
+Then open a new administrator PowerShell, so it has the new PATH, and run
+firebreak:
 
-- From stock, firebreak asks for the fastboot gesture.
-- A ring that stays solid blue at the fastboot gesture can mean a cable that
-  carries power but no data, or a bad USB connection. Try another cable, then
-  another port. On Windows it can also mean the [drivers](#windows) are
-  missing.
-- A ring that restarts instead of reaching TWRP, blue with about a second of
-  turning cyan and little or no white, has been a USB port that cannot power
-  it. To tell, hold the + button with the device on a USB wall charger: a ring
-  that reaches white there means TWRP runs. Then use another port. A USB 3
-  port on the computer itself, with nothing else on it, is the most reliable.
-- An Echo that drops off USB during a TWRP step, more than once, has also been
-  a port that cannot power it. Where the run says boot0 may hold no
-  preloader, run firebreak again first. If it fails the same way, unplug the
-  Echo, run firebreak again, and plug it into another port.
-- A `/system` write that keeps failing with `failed to read copy response: EOF`
-  can mean a poor USB connection. Unplug both ends of the cable, plug them back
-  in firmly, and try another cable if it fails again.
-- Do not connect a stock device to Wi-Fi before you unlock it. Amazon can
-  update it to a build firebreak does not support.
-- `amonet-biscuit-v2.0.1`, `amonet-radar-v1.0.1` and `kamakiri-donut-v1.0.0`
-  root the Fire OS 6 build already installed, and keep the device's Wi-Fi and
-  Alexa setup. Unlock it soon after setup, before it can update.
-  `--factory-reset` erases the device and installs the target's build instead.
-- [docs/unlocking.md][unlocking] says why each step is there, and
-  [docs/measurements.md][measurements] has the ring through a root and a
-  restore, so you can tell where a run has got to.
+```powershell
+uvx --managed-python firebreak@latest unlock
+```
 
-## Bootloaders
+> [!TIP]
+> `--managed-python` makes uv use its own Python. firebreak stops on a Python
+> from the Microsoft Store, because adb and fastboot cannot see the files it
+> keeps.
 
-From stock, only the LK decides whether firebreak can unlock a device.
-`fastboot getvar lk_build_desc` reads it.
+Windows on ARM, Windows 11 25H2 and Windows older than 11 23H2 have limits:
+see [Windows][troubleshooting-windows] in the troubleshooting guide.
 
-| `lk_build_desc` | ships in |
-| --- | --- |
-| `2c3569d-20260617_045829` | Fire OS 6 8338, 8344 |
-| `63cb91b-20221007_072309` | Fire OS 6 [4405][fireos-4405] to [8149][fireos-8149] |
-| `41fb3ce-20221007_151724` | Fire OS 6 [4310][fireos-4310], [4313][fireos-4313], [4315][fireos-4315] |
-| `beb022a-20211202_231918` | Fire OS [5.5.5.4][fireos-5554] |
-| `a828f29-20210822_210511` | Fire OS [5.5.4.9][fireos-5549], [5.5.5.0][fireos-5550] |
-| `f379dba-20170906_000423` | Fire OS [5.5.3.1][fireos-5531] to [5.5.4.6][fireos-5546] |
-| `0e1d0d9-20161018_220224` | Fire OS [5.5.0.3][fireos-5503] |
+## Usage
 
-- The table is the Echo Dot (2nd Generation)'s. An Echo (2nd Generation)
-  reports four LKs of its own, and they differ from a Dot's even where the
-  build numbers match: Fire OS 6 8338, 8344 and 8349 ship
-  `2c3569d-20260617_051433` on an Echo against `2c3569d-20260617_045829` on a
-  Dot, from one commit but not the same bytes. amonet-radar v1.0.1 has an image
-  for each of the four, so no Echo build Amazon has shipped is out of reach.
-- [docs/devices.md][devices] has each build's preloader, TEE and
-  anti-rollback versions.
-- An LK older than 5.5.0.3 reports none of these, and so no `lk_build_desc`
-  and no `pl_build_desc`. firebreak unlocks such a Dot with the default
-  fastbrick image, which amonet v2.0.1's own map gives an LK it does not know.
+`uvx firebreak@latest --help` prints this:
 
-## `--end-in-fireos`
+```text
+usage: firebreak [-h] [--credits] [--no-update-check] [--verbose] [--version]
+                 COMMAND ...
 
-`stock [BUILD]` leaves the device in fastboot at the end. The next run then
-needs no button held, because a device already in fastboot is one firebreak can
-find by itself. `--end-in-fireos` lets it start the Fire OS it now holds
-instead. Only the `stock` target takes it. `5.5.0.3` cannot wait in fastboot,
-so it waits in the Dot's bootrom, which the next run picks up with no button
-held; power the Dot off and it starts Fire OS 5 instead.
+Change the firmware on an Echo Dot (2nd Generation), an Echo (2nd
+Generation) or an Echo Dot (3rd Generation) over USB: unlock it, or return it
+to stock. It discovers what state the Echo is in and moves it toward the
+target.
 
-## `--no-wait`
+positional arguments:
+  COMMAND            the command to run, one of those listed below
 
-`stock [BUILD] --no-wait` starts the writes at once. Without it the run counts
-down 10 seconds first, which is the last point Ctrl-C leaves the device as it
-is. Only the `stock` target takes it.
+options:
+  -h, --help         show this help message and exit
+  --credits          show acknowledgement of those whose work firebreak is
+                     built upon and exit
+  --no-update-check  do not ask PyPI whether a newer firebreak exists
+  --verbose          print each adb and fastboot command, its exit status and
+                     the time, and each state the Echo reaches
+  --version          show program's version number and exit
 
-## One command per entry point
+commands for the Echo Dot (2nd Generation):
+  stock [BUILD]
+      Amazon's Fire OS BUILD, 8149 when left out, which erases the whole
+      Dot.
+  unlock [TARGET], where TARGET is one of:
+    fireos6, the default
+        boot-root.zip's root adb on the Fire OS 6 already installed, which
+        keeps the Dot's setup; with --factory-reset, Fire OS 6 8149 with
+        TWRP 3.7.0, with the Dot erased.
+    fireos5
+        rooted Fire OS 5.5.5.4 on amonet v1.1.0, with TWRP 3.7.0_9-bboe2.
 
-A target run starts wherever the device is, so testing one stage means
-reaching its state first. These commands do only that, and stop there.
+commands for the Echo Dot (3rd Generation):
+  stock [BUILD]
+      Amazon's Fire OS BUILD, 8349 when left out, which erases the whole
+      Echo and locks it again.
+  unlock [TARGET], where TARGET is one of:
+    fireos6, the default
+        boot-root.zip's root adb on the Fire OS 6 already installed, which
+        keeps the Echo's setup; with --factory-reset, Fire OS 6 8349, with
+        the Echo erased.
 
-| command | where it leaves the device | writes |
-| --- | --- | --- |
-| `firebreak reboot` | its firmware, as an ordinary power-on starts it | nothing |
-| `firebreak fastboot` | the fastboot its bootloader gives | nothing |
-| `firebreak twrp` | its TWRP | nothing, where the bootloader is unlocked and its recovery holds a TWRP; `--force` writes one |
-| `firebreak bootrom` | its bootrom, with amonet's payload holding it | boot0's header from a recovery, all of boot0 from fastboot |
-| `firebreak short` | the same, with the test point shorted | nothing |
+commands for the Echo (2nd Generation):
+  stock [BUILD]
+      Amazon's Fire OS BUILD, 8149 when left out, which erases the whole
+      Echo.
+  unlock [TARGET], where TARGET is one of:
+    fireos6, the default
+        boot-root.zip's root adb on the Fire OS 6 already installed, which
+        keeps the Echo's setup; with --factory-reset, Fire OS 6 8149, with
+        the Echo erased.
 
-Each asks before a write and says what the write does. `--force` answers in
-advance, and a run with no terminal to ask at stops and names it.
+Run it again with another of these to move the Echo there.
 
-## `short`
+commands that reach one entry point and stop there:
+  reboot
+      start the Echo's firmware, as an ordinary power-on does. It reboots
+      an Echo in its TWRP or its fastboot, and leaves one that already
+      runs its firmware alone. An Echo held in its bootrom needs a power
+      cycle, and it says so. It writes nothing.
+  fastboot
+      start the Echo's fastboot, whichever bootloader it holds. It reboots
+      an Echo that answers adb, and asks for the button gesture where it
+      cannot. It writes nothing.
+  twrp
+      start the Echo's TWRP. On an unlocked Echo it restarts into the
+      recovery already there and writes nothing, and says what to do where
+      that is not a TWRP. A locked Echo has to be unlocked first, which
+      erases it, so that one is asked about.
+  bootrom
+      hold the Echo in its bootrom, where amonet's payload can reach the
+      eMMC with no firmware running. It asks before it clears boot0, which
+      is what leaves an Echo startable from its bootrom alone. An Echo
+      that shows no light cannot be reached this way: `firebreak short` is
+      for that one.
+  short
+      hold the bootrom of an Echo that shows no light, by shorting its
+      test point. It says where to short, waits for the bootrom, says when
+      the short may come off, and leaves amonet's payload holding it. It
+      writes nothing, and --device picks whose test point to describe.
 
-Use `firebreak short` when the Dot shows no light and gives no fastboot. It
-reaches the Dot's bootrom by shorting its eMMC bus as it powers up, and holds
-it there. The run after it joins that payload with no second
-short, so this is how a target run starts on a Dot that cannot reach fastboot.
-Only this command asks for a short.
+other commands:
+  report
+      print what the Echo and this computer are, and the Echo's partition
+      table, for a support request. It starts the Echo's recovery to read
+      them and writes no partition.
+  survey OTA [OTA ...]
+      read each Amazon OTA zip for the tables in docs/devices.md. It needs
+      no Echo.
+  write-test
+      write a known pattern over the Echo's cache partition and read it
+      back, which tells a failing eMMC from a failing USB cable because
+      nothing crosses USB. It leaves a fresh empty filesystem there, or
+      says it could not.
 
-1. Open the Dot with a Torx T8 screwdriver. Lift the shield's lid off the eMMC
-   by its corners; its metal frame stays on the board.
-2. Find the passive marked in [this
-   photo](https://xdaforums.com/attachments/short2-jpg.6273804/), in the row
-   between R60 and C52 beside the eMMC ([where that is on the
-   board](https://andygoetz.org/blog/2022/05/echo-dot-v2-dumping-emmc/)). Do not
-   use C52, which is a capacitor.
-3. With the Dot unplugged, run
-   `uvx firebreak@latest short --device biscuit`.
-4. When firebreak prints "Short … test point and plug it in", hold a wire from
-   that passive to the shield frame beside it, which is ground, and plug the Dot
-   in. A Dot plugged in before that message can go unseen. On "Short … missed",
-   unplug it and try again.
-5. Take the wire off when firebreak prints "The short may come off now".
-6. Leave the Dot plugged in, and run the target you want, such as
-   `uvx firebreak@latest unlock`. A power cycle loses the hold.
+Run `firebreak COMMAND --help` for what that command takes.
+```
+
+## Documentation
+
+- [docs/troubleshooting.md][troubleshooting]: USB and cable problems, Windows
+  limits, and an Echo Dot (2nd Generation) with no light.
+- [docs/unlocking.md][unlocking]: why each step is there.
+- [docs/measurements.md][measurements]: the ring at each step, so you can tell
+  where a run has got to.
 
 ## Reporting a problem
 
-When a run fails, run firebreak again with the `report` command, as in
-`uvx firebreak@latest report`, then please stop by `#support-device-unlocking`
-in the [EchoMuse Discord](https://discord.gg/vAPHMDvREG) and paste what it
-prints. It starts the device's recovery, prints what the device, its eMMC and
-this computer are, and the device's partition table, and writes no partition. A
-device already in a recovery stays there, and it is left in its recovery
-afterwards.
-
-`report` also names the device and lists its USB devices. An Echo (2nd
-Generation) takes `unlock fireos6`, which roots Fire OS 6
-[8149][fireos-radar-8149] with amonet-radar v1.0.1, and `stock [BUILD]`, which
-returns one on amonet to
-any of sixteen stock builds, from Fire OS [5.5.5.4][fireos-radar-5554] to
-Fire OS 6 8349, which amonet-radar v1.0.1 is the first release to
-unlock. Both have run on an Echo. The first boot after
-the root has sometimes shown nothing on USB; the run waits, and after a minute
-it asks for the Echo's power to be unplugged and plugged back in. An Echo Dot
-(3rd Generation) takes `unlock fireos6` and `stock`, which returns it to Fire
-OS 6 8349 and locks it again. `unlock fireos5` is for the Echo Dot (2nd
-Generation) alone. The report is the same on other Echo devices and helps add
-them.
-
-`write-test` then tells a failing eMMC from a failing cable. It pushes a
-pattern into the Dot's RAM, then has the Dot write it over its own `cache`
-partition and read it back, so nothing crosses USB. It erases `cache`, which
-holds nothing the Dot needs, and leaves an empty filesystem there, or says
-it could not.
-
-For a Dot that shows no light, run [`short`](#short)
-first; `write-test` then goes through the payload waiting there, writes a
-pattern over the end of `cache` from this computer, and reads it back. It says
-whether the eMMC refused a write or the bytes did not arrive, and puts back
-what was there when the Dot still answers.
+When a run fails, run `uvx firebreak@latest report`. Then go to
+`#support-device-unlocking` in the
+[EchoMuse Discord](https://discord.gg/vAPHMDvREG) and paste what it prints. It
+writes no partition.
 
 ## Credits
 
@@ -324,7 +265,7 @@ firebreak automates work that other people did first.
   described how to short the eMMC bus at the passives beside R60.
 - [mtkclient](https://github.com/bkerler/mtkclient), by bkerler, agrees with
   two of firebreak's bootrom addresses.
-- [ftvdb](https://ftvdb.com/) keeps the Fire OS builds that the tables link to.
+- [ftvdb](https://ftvdb.com/) keeps an archive of Fire OS builds.
 
 ## Licence
 
@@ -332,21 +273,8 @@ firebreak uses the BSD 2-Clause licence, in [LICENSE.txt][licence]. This
 repository contains no Amazon code, and firebreak is not affiliated with,
 endorsed by, or supported by Amazon.
 
-[devices]: https://github.com/bboe/firebreak/blob/main/docs/devices.md#biscuit
-[fireos-4310]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/2c4db2f5fa2ddb390faf5ccf9a879b01-8087721594-fire-os-6-5-5-5-ns6555-4310-2022-11-23/
-[fireos-4313]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/0c90e6241451777048da197542c82b87-8087722362-fire-os-6-5-5-5-ns6555-4313-2023-01-10/
-[fireos-4315]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/03c7c4dc338a93635dda0f5e1cd4e451-8087722874-fire-os-6-5-5-5-ns6555-4315-2023-11-20/
-[fireos-4405]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/570f3f6b28f94323e01e95561c87887f-8289072516-fire-os-6-5-5-6-ns6556-4405-2023-01-21/
-[fireos-5503]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/6049e04dd518483ed6e5b0d72ffe9eac-564196920-fire-os-5-5-0-3-564196920-2018-09-20/
-[fireos-5531]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/789c6b80b00b90a35c3016d42a7c4455-641575220-fire-os-5-5-3-1-641575220-2019-07-22/
-[fireos-5546]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/547fad91b469b9d6a3a1fcdb85b43671-666694320-fire-os-5-5-4-6-666694320-2021-06-23/
-[fireos-5549]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/538f9374ad45f3f1ea18948609d7446f-672720020-fire-os-5-5-4-9-672720020-2021-10-27/
-[fireos-5550]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/1be9f19c0c16337c34d55390a146c990-673726720-fire-os-5-5-5-0-673726720-2021-12-14/
-[fireos-5554]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/805e721e1bed461d8a81015a1f703fc1-680767620-fire-os-5-5-5-4-680767620-2022-11-18/
-[fireos-8149]: https://ftvdb.com/echo/firmware/com.amazon.biscuit.android.os/a01de630f6d943dddc9b751ae74bbb52-13222532484-fire-os-6574-1-ns65741-8149-2026-09-29/
-[fireos-radar-4305]: https://ftvdb.com/echo/firmware/com.amazon.radar.android.os/3341ac1839e3ce5b4770ecfdebce828b-8087720314-fire-os-6-5-5-5-ns6555-4305-2022-11-30/
-[fireos-radar-5554]: https://ftvdb.com/echo/firmware/com.amazon.radar.android.os/e7338ac28c64f1846389c8a7bf871c94-680767620-fire-os-5-5-5-4-680767620-2022-11-18/
-[fireos-radar-8149]: https://ftvdb.com/echo/firmware/com.amazon.radar.android.os/43c054c90359193ce6c1d0b65fbfeb0e-13222532484-fire-os-6574-1-ns65741-8149-2026-09-29/
 [licence]: https://github.com/bboe/firebreak/blob/main/LICENSE.txt
 [measurements]: https://github.com/bboe/firebreak/blob/main/docs/measurements.md
+[troubleshooting]: https://github.com/bboe/firebreak/blob/main/docs/troubleshooting.md
+[troubleshooting-windows]: https://github.com/bboe/firebreak/blob/main/docs/troubleshooting.md#windows
 [unlocking]: https://github.com/bboe/firebreak/blob/main/docs/unlocking.md

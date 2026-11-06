@@ -1,0 +1,56 @@
+# Troubleshooting
+
+## USB
+
+- A ring that stays solid blue at the fastboot gesture can mean a cable that
+  carries power but no data, or a bad USB connection. Try another cable, then
+  another port. On Windows it can also mean the
+  [drivers](https://github.com/bboe/firebreak#windows) are missing.
+- A ring that restarts instead of reaching TWRP, blue with about a second of
+  turning cyan and little or no white, has been a USB port that cannot power
+  it. To tell, hold the + button with the device on a USB wall charger: a ring
+  that reaches white there means TWRP runs. Then use another port. A USB 3
+  port on the computer itself, with nothing else on it, is the most reliable.
+- An Echo that drops off USB during a TWRP step, more than once, has also been
+  a port that cannot power it. Where the run says boot0 may hold no
+  preloader, run firebreak again first. If it fails the same way, unplug the
+  Echo, run firebreak again, and plug it into another port.
+- A `/system` write that keeps failing with `failed to read copy response: EOF`
+  can mean a poor USB connection. Unplug both ends of the cable, plug them back
+  in firmly, and try another cable if it fails again.
+
+## Windows
+
+- The drivers have x86 and x64 builds only, so on Windows on ARM the steps
+  that use fastboot or the bootrom cannot run.
+- UsbDk has run on Windows 11 23H2. mtkclient reports it broken on 25H2
+  (build 26200).
+- On a Windows older than 11 23H2, `tar` cannot unpack a `.7z`. It prints an
+  error, but PowerShell runs the rest of the setup. An Echo Dot (3rd
+  Generation) then stops because it finds no libusb. Unpack
+  `VS2022\MS64\dll\libusb-1.0.dll` from `%TEMP%\libusb.7z` into
+  `%LOCALAPPDATA%\Programs\libusb` with 7-Zip, and keep its folders.
+
+## An Echo Dot (2nd Generation) with no light
+
+Use `firebreak short` when the Dot shows no light and gives no fastboot. It
+reaches the Dot's bootrom by shorting its eMMC bus as it powers up, and holds
+it there. The run after it joins that payload with no second short, so this is
+how a target run starts on a Dot that cannot reach fastboot.
+
+1. Open the Dot with a Torx T8 screwdriver. Lift the shield's lid off the eMMC
+   by its corners; its metal frame stays on the board.
+2. Find the passive marked in [this
+   photo](https://xdaforums.com/attachments/short2-jpg.6273804/), in the row
+   between R60 and C52 beside the eMMC ([where that is on the
+   board](https://andygoetz.org/blog/2022/05/echo-dot-v2-dumping-emmc/)). Do not
+   use C52, which is a capacitor.
+3. With the Dot unplugged, run
+   `uvx firebreak@latest short --device biscuit`.
+4. When firebreak prints "Short … test point and plug it in", hold a wire from
+   that passive to the shield frame beside it, which is ground, and plug the Dot
+   in. A Dot plugged in before that message can go unseen. On "Short … missed",
+   unplug it and try again.
+5. Take the wire off when firebreak prints "The short may come off now".
+6. Leave the Dot plugged in, and run the target you want, such as
+   `uvx firebreak@latest unlock`. A power cycle loses the hold.

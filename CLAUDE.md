@@ -2,14 +2,15 @@
 
 firebreak changes the firmware on three Echoes over USB: the Echo Dot (2nd
 Generation) (model RS03QR, codename biscuit), the Echo (2nd Generation)
-(radar) and the Echo Dot (3rd Generation) (donut). README.md has the targets
-and how to run it. `docs/unlocking.md` says why each step is there; read the
+(radar) and the Echo Dot (3rd Generation) (donut). README.md has how to
+install and run it. `docs/unlocking.md` says why each step is there; read the
 section for a step **before** you touch it. Most of it was measured on
 hardware rather than reasoned out. Its sections are the general process, and
 its `Each device` section holds what one device alone does.
 `docs/measurements.md` holds the whole-run readings that belong to no one step:
 the ring, the timings, and what an Echo's bootrom does. `docs/plugins.md`
 covers the plugin API: devices, unlocks and their plans.
+`docs/troubleshooting.md` holds the user-facing fixes the README left out.
 
 ## Commands
 

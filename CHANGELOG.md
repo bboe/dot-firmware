@@ -2,6 +2,13 @@
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Changed
+
+- `--help` names all three Echoes, and its description is shorter.
+- `--credits` ends its help in "and exit", as `--help` and `--version` do.
+
 ## 1.0.0 - 2026-11-05
 
 ### Added

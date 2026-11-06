@@ -1,12 +1,7 @@
-"""Change the firmware on an Echo Dot (2nd Generation) or an Echo (2nd
-Generation) over USB: unlock it, or return it to stock. It finds where the Echo
-is, from stock, part way through, or on another target, and keeps going until
-the Echo is on the target: it waits while the Echo reboots, and while you take
-a step it asks for. Stopped, it picks up where it left off on the next run. It
-uses the one Echo on USB; set ANDROID_SERIAL when several are. It needs Python
-3.9 or later, and adb and fastboot from Android platform-tools.
-https://github.com/bboe/firebreak/blob/main/docs/unlocking.md says why each
-step is there.
+"""Change the firmware on an Echo Dot (2nd Generation), an Echo (2nd
+Generation) or an Echo Dot (3rd Generation) over USB: unlock it, or return it
+to stock. It discovers what state the Echo is in and moves it toward the
+target.
 """
 
 from __future__ import annotations
@@ -97,7 +92,7 @@ Andy Goetz described how to short the eMMC bus at the passives beside R60.
   https://andygoetz.org/blog/2022/05/echo-dot-v2-dumping-emmc/
 mtkclient, by bkerler, agrees with two of firebreak's bootrom addresses.
   https://github.com/bkerler/mtkclient
-ftvdb keeps the Fire OS builds that the tables link to.
+ftvdb keeps an archive of Fire OS builds.
   https://ftvdb.com/"""
 DEVICES = {device.name: device for device in TARGETS}
 FACTORY_RESETS = {
@@ -438,7 +433,9 @@ def option_parents(*, hidden: bool = False) -> dict[str, argparse.ArgumentParser
     made["--credits"].add_argument(
         "--credits",
         action="version",
-        help="print who did the work firebreak builds on, and stop",
+        help=(
+            "show acknowledgement of those whose work firebreak is built upon and exit"
+        ),
         version=CREDITS,
     )
     made["--device"] = argparse.ArgumentParser(

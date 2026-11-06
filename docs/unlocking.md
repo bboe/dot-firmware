@@ -2493,6 +2493,14 @@ hosts. It asked for the power cycle after boot-root too. One hold before it
 passed through the bootrom to the preloader within a second, which reads as
 the button let go too soon, and the next hold, kept for 10 seconds, stayed.
 
+The README installs UsbDk with `Start-Process msiexec -Wait`. A bare
+`msiexec` returns to PowerShell at once and installs in the background.
+Measured on nether on 2026-11-06: a bare `msiexec /i UsbDk.msi /qn` returned in
+0.02 s with no UsbDk service, and the service ran only after about 30 s. With
+`-Wait` the prompt came back after 31 s with the service already running. A
+donut run started in that gap would meet libusb with no UsbDk, and a
+`Remove-Item` of the installer in that gap would delete it in mid-install.
+
 The dump paid for itself twice. `misc`'s command field is all zeros, which is
 the self-clearing the fastboot route relies on, and `0x360` reads
 `00 41 42 42 01 00 8f 00` on an Echo freshly restored to stock: the same bytes

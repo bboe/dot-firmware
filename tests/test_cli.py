@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import pathlib
 import re
 import subprocess
@@ -13,6 +14,11 @@ from firebreak import __version__
 from firebreak.devices import BUILDS
 from firebreak.host import NO_ACCESS
 
+PLAIN = {
+    **{key: value for key, value in os.environ.items() if key != "FORCE_COLOR"},
+    "COLUMNS": "80",
+    "NO_COLOR": "1",
+}
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
@@ -40,7 +46,11 @@ def test_credits_name_every_link_the_readme_credits() -> None:
 )
 def test_help(*, command: list[str]) -> None:
     output = subprocess.run(
-        args=[*command, "--help"], capture_output=True, check=True, text=True
+        args=[*command, "--help"],
+        capture_output=True,
+        check=True,
+        env=PLAIN,
+        text=True,
     ).stdout
     assert output.startswith("usage: firebreak ")
 
@@ -103,6 +113,17 @@ def test_the_positional_arguments_are_checked(
     )
     assert finished.returncode == 2
     assert message in finished.stderr
+
+
+def test_the_readme_gives_the_help_a_run_prints() -> None:
+    output = subprocess.run(
+        args=[sys.executable, "-m", "firebreak", "--help"],
+        capture_output=True,
+        check=True,
+        env=PLAIN,
+        text=True,
+    ).stdout.replace("\noptional arguments:\n", "\noptions:\n")
+    assert f"```text\n{output.rstrip()}\n```" in (ROOT / "README.md").read_text()
 
 
 def test_the_readme_gives_the_udev_commands_a_run_prints() -> None:
