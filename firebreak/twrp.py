@@ -59,6 +59,7 @@ NODES = (
     ' [ "$g" = "$s" ] || b="$b $n=$g"; done; echo "$b nodes-ok"'
 )
 SLICE_OK = "slice-ok"
+START_OK = "start-ok"
 STDIN_PROBE_BYTES = 1024
 STREAM_OK = "stream-ok"
 SYSTEM_SLICE = (
@@ -125,7 +126,7 @@ def check_nodes(*, want: dict[str, int]) -> str:
                     for node, _, got in read
                 )
         if attempt + 1 < PUSH_TRIES:
-            reconnect(remote=DISK)
+            reconnect(read=True, remote=DISK)
     raise FatalError(
         message=f"the {title()} did not answer which of its partitions are block"
         f" devices: {said!r}. " + again()
@@ -158,6 +159,20 @@ def no_truncate() -> str:
     return " conv=notrunc" if SESSION.dd == TOYBOX_DD else ""
 
 
+def partition_start(*, number: int) -> str:
+    command = f'echo "$(cat /sys/class/block/mmcblk0p{number}/start) {START_OK}"'
+    for attempt in range(PUSH_TRIES):
+        said = last_line(said=adb_shell(command=command, timeout=60)).split()
+        if said[1:] == [START_OK] and said[0].isdecimal():
+            return said[0]
+        if attempt + 1 < PUSH_TRIES:
+            reconnect(read=True, remote=f"{DISK}p{number}")
+    raise FatalError(
+        message=f"the {title()} did not answer where {DISK}p{number} starts:"
+        f" {' '.join(said) or 'nothing'}. " + again()
+    )
+
+
 def partition_table() -> str:
     command = f"sgdisk --print {DISK}; echo {TABLE_OK}"
     for attempt in range(PUSH_TRIES):
@@ -165,7 +180,7 @@ def partition_table() -> str:
         if said[-1] == TABLE_OK and any(" userdata" in line for line in said):
             return "\n".join(said[:-1])
         if attempt + 1 < PUSH_TRIES:
-            reconnect(remote=DISK)
+            reconnect(read=True, remote=DISK)
     raise FatalError(
         message=f"sgdisk did not print the {title()}'s partition table:\n"
         + "\n".join(said)
@@ -382,10 +397,10 @@ def write(
         PROGRESS.end(skipped=True)
         return
     if number is not None:
-        start = adb_shell(command=f"cat /sys/class/block/mmcblk0p{number}/start")
-        if last_line(said=start).strip() != str(sector):
+        start = partition_start(number=number)
+        if start != str(sector):
             raise FatalError(
-                message=f"{DISK}p{number} starts at {start or 'nothing'}, not {sector},"
+                message=f"{DISK}p{number} starts at {start}, not {sector},"
                 " so the running partition table is not the one this expects"
             )
         pushed = run(arguments=["adb", "push", path, f"{DISK}p{number}"], timeout=1800)

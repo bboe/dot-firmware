@@ -117,7 +117,7 @@ def test_a_fastboot_request_keeps_the_rest_of_the_sector(*, adb: FakeAdb) -> Non
     want = b"bootonce-bootloader".ljust(twrp.BCB_COMMAND_SIZE, b"\0") + held[32:]
     adb.raws = [bcb_table(), held]
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=want)]
-    adb.answers["/start"] = [str(BCB_FIRST)]
+    adb.answers["/start"] = [f"{BCB_FIRST} {twrp.START_OK}"]
     adb.answers["flushed"] = ["flushed"]
     twrp.ask_fastboot(command=b"bootonce-bootloader")
     assert [words[-1] for words in adb.asked if words[1] == "push"] == [
@@ -451,7 +451,7 @@ def test_a_write_by_partition_checks_where_it_starts(
     *, adb: FakeAdb, image: pathlib.Path
 ) -> None:
     adb.answers["md5sum"] = [md5(data=b"old")]
-    adb.answers["/start"] = ["9"]
+    adb.answers["/start"] = [f"9 {twrp.START_OK}"]
     with pytest.raises(FatalError, match="starts at 9, not 8"):
         twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
     assert [words for words in adb.asked if words[1] == "push"] == []
@@ -461,9 +461,20 @@ def test_a_write_by_partition_is_pushed_to_its_node(
     *, adb: FakeAdb, image: pathlib.Path
 ) -> None:
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
-    adb.answers["/start"] = ["8"]
+    adb.answers["/start"] = [f"8 {twrp.START_OK}"]
     adb.answers["flushed"] = ["flushed"]
     twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    assert ["adb", "push", str(image), f"{twrp.DISK}p7"] in adb.asked
+
+
+def test_a_write_by_partition_reads_a_lost_start_again(
+    *, adb: FakeAdb, image: pathlib.Path
+) -> None:
+    adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
+    adb.answers["/start"] = ["adb.exe: device 'G090' not found", f"8 {twrp.START_OK}"]
+    adb.answers["flushed"] = ["flushed"]
+    twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    assert len(adb.commands(holding="wait-for-recovery")) == 1
     assert ["adb", "push", str(image), f"{twrp.DISK}p7"] in adb.asked
 
 
@@ -471,10 +482,24 @@ def test_a_write_by_partition_that_push_refuses_stops_it(
     *, adb: FakeAdb, image: pathlib.Path
 ) -> None:
     adb.answers["md5sum"] = [md5(data=b"old")]
-    adb.answers["/start"] = ["8"]
+    adb.answers["/start"] = [f"8 {twrp.START_OK}"]
     adb.answers[f"{twrp.DISK}p7"] = [(1, "remote write failed")]
     with pytest.raises(FatalError, match="remote write failed"):
         twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+
+
+def test_a_write_by_partition_whose_start_never_answers_stops_it(
+    *, adb: FakeAdb, image: pathlib.Path
+) -> None:
+    adb.answers["md5sum"] = [md5(data=b"old")]
+    adb.answers["/start"] = ["adb.exe: device 'G090' not found"]
+    with pytest.raises(FatalError) as stopped:
+        twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    message = " ".join(explained(error=stopped.value).split())
+    assert f"did not answer where {twrp.DISK}p7 starts" in message
+    assert "partition table" not in message
+    assert len(adb.commands(holding="/start")) == twrp.PUSH_TRIES
+    assert [words for words in adb.asked if words[1] == "push"] == []
 
 
 def test_a_write_that_does_not_flush_stops_it(

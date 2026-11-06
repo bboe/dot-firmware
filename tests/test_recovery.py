@@ -157,8 +157,8 @@ class FakeDot:
     def push_checked(self, *, local: pathlib.Path, remote: object) -> None:
         self.pushed[str(remote)] = local.read_bytes()
 
-    def reconnect(self, *, remote: object) -> None:
-        del remote
+    def reconnect(self, *, read: bool = False, remote: object) -> None:
+        del read, remote
         self.reconnects += 1
 
 

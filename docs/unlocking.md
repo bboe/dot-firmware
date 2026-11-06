@@ -1676,6 +1676,14 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   offset rather than the node -- but only after 768 MB has gone into a tmpfs on
   a 512 MB device. So the start sector is checked first, which also catches a
   number that means a different partition in the table the kernel still holds.
+- That check reads sysfs's `start` and ends with a marker of its own. On
+  Windows 11, 2026-11-05, an Echo that dropped off USB mid-restore turned the
+  unmarked read into adb's own error, and the run blamed the partition table:
+  `/dev/block/mmcblk0p13 starts at adb.ex: device 'G090LF0964230U8T' not found,
+  not 294912`. So an answer without the marker, or without a number before it,
+  waits for the Echo to reconnect and is read again, up to 3 times, as the
+  table and block-device reads are. Only a whole answer that differs is a
+  wrong table.
 - boot0 is the one write whose read-back names the node it wrote, so there a
   regular file would match itself and pass. Hence the check that it is a block
   device. For the same reason the cleared header is counted twice, bytes read

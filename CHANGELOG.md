@@ -109,6 +109,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- A write in TWRP that lost its read of where the partition starts waits for
+  the Echo to reconnect and reads it again. Before, it took adb's own error as
+  the start and stopped the run with a wrong partition table. On Windows,
+  2026-11-05: `/dev/block/mmcblk0p13 starts at adb.ex: device
+  'G090LF0964230U8T' not found, not 294912`.
 - `firebreak short` on an Echo Dot (3rd Generation) refuses at once and names
   `firebreak unlock fireos6`. So does `firebreak bootrom` on a donut that is
   already in its bootrom. Before, `short` asked for a test point that a donut

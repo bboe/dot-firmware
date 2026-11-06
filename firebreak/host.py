@@ -287,10 +287,10 @@ def push_checked(
     )
 
 
-def reconnect(*, remote: str | pathlib.PurePosixPath) -> None:
+def reconnect(*, read: bool = False, remote: str | pathlib.PurePosixPath) -> None:
     PROGRESS.note(
-        message=f"{remote} did not arrive; waiting for the {title()} to reconnect"
-        " to try again."
+        message=f"{remote} did not {'answer' if read else 'arrive'}; waiting for"
+        f" the {title()} to reconnect to try again."
     )
     try:
         run(arguments=["adb", "wait-for-recovery"], timeout=120)

@@ -403,7 +403,7 @@ def written_already(*, local: pathlib.Path, node: str) -> bool:
         if len(held) == MD5_DIGITS:
             return False
         if attempt + 1 < PUSH_TRIES:
-            reconnect(remote=DISK)
+            reconnect(read=True, remote=DISK)
     raise FatalError(
         message=f"{node} did not answer with an md5 of its first"
         f" {local.stat().st_size} bytes: {held or 'nothing'}. Nothing"

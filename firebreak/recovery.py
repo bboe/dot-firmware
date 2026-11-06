@@ -247,7 +247,7 @@ def read(*, count: int, first: int, node: str) -> str:
     script = HASH.format(count=count, first=first, node=node)
     for attempt in range(PUSH_TRIES):
         if attempt:
-            reconnect(remote=node)
+            reconnect(read=True, remote=node)
         said = [*adb_shell(command=script, timeout=600).split(sep="\n")[-2:], "", ""]
         digest = said[0].split(sep=" ")[0]
         if said[1] == "whole" and len(digest) == MD5_DIGITS:

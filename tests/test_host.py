@@ -395,6 +395,8 @@ def test_reconnect(
     host.reconnect(remote="/tmp/x")
     assert asked == [["adb", "wait-for-recovery"]]
     assert "/tmp/x did not arrive" in capsys.readouterr().out
+    host.reconnect(read=True, remote="/dev/block/mmcblk0p13")
+    assert "/dev/block/mmcblk0p13 did not answer" in capsys.readouterr().out
 
     def slow(**_: object) -> None:
         raise subprocess.TimeoutExpired(cmd="adb", timeout=120)
