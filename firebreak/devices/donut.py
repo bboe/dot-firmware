@@ -27,16 +27,17 @@ BUILDS = {
     )
 }
 BUTTON_GESTURE = (
-    "Unplug it, hold its action button, the circle on top, and plug the cable in"
-    " while still holding. Keep holding until the run says the bootrom answered."
+    "Unplug it. Press and hold its action button, the circle on top, before you"
+    " plug the cable in. Keep holding while you plug it in, until the run says"
+    " the bootrom answered."
 )
 DEFAULT_BUILD = "8349"
 FASTBOOT_MODE = (
-    "Unplug the USB cable, press and hold the action button, the circle on top,"
-    " and plug the cable back in while still holding. This Echo reaches its"
-    " bootrom from the same hold, so a try can land there instead: a run that"
-    " says the bootrom answered means this one needs starting again, with the"
-    " hold a moment later."
+    "Unplug the USB cable and plug it back in, then press and hold the action"
+    " button, the circle on top, a second or two later, until the ring turns"
+    " green. A hold from the moment the cable goes in reaches this Echo's"
+    " bootrom instead: a run that says the bootrom answered means this one needs"
+    " starting again, with the hold later."
 )
 DONUT = Device(
     device_type_id="A32DOYMUN6DTXA",

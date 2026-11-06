@@ -2884,13 +2884,11 @@ that names itself only in a fastboot or a recovery still has to be taken to
 one, and `chainable` then refuses as it always did.
 
 **Two readings a review asked for, and what they changed.** A donut in stock
-fastboot has no stage in `kamakiri_stages` and no prompt in the guidance, so a
-run that met one would print nothing for ten minutes and then give the generic
-timeout. Nothing has code for it, because nothing has reached that state: the
-hold on a stock, locked donut went to the bootrom every try, and whether a
-stock LK offers fastboot at all is unproven. It is written down here rather
-than guessed at, and the first reading of a stock donut in fastboot is what
-would settle the branch.
+fastboot has no stage in `kamakiri_stages`, so a run that met one printed
+nothing for ten minutes and then gave the generic timeout. When this was
+written no stock donut had reached that state, so it was left unhandled until
+a reading settled it. The readings further down did: a late hold reaches it,
+and the run now prompts there.
 
 The privileged call is the other. `sudo -v` caches for five minutes by
 default, and the trigger comes after the button hold and whatever a run still
@@ -2914,14 +2912,68 @@ and the line they wait on names the bootrom and says to keep holding. The
 colour is left out because no reading on a donut says what its ring does
 there.
 
-Whether a stock donut can reach fastboot by the button at all is unproven. On
-2026-11-04, from a donut genuinely restored to stock and locked, repeated
-holds reached the bootrom and gave no green ring and no fastboot. The reading
-above, where the same gesture landed in fastboot on some tries, was taken
-before that restore, on an Echo carrying kaeru, so it says nothing about a
-stock LK. `fastboot_mode` still describes the hold, because `firebreak
-fastboot` on a stock-booted donut has no other way to offer: without root
-there is no adb that can write `misc`.
+A stock donut can land in fastboot from the hold. On 2026-11-04, from a donut
+genuinely restored to stock and locked, repeated holds reached the bootrom and
+gave no green ring and no fastboot. But on 2026-11-05, on Windows, a hold on a
+donut just restored to stock 8349 gave a green ring, and fastboot answered
+`unlock_status: false`, which is the stock LK and not kaeru's. The same day on
+macOS, after another restore to 8349, a hold started a second or two after
+the cable went in reached it on purpose: `unlock_status: false` and
+`lk_build_desc 6f7225e-20230407_013816`, anti-rollback 0x0001 for PL, TEE and
+LK. So a late hold lands there, and a hold from the moment the cable goes in
+reaches the bootrom.
+
+That fastboot is a dead end for the unlock: no route step starts from it,
+because the unlock begins in the bootrom. The run used to treat it as handled,
+print nothing, and fail after 10 minutes with "has been stock fastboot". Now a
+donut in stock fastboot is a state the run waits in, like a stock Fire OS it
+cannot act on, and with no deadline, because only a hold moves it on. Each
+entry checks the Echo is the one the run is for, as a stage would, so a
+biscuit in stock fastboot under `--device donut` is still refused. Each entry
+then says the donut is in its stock fastboot and asks for the bootrom, with the
+password asked first, once, as for every other prompt that leads to the hold.
+
+Nothing from that stock fastboot reaches the bootrom without the hold. Read on
+macOS on 2026-11-05, from stock 8349's LK `6f7225e-20230407_013816` and
+preloader `9eb982d-20231103_081354`, with nothing held:
+
+- `fastboot oem help`, and every `oem` command, answers
+  `the command you input is restricted on locked hw`.
+- `fastboot reboot-bootloader` answers `OKAY`. The preloader's `0e8d:2000`
+  shows for about 2 seconds, then stock fastboot comes back.
+- `fastboot reboot recovery` answers `OKAY`, and the preloader shows for about
+  2 seconds. Then nothing is on USB, which is stock Fire OS with adb off: the
+  donut boots normally, with no sign of a recovery.
+- mtkclient's `crash`, `118a000` of 2026-10-26, catches that preloader window
+  through `reboot-bootloader`. The preloader answers the handshake and names
+  the chip, MT8167/MT8516/MT8362. Then it gives no status to the first
+  register write, to the watchdog at `0x10007000`, so mtkclient stops before it
+  tries any crash. A power cycle brings the donut back, as stock.
+
+So a donut's stock preloader and LK give no more than biscuit's and radar's:
+
+| | biscuit and radar | donut |
+| --- | --- | --- |
+| button at power-on | stock fastboot | the bootrom, held from the start; stock fastboot, held late |
+| bootrom without the button | an erased boot0 or the test point | the same |
+| stock fastboot | where the fastbrick unlocks it | a dead end: no fastbrick exists for this LK |
+| `reboot-bootloader` there | back to stock fastboot | the same |
+| preloader window on each boot | about 0.8 s, read on a radar | about 2 s |
+| mtkclient into the bootrom | all four crashes come back as the preloader | no answer to a register write |
+| locked `oem` commands | `restricted on locked hw` | the same |
+
+What sets the donut apart is the button and the fastbrick. Its hold reaches the
+bootrom, which its unlock needs, and its stock fastboot carries no unlock, so
+the prompt above sends it back to the bootrom and never tries that fastboot.
+
+`fastboot_mode` still describes the hold, because `firebreak fastboot` on a
+stock-booted donut has no other way to offer: without root there is no adb
+that can write `misc`.
+
+`stock` on a donut with nothing to restore names `unlock`, not the amonet v2
+and + button advice the general restore gives. A donut never runs amonet, and
+its unlock starts from the bootrom whether it is stock or an earlier unlock
+lost its root, so that one command covers both.
 
 libusb itself is never bundled: it is a native library, so a run without it
 fails on pyusb's own `NoBackendError`, which `firebreak/mediatek/libusb.py`

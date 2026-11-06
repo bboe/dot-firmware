@@ -61,6 +61,7 @@ from firebreak.ui import (
     amonet_has_no_fastboot,
     clock,
     filled,
+    invocation,
     passed,
     say,
     show,
@@ -320,6 +321,22 @@ def needed(*, start: State, table: dict[State, Stage]) -> list[Need]:
     return list(dict.fromkeys(need for stage in passing for need in stage.needs))
 
 
+def nothing_to_restore(*, device: Device) -> str:
+    lead = (
+        f"This {title()} appears to be on stock Fire OS 6, so there is nothing to"
+        " restore."
+    )
+    if device in KAMAKIRI_UNLOCKS:
+        return (
+            f"{lead} To unlock it, or to unlock it again after an unlock whose root"
+            f" is gone, run {invocation(options=['unlock'])}."
+        )
+    return (
+        f"{lead} However, if you unlocked it with amonet v2, hold its + button"
+        " while you plug it in. That starts its TWRP. Then run this again."
+    )
+
+
 def ota_build() -> None:
     build = ARGUMENTS.build or ARGUMENTS.target.installs.build
     with hold(lock=lock_for(key=build)):
@@ -437,6 +454,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
     since = 0.0
     while True:
         current = state()
+        stranded = current == State.STOCK_FASTBOOT and current not in table
         installed = target.goal == State.UNLOCKED_BOOTED and State.UNLOCKED_TWRP in done
         restored = target.unlock is None and bool(done & TWRPS)
         ahead = AHEAD.get(current)
@@ -553,6 +571,12 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     text=f"This {title()} is in its unlocked fastboot."
                     " Starting its recovery."
                 )
+            elif stranded and target.unlock is not None:
+                check_target(target=target)
+                if not guided:
+                    password_first(device=target.device)
+                guided = True
+                say(text=stock_fastboot_ask(device=target.device))
             elif current == State.EMOS and current not in done:
                 say(
                     text=f"This {title()} runs EchoMuse's emOS. Rebooting it into"
@@ -630,12 +654,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     " does not support."
                 )
             else:
-                say(
-                    text=f"This {title()} appears to run stock Fire OS 6, so there is"
-                    " nothing to restore. However, if you unlocked it with amonet"
-                    " v2, hold its + button while you plug it in. That starts"
-                    " its TWRP. Then run this again."
-                )
+                say(text=nothing_to_restore(device=target.device))
             cache_note()
             return
         if current == target.goal:
@@ -653,10 +672,13 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             or current
             in {State.NONE, State.PRELOADER, State.STOCK_BOOTED, State.STARTING}
             or (current == State.BOOTED and target.unlock is not None)
+            or stranded
         ):
             waits = {State.NONE} if installed else {State.NONE, State.STOCK_BOOTED}
             if restored:
                 waits = set()
+            if stranded:
+                waits.add(current)
             if current not in waits and time.monotonic() > deadline:
                 if restored:
                     raise FatalError(
@@ -764,6 +786,14 @@ def stages() -> dict[State, Stage]:
 def start_prebuild() -> None:
     with contextlib.suppress(RuntimeError):
         PREBUILDER.start()
+
+
+def stock_fastboot_ask(*, device: Device) -> str:
+    return (
+        f"This {title()} is in its stock fastboot. Its unlock starts only in its"
+        " bootrom, so start it in its bootrom. A hold that starts after the cable"
+        " goes in reaches fastboot, so start the hold first.\n\n" + device.short_gesture
+    )
 
 
 def unlock_ask(*, device: Device) -> str:

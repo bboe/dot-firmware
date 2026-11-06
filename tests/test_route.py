@@ -244,6 +244,35 @@ def test_a_browser_download_comes_first(*, monkeypatch: pytest.MonkeyPatch) -> N
     ]
 
 
+def test_a_donut_in_stock_fastboot_is_asked_for_its_bootrom_again(
+    *,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    run: Run,
+) -> None:
+    asked: list[int] = []
+    monkeypatch.setattr(name="ELEVATES", target=route, value=True)
+    monkeypatch.setattr(name="authorized", target=route, value=lambda: asked.append(1))
+    monkeypatch.setattr(
+        name="target", target=route.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
+    )
+    run.tick = route.WAIT
+    run.states = [
+        route.State.STOCK_FASTBOOT,
+        route.State.STOCK_FASTBOOT,
+        route.State.STOCK_FASTBOOT,
+        route.State.NONE,
+        route.State.STOCK_FASTBOOT,
+    ]
+    with pytest.raises(RanOutError):
+        route.root()
+    out = said(capsys=capsys)
+    assert out.count("is in its stock fastboot") == 2
+    assert out.count(" ".join(DONUT.short_gesture.split())) == 2
+    assert asked == [1]
+    assert run.checked == 2
+
+
 def test_a_donut_is_asked_for_its_bootrom_and_for_the_password_first(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -893,6 +922,15 @@ def test_a_stage_counts_its_passes_unless_it_returns_false(
     with pytest.raises(KeyboardInterrupt):
         route.root()
     assert ran == expected
+
+
+def test_a_stock_donut_with_nothing_to_restore_is_told_to_unlock_it() -> None:
+    said = " ".join(route.nothing_to_restore(device=DONUT).split())
+    assert "nothing to restore" in said
+    assert f"run {route.invocation(options=['unlock'])}." in said
+    assert "amonet" not in said
+    assert "+ button" not in said
+    assert "amonet v2" in route.nothing_to_restore(device=BISCUIT)
 
 
 def test_a_stock_fire_os_5_run_ends_after_the_restore(

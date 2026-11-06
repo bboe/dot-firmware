@@ -129,6 +129,14 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- An Echo Dot (3rd Generation) in its stock fastboot is told so at once and
+  asked for its bootrom, with the hold started before the cable goes in.
+  Before, the unlock printed nothing there and stopped after 10 minutes with
+  "has been stock fastboot for 10 minutes", because no step of a donut's
+  unlock starts in fastboot. `firebreak fastboot` tells a donut to start the
+  hold a second or two after the cable goes in, which reaches fastboot, and
+  `stock` on a donut with nothing to restore names `unlock`, not amonet v2
+  and its + button.
 - A write in TWRP that lost its read of where the partition starts waits for
   the Echo to reconnect and reads it again. Before, it took adb's own error as
   the start and stopped the run with a wrong partition table. On Windows,
