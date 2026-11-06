@@ -8,7 +8,6 @@ from firebreak.devices import biscuit, crown, donut, radar
 if TYPE_CHECKING:
     from firebreak.cache import Download
     from firebreak.plugin import Device, FireOs5Chain, Target, Unlock
-    from firebreak.targets import Deprecated
 
 BY_NAME = "/dev/block/platform/mtk-msdc.0/by-name"
 LITTLE_KERNEL_DESCRIPTION = re.compile(pattern=r"[0-9a-f]{7}-\d{8}_\d{6}")
@@ -30,9 +29,6 @@ DEFAULT_BUILDS: dict[Device, str] = {
     config.device: config.default_build
     for config in SUPPORTED
     if config.builds and config.default_build is not None
-}
-DEPRECATED: dict[str, Deprecated] = {
-    name: was for config in SUPPORTED for name, was in config.was_called.items()
 }
 DEVICES = tuple(config.device for config in SUPPORTED)
 FASTBRICKS: dict[Device, Unlock] = {

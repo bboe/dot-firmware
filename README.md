@@ -1,32 +1,29 @@
 # firebreak
 
-firebreak unlocks an Echo Dot (2nd Generation) over USB, moves it between amonet
-targets, or returns it to stock. Run it again with another target to move the
-device. A stopped run picks up where it left off.
+firebreak unlocks and roots an Echo Dot (2nd Generation), an Echo (2nd
+Generation) or an Echo Dot (3rd Generation) over USB, or returns it to stock.
+Run it again with another target to move the device. A stopped run picks up
+where it left off.
 
-Unlocking a stock Dot needs `amonet-biscuit-v2.0.1.zip`, which amonet publishes
-only on
+Unlocking a stock Echo Dot (2nd Generation) needs
+`amonet-biscuit-v2.0.1.zip`, which amonet publishes only on
 [its XDA thread](https://xdaforums.com/t/unlock-root-twrp-unbrick-amazon-echo-dot-2nd-gen-2016-biscuit.4761416/).
 A run downloads it unattended. If that fails, the run says so and opens your
 browser for the thread instead, because the thread itself refuses an
 unattended download. Either way the zip is checked against a pinned hash.
-Moving an already-unlocked Dot between targets
+Moving an already-unlocked Echo Dot (2nd Generation) between targets
 needs that zip too, because the run checks the bootloader against the copy in
-it, and so do the runs that go through the Dot's bootrom: `firebreak bootrom`, a
+it, and so do the runs that go through its bootrom: `firebreak bootrom`, a
 resume after `boot0` was erased, and `stock 5.5.0.3`.
 
 | target | the device ends with | time |
 | --- | --- | --- |
-| `unlock fireos6` (default) | rooted Fire OS 6 [8149][fireos-8149] on amonet v2.0.1, TWRP 3.7.0; also needs `boot-root.zip`. On an Echo (2nd Generation), rooted Fire OS 6 [8149][fireos-radar-8149] on amonet-radar v1.0.1 | about 5 min from `unlock fireos5` |
+| `unlock fireos6` (default) | rooted Fire OS 6 [8149][fireos-8149] on amonet v2.0.1, TWRP 3.7.0; also needs `boot-root.zip`. On an Echo (2nd Generation), rooted Fire OS 6 [8149][fireos-radar-8149] on amonet-radar v1.0.1. On an Echo Dot (3rd Generation), the Fire OS 6 already installed rooted with kamakiri-donut v1.0.0, or Fire OS 6 8349 with `--factory-reset` | about 5 min from `unlock fireos5`; on an Echo Dot (3rd Generation), about 3.5 min from stock |
 | `unlock fireos5` | rooted Fire OS [5.5.5.4][fireos-5554] on amonet v1.1.0, TWRP 3.7.0_9-bboe2 | about 9 min from stock |
-| `stock [BUILD]` | stock Fire OS at that build, with the device erased: Fire OS 6 [8149][fireos-8149] when left out, or Fire OS 5 from [5.5.0.3][fireos-5503] to [5.5.5.4][fireos-5554]. On an Echo (2nd Generation), Fire OS 6 [8149][fireos-radar-8149] when left out, any Fire OS 6 from [4305][fireos-radar-4305] to 8349, or Fire OS [5.5.5.4][fireos-radar-5554] | about 3 min from `unlock fireos5` |
+| `stock [BUILD]` | stock Fire OS at that build, with the device erased: Fire OS 6 [8149][fireos-8149] when left out, or Fire OS 5 from [5.5.0.3][fireos-5503] to [5.5.5.4][fireos-5554]. On an Echo (2nd Generation), Fire OS 6 [8149][fireos-radar-8149] when left out, any Fire OS 6 from [4305][fireos-radar-4305] to 8349, or Fire OS [5.5.5.4][fireos-radar-5554]. On an Echo Dot (3rd Generation), Fire OS 6 8349, with its bootloader locked again | about 3 min from `unlock fireos5` |
 
-`unlock` takes the newest amonet that firebreak supports for that Fire OS, so
-a target no longer names an amonet version. `unlock` with no target takes
-`fireos6`. The older names that carry an amonet version still work and say what
-to use instead; those names go away in firebreak 1.0. Running firebreak with no
-target at all warns which command replaced the old default, and that warning
-goes away then too.
+`unlock` takes the newest unlock that firebreak supports for that Fire OS, so
+a target names no amonet version. `unlock` with no target takes `fireos6`.
 
 ## Run it
 
@@ -44,6 +41,7 @@ These commands use [Homebrew](https://brew.sh). Without it, download Google's
 
 ```sh
 brew install --cask android-platform-tools uv
+brew install libusb               # for an Echo Dot (3rd Generation)
 uvx firebreak@latest unlock       # fireos6
 uvx firebreak@latest stock        # 8149, or name 8344, 8338, 8146, 8142, 8138, 6302, 5041, 4405, 4315, 5.5.5.4, 5.5.5.0, 5.5.4.9, 5.5.4.6, 5.5.3.1, 5.5.0.3
 ```
@@ -55,7 +53,37 @@ These commands are for Debian and Ubuntu. Run firebreak without `sudo`.
 ```sh
 sudo apt install adb fastboot curl libusb-1.0-0
 curl -LsSf https://astral.sh/uv/install.sh | sh
-uvx firebreak@latest
+```
+
+These udev rules let your own user open the Echo in each of its USB modes, so
+firebreak needs no `sudo`. A run that cannot open the Echo prints the same
+commands.
+
+<!-- markdownlint-disable MD013 -->
+```sh
+sudo groupadd -f plugdev
+sudo tee /etc/udev/rules.d/51-echo-dot.rules >/dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTR{idVendor}=="1949", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="4ee2", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", ATTR{idProduct}=="d001", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", ATTR{idProduct}=="0c01", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", ATTR{idProduct}=="0003", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", ATTR{idProduct}=="201c", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0e8d", ATTRS{idProduct}=="0003", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1949", ATTRS{idProduct}=="2007", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+EOF
+sudo udevadm control --reload
+sudo udevadm trigger
+sudo usermod -aG plugdev "$USER"
+adb kill-server
+```
+<!-- markdownlint-enable MD013 -->
+
+Then log in again, so your shell has the `plugdev` group, and run it:
+
+```sh
+uvx firebreak@latest unlock       # fireos6
+uvx firebreak@latest stock        # the device's default build, or name one
 ```
 
 An Echo Dot (3rd Generation) unlocks on Linux with no `sudo`. Linux uses a
@@ -138,10 +166,10 @@ tar -xf $env:TEMP\libusb.7z -C $d VS2022/MS64/dll/libusb-1.0.dll
   in firmly, and try another cable if it fails again.
 - Do not connect a stock device to Wi-Fi before you unlock it. Amazon can
   update it to a build firebreak does not support.
-- `amonet-biscuit-v2.0.1` and `amonet-radar-v1.0.1` root the Fire OS 6 build
-  already installed, and keep the device's Wi-Fi and Alexa setup. Unlock it
-  soon after setup, before it can update. `--factory-reset` erases the device and
-  installs the target's build instead.
+- `amonet-biscuit-v2.0.1`, `amonet-radar-v1.0.1` and `kamakiri-donut-v1.0.0`
+  root the Fire OS 6 build already installed, and keep the device's Wi-Fi and
+  Alexa setup. Unlock it soon after setup, before it can update.
+  `--factory-reset` erases the device and installs the target's build instead.
 - [docs/unlocking.md][unlocking] says why each step is there, and
   [docs/measurements.md][measurements] has the ring through a root and a
   restore, so you can tell where a run has got to.
@@ -247,9 +275,11 @@ any of sixteen stock builds, from Fire OS [5.5.5.4][fireos-radar-5554] to
 Fire OS 6 8349, which amonet-radar v1.0.1 is the first release to
 unlock. Both have run on an Echo. The first boot after
 the root has sometimes shown nothing on USB; the run waits, and after a minute
-it asks for the Echo's power to be unplugged and plugged back in. Every other
-target is for the Echo Dot (2nd Generation). The report is the same on other
-Echo devices and helps add them.
+it asks for the Echo's power to be unplugged and plugged back in. An Echo Dot
+(3rd Generation) takes `unlock fireos6` and `stock`, which returns it to Fire
+OS 6 8349 and locks it again. `unlock fireos5` is for the Echo Dot (2nd
+Generation) alone. The report is the same on other Echo devices and helps add
+them.
 
 `write-test` then tells a failing eMMC from a failing cable. It pushes a
 pattern into the Dot's RAM, then has the Dot write it over its own `cache`

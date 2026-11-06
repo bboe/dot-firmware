@@ -10,7 +10,8 @@ import pytest
 from firebreak import kamakiri_step
 from firebreak.devices import DONUT
 from firebreak.devices.donut import KAMAKIRI_V1_0_0
-from firebreak.mediatek.libusb import NoLibusbError, NotThereError
+from firebreak.host import NO_ACCESS
+from firebreak.mediatek.libusb import NoAccessError, NoLibusbError, NotThereError
 from firebreak.mediatek.usbdl import HandshakeTimeoutError
 from firebreak.ui import FatalError
 
@@ -276,6 +277,21 @@ def test_the_step_names_brew_install_libusb_when_libusb_is_missing(
     monkeypatch.setattr(name="open_bootrom", target=kamakiri_step, value=missing)
     with pytest.raises(expected_exception=FatalError, match="brew install libusb"):
         kamakiri_step.waited(device_code=HARDWARE)
+
+
+def test_the_step_prints_the_udev_rules_when_linux_denies_the_bootrom(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def denied() -> object:
+        message = "libusb cannot open the bootrom it can see: Access denied."
+        raise NoAccessError(message)
+
+    monkeypatch.setattr(name="open_bootrom", target=kamakiri_step, value=denied)
+    with pytest.raises(expected_exception=FatalError) as stopped:
+        kamakiri_step.waited(device_code=HARDWARE)
+    assert stopped.value.message.startswith(NO_ACCESS)
+    assert "sg plugdev -c " in stopped.value.message
+    assert "Access denied." in stopped.value.message
 
 
 def test_the_step_refuses_to_start_without_the_privileged_call(

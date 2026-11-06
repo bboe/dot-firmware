@@ -146,10 +146,10 @@ device's own module is where its next amonet release goes, so a release has no
 file of its own and a constant that two releases would share, such as a zip or
 a TWRP version, says in its name which release it belongs to.
 `firebreak/devices/registry.py` gathers what the core asks for across devices,
-and the package re-exports it, so `DEVICES`, `TARGETS`, `DEPRECATED` and
+and the package re-exports it, so `DEVICES`, `TARGETS` and
 `DEFAULTS` are assembled from each module rather than listed twice. A device
 module declares one `CONFIG`, a `DeviceConfig` that names the device and
-whatever of these it has: `targets`, `was_called`, `default_target`,
+whatever of these it has: `targets`, `default_target`,
 `lk_values`, `builds` and `default_build`, `fireos5_builds`, which of its builds
 are Fire OS 5 and so show nothing on USB once they start, `fastbrick`, the
 unlock whose archive holds its fastbrick payloads, `fireos5_chain`, the earlier

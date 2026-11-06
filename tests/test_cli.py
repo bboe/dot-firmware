@@ -5,11 +5,13 @@ import pathlib
 import re
 import subprocess
 import sys
+import textwrap
 
 import pytest
 
 from firebreak import __version__
 from firebreak.devices import BUILDS
+from firebreak.host import NO_ACCESS
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -101,6 +103,14 @@ def test_the_positional_arguments_are_checked(
     )
     assert finished.returncode == 2
     assert message in finished.stderr
+
+
+def test_the_readme_gives_the_udev_commands_a_run_prints() -> None:
+    commands = NO_ACCESS.split("\n\n")[1]
+    assert f"```sh\n{commands}\n```" in (ROOT / "README.md").read_text()
+    rules = commands.split("<<'EOF'\n")[1].split("\nEOF")[0]
+    unlocking = (ROOT / "docs" / "unlocking.md").read_text()
+    assert textwrap.indent(rules, "  ") in unlocking
 
 
 def test_the_wheel_takes_its_version_from_the_package() -> None:

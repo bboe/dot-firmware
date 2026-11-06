@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from firebreak import bootrom
 from firebreak.bootrom_step import bootloader_plan, unwritten
 from firebreak.emmc import EmmcArea
-from firebreak.host import getvar, in_fastboot
+from firebreak.host import NO_ACCESS, getvar, in_fastboot, rerun
 from firebreak.kamakiri.donut_v1_0_0 import (
     STAGE1_SHA256,
     Client,
@@ -17,6 +17,7 @@ from firebreak.kamakiri.donut_v1_0_0 import (
 )
 from firebreak.mediatek import kamakiri
 from firebreak.mediatek.libusb import (
+    NoAccessError,
     NoLibusbError,
     NoPyusbError,
     NotPermittedError,
@@ -115,6 +116,10 @@ def check_device_type(*, live: Client, unlock: Unlock) -> None:
 def checked_bootrom(*, device_code: int | None) -> Bootrom:
     try:
         port = open_bootrom()
+    except NoAccessError as error:
+        raise FatalError(
+            message=f"{NO_ACCESS}{rerun()}\n\n{error} {unwritten()}"
+        ) from error
     except (NoLibusbError, NoPyusbError, NotPermittedError) as error:
         raise FatalError(message=f"{error} {unwritten()}") from error
     SESSION.raw_usb = True

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import errno
 import functools
 import subprocess
 import sys
@@ -53,6 +54,10 @@ class NoPyusbError(UsbdlError):
 
 
 class NotPermittedError(UsbdlError):
+    pass
+
+
+class NoAccessError(NotPermittedError):
     pass
 
 
@@ -190,9 +195,7 @@ def detached(*, core: Any, device: Any, interface: int) -> None:  # ruff: ignore
     except core.core.USBError as error:
         message = (
             "the kernel holds the interface libusb needs to reach the bootrom,"
-            f" and firebreak cannot take it: {error}. On Linux the udev rules"
-            " from https://github.com/bboe/firebreak#linux give this user that"
-            " access."
+            f" and firebreak cannot take it: {error}."
         )
         raise NotPermittedError(message) from error
 
@@ -217,15 +220,13 @@ def endpoints(*, device: Any) -> tuple[Any, Any, Any]:  # ruff: ignore[any-type]
     try:
         configuration = configured(core=core, device=device)
     except core.core.USBError as error:
-        message = f"libusb cannot open the bootrom it can see: {error}." + (
-            " On Windows UsbDk takes it from its serial driver, and the steps at"
-            " https://github.com/bboe/firebreak#windows install it."
-            if USBDK
-            else " On Linux the udev rules from https://github.com/bboe/firebreak#linux"
-            " give this user access to it, and a run needs no root with them in"
-            " place."
-        )
-        raise NotPermittedError(message) from error
+        message = f"libusb cannot open the bootrom it can see: {error}."
+        if USBDK:
+            message += (
+                " On Windows UsbDk takes it from its serial driver, and the steps"
+                " at https://github.com/bboe/firebreak#windows install it."
+            )
+        raise refusal(error=error, message=message) from error
     data = core.util.find_descriptor(configuration, bInterfaceClass=CDC_DATA_CLASS)
     if data is None:
         message = "the bootrom offers no CDC data interface"
@@ -297,6 +298,13 @@ def pyusb() -> Any:  # ruff: ignore[any-type]
         )
         raise NoPyusbError(message) from error
     return types.SimpleNamespace(core=core, util=util)
+
+
+def refusal(*, error: Exception, message: str) -> NotPermittedError:
+    denied = getattr(error, "errno", None) == errno.EACCES
+    if denied and sys.platform.startswith("linux"):
+        return NoAccessError(message)
+    return NotPermittedError(message)
 
 
 def sudo_python() -> list[str]:

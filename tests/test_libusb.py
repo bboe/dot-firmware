@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import sys
 import types
 from typing import TYPE_CHECKING, Any
@@ -472,6 +473,23 @@ def test_open_bootrom_lets_go_of_a_device_it_cannot_use(
     assert device.disposed
 
 
+def test_open_bootrom_names_a_bootrom_gone_from_usb_without_the_udev_rules(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def gone(**_: object) -> object:
+        raise FakeUsbError(
+            errno.ENODEV, "No such device (it may have been disconnected)"
+        )
+
+    device = FakeDevice()
+    monkeypatch.setattr(name="get_active_configuration", target=device, value=gone)
+    patch_usb(device=device, monkeypatch=monkeypatch)
+    monkeypatch.setattr(name="platform", target=sys, value="linux")
+    with pytest.raises(libusb.NotPermittedError, match="No such device") as stopped:
+        libusb.open_bootrom()
+    assert not isinstance(stopped.value, libusb.NoAccessError)
+
+
 def test_open_bootrom_on_windows_points_at_usbdk_when_it_cannot_open(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -527,14 +545,18 @@ def test_open_bootrom_says_when_libusb_may_not_open_what_it_sees(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def denied(**_: object) -> object:
-        message = "[Errno 13] Access denied (insufficient permissions)"
-        raise FakeUsbError(message)
+        raise FakeUsbError(errno.EACCES, "Access denied (insufficient permissions)")
 
     device = FakeDevice()
     monkeypatch.setattr(name="get_active_configuration", target=device, value=denied)
     patch_usb(device=device, monkeypatch=monkeypatch)
-    with pytest.raises(expected_exception=libusb.NotPermittedError, match="udev rules"):
+    monkeypatch.setattr(name="platform", target=sys, value="linux")
+    with pytest.raises(expected_exception=libusb.NoAccessError, match="Access denied"):
         libusb.open_bootrom()
+    monkeypatch.setattr(name="platform", target=sys, value="darwin")
+    with pytest.raises(libusb.NotPermittedError, match="Access denied") as stopped:
+        libusb.open_bootrom()
+    assert not isinstance(stopped.value, libusb.NoAccessError)
 
 
 def test_open_bootrom_says_when_nothing_answers(
@@ -553,8 +575,10 @@ def test_open_bootrom_says_when_the_kernel_will_not_let_the_interface_go(
     device.refuse_detach = True
     monkeypatch.setattr(name="ELEVATES", target=libusb, value=False)
     patch_usb(device=device, interface=interface, monkeypatch=monkeypatch)
-    with pytest.raises(expected_exception=libusb.NotPermittedError, match="udev rules"):
+    monkeypatch.setattr(name="platform", target=sys, value="linux")
+    with pytest.raises(libusb.NotPermittedError, match="Resource busy") as stopped:
         libusb.open_bootrom()
+    assert not isinstance(stopped.value, libusb.NoAccessError)
 
 
 def test_open_bootrom_takes_both_interfaces_where_no_helper_sends_the_trigger(

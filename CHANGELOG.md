@@ -59,6 +59,17 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- README, the package description and the contributor notes name all three
+  Echoes firebreak supports, not only the Echo Dot (2nd Generation), and the
+  README's target table gives an Echo Dot (3rd Generation)'s results. README
+  also says what each host needs that it left out: `brew install libusb` on
+  macOS for a donut's bootrom, and on Linux the udev rules and `plugdev` group
+  that let a user run firebreak without `sudo`, the same commands a run prints
+  when it cannot open the Echo.
+- A donut's bootrom that Linux denies libusb, by `EACCES`, prints
+  those udev commands, as every other refused USB open does. Before, it
+  pointed at a README section that held no rules. A busy interface or a
+  bootrom gone from USB names its own error and no udev rules.
 - A run that stops while boot0 holds no preloader says what to do if the
   next run fails the same way: unplug the Echo, run firebreak again, then plug
   it into another USB port, best a USB 3 port on the computer itself. A TWRP
@@ -97,6 +108,12 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Removed
 
+- The target names that carried an amonet version, `amonet-biscuit-v1.1.0`,
+  `amonet-biscuit-v1.1.0-bboe` and `amonet-biscuit-v2.0.0`, as the README
+  promised for 1.0. Use `firebreak unlock fireos5` or `firebreak unlock
+  fireos6`. A plugin's `DeviceConfig` loses `was_called` with them. A run with
+  no command prints the help and no longer warns which command replaced the
+  old default.
 - `firebreak.pyz`. A release now carries the wheel and the sdist alone, and
   `uvx firebreak@latest` is the one way to run it. Nothing is known to have
   used the pyz, and it cost more than it paid for: because a zipapp carries no

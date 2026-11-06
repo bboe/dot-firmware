@@ -24,7 +24,7 @@ from firebreak.plugin import (
     ZeroRpmb,
 )
 from firebreak.states import State
-from firebreak.targets import FIREOS5, FIREOS6, STOCK, Deprecated
+from firebreak.targets import FIREOS5, FIREOS6, STOCK
 from firebreak.updates import cdn_ota
 
 AMONET_V1_1_0_LK = "f379dba-20170906_000423"
@@ -328,18 +328,4 @@ CONFIG = DeviceConfig(
             unlock=UNLOCK_TO_FIREOS6,
         ),
     ),
-    was_called={
-        "amonet-biscuit-v1.1.0": Deprecated(
-            device=BISCUIT,
-            name=FIREOS5,
-            note=f"It now installs TWRP {BBOE_TWRP_VERSION} rather than amonet's own"
-            " TWRP 3.2.3.",
-        ),
-        "amonet-biscuit-v1.1.0-bboe": Deprecated(device=BISCUIT, name=FIREOS5),
-        "amonet-biscuit-v2.0.0": Deprecated(
-            device=BISCUIT,
-            name=FIREOS6,
-            note="It now writes amonet v2.0.1, whose kaeru boots the active slot.",
-        ),
-    },
 )

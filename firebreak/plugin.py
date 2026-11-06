@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
     from firebreak.cache import Download
     from firebreak.plan import Action
-    from firebreak.targets import Deprecated
 
 BOOT0 = "boot0"
 
@@ -53,7 +52,6 @@ class DeviceConfig:
     kamakiri_unlock: Unlock | None = None
     lk_values: frozenset[str] = frozenset()
     targets: tuple[Target, ...] = ()
-    was_called: dict[str, Deprecated] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)

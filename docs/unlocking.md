@@ -2326,9 +2326,15 @@ the endpoints over anyway, which is why three months of readings on one host
 never saw this. So `open_bootrom` now calls `detached` first, which asks
 whether a kernel driver holds the data interface and detaches it if so.
 `NotImplementedError` means a platform that does not do this, which is every
-platform but Linux, and a `USBError` from the detach itself becomes a refusal
-naming the udev rules. Nothing was written when it failed, because the
-handshake comes first.
+platform but Linux, and a `USBError` from the detach itself becomes a refusal.
+That refusal names its own error and no udev rules. A missing rule never
+reaches the detach: pyusb opens the device to read its configuration, in
+`endpoints`, and an access denial fails there first. libusb's Linux detach
+also gives every errno but `ENODEV` and `EINVAL` as `LIBUSB_ERROR_OTHER`, which
+pyusb passes on with no errno, so a busy interface or a bootrom gone from USB
+is all a detach can report. udev commands there would send the user after
+the wrong fault, as the serial port's `EBUSY` once did. Nothing was written
+when it failed, because the handshake comes first.
 
 The error that reached the user was correct and useless: `[Errno 16] Resource
 busy` through the generic `did not answer as one`. A reading on a second
@@ -2892,9 +2898,12 @@ has to download, which can be longer. So `authorized` is called again once the
 bootrom has answered, which is silent inside the window and, past it, prompts
 between steps rather than over a spinner or mid-hold. And `endpoints` now
 turns the `USBError` that libusb raises for a device it may see but not open
-into a refusal naming the udev rules: on Linux nothing elevates, so that is
-the ordinary way a missing rule shows, and it used to reach the user as a
-traceback.
+into a refusal: on Linux nothing elevates, so an `EACCES` there, which pyusb
+gives for `LIBUSB_ERROR_ACCESS`, is the ordinary way a missing rule shows, and
+it used to reach the user as a traceback. Only that one prints the rules and
+the `sg plugdev` rerun that every other refused open prints; any other errno
+names its own error. Off Linux the rules do not apply, and Windows names
+UsbDk instead.
 
 **A donut is asked for its bootrom, not for fastboot.** The two prompts that
 guide an unlock named `fastboot_mode` and offered a green ring to wait for,
