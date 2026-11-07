@@ -21,6 +21,9 @@ This project adheres to [Semantic Versioning](https://semver.org).
   longer lists Fire TV's `amzdigital-a.akamaihd.com`.
 - `--help` names all three Echoes, and its description is shorter.
 - `--credits` ends its help in "and exit", as `--help` and `--version` do.
+- Support moved to `#echo-support` in the
+  [0x7E Labs Discord](https://discord.gg/huE5XhWbsz): the README, `report`
+  and a failed run's advice name it.
 
 ### Fixed
 

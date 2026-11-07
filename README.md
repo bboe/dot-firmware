@@ -236,8 +236,8 @@ Run `firebreak COMMAND --help` for what that command takes.
 ## Reporting a problem
 
 When a run fails, run `uvx firebreak@latest report`. Then go to
-`#support-device-unlocking` in the
-[EchoMuse Discord](https://discord.gg/vAPHMDvREG) and paste what it prints. It
+`#echo-support` in the
+[0x7E Labs Discord](https://discord.gg/huE5XhWbsz) and paste what it prints. It
 writes no partition.
 
 ## Credits

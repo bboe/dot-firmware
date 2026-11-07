@@ -31,8 +31,8 @@ RELEASES = "https://github.com/bboe/firebreak/releases/latest"
 SPINNER = "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
 SUPPORT = (
     "If you are troubleshooting a problem and would like help, please stop by"
-    " #support-device-unlocking in the EchoMuse Discord,"
-    " https://discord.gg/vAPHMDvREG, and paste everything below."
+    " #echo-support in the 0x7E Labs Discord,"
+    " https://discord.gg/huE5XhWbsz, and paste everything below."
 )
 UVX = ["uvx", "firebreak@latest"]
 WAIT = 600
@@ -176,8 +176,8 @@ def amonet_has_no_fastboot() -> str:
 def asked_for() -> str:
     return (
         f"If it fails the same way, run {invocation(options=['report'])} and"
-        " paste what it prints in #support-device-unlocking in the EchoMuse"
-        f" Discord, https://discord.gg/vAPHMDvREG: it says what this {title()}'s eMMC"
+        " paste what it prints in #echo-support in the 0x7E Labs Discord,"
+        f" https://discord.gg/huE5XhWbsz: it says what this {title()}'s eMMC"
         f" and partitions are. {invocation(options=['write-test'])} then tells"
         " a failing card from a failing cable."
     )

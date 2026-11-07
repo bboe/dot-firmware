@@ -94,7 +94,7 @@ def test_asked_for_names_the_report_as_this_run_was_started(
     monkeypatch.setattr(name="executable", target=sys, value="/usr/bin/python3")
     said = ui.asked_for()
     assert "run python3 -m firebreak report and paste" in said
-    assert "#support-device-unlocking in the EchoMuse Discord" in said
+    assert "#echo-support in the 0x7E Labs Discord" in said
     assert "python3 -m firebreak write-test then tells" in said
 
 
