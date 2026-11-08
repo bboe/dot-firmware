@@ -80,6 +80,9 @@ def patched(
     monkeypatch.setattr(name="open_bootrom", target=kamakiri_step, value=open_bootrom)
     monkeypatch.setattr(name="authorize", target=kamakiri_step, value=lambda: permitted)
     monkeypatch.setattr(
+        name="authorized_already", target=kamakiri_step, value=lambda: permitted
+    )
+    monkeypatch.setattr(
         name="Bootrom", target=kamakiri_step, value=lambda **_: made[-1]
     )
     monkeypatch.setattr(name="sleep", target=kamakiri_step.time, value=lambda _: None)
@@ -300,6 +303,34 @@ def test_the_step_refuses_to_start_without_the_privileged_call(
     patched(bootroms=[], monkeypatch=monkeypatch, permitted=False)
     with pytest.raises(expected_exception=FatalError, match="sudo refused"):
         kamakiri_step.kamakiri_step(source=pathlib.Path(), unlock=KAMAKIRI_V1_0_0)
+
+
+@pytest.mark.parametrize(
+    ("cached", "explained", "says"),
+    [(False, False, True), (True, False, False), (False, True, False)],
+)
+def test_the_step_says_why_before_sudo_asks(
+    *,
+    cached: bool,
+    capsys: pytest.CaptureFixture[str],
+    explained: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    says: bool,
+) -> None:
+    patched(bootroms=[], monkeypatch=monkeypatch)
+    monkeypatch.setattr(
+        name="authorized_already", target=kamakiri_step, value=lambda: cached
+    )
+    asked: list[int] = []
+    monkeypatch.setattr(
+        name="authorize", target=kamakiri_step, value=lambda: asked.append(1) or True
+    )
+    kamakiri_step.authorized(explained=explained)
+    said = capsys.readouterr().out
+    out = " ".join(said.split())
+    assert ("so sudo asks for your password now" in out) is says
+    assert asked == ([] if cached else [1])
+    assert said.endswith("\n\n") is not cached
 
 
 def test_waiting_forgets_the_handshake_when_the_echo_goes_away(

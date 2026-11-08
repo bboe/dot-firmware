@@ -1644,6 +1644,24 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   again.
 - Stock Fire OS 5 shows nothing on USB once it starts, so a Fire OS 5 restore
   ends after the reboot.
+- donut's 1895 starts with adb off: its ramdisk sets
+  `persist.sys.usb.config=none`, where every later donut build sets `adb`.
+  On 2026-11-07 a restored 1895 came up on USB as `0e8d:2008`, with MTP and HID
+  interfaces and no adb, and the restore waited 15 minutes for an adb that
+  never came. So a build in `adb_off_builds` ends after the reboot too.
+- Stock Fire OS 6 turns adb off during its first boot. On a donut,
+  2026-11-08, stock 8344 came up as `unauthorized` on its first boot, and
+  after one power cycle showed nothing on USB. TWRP then read `none` in
+  `/data/property/persist.sys.usb.config`, which overrides the ramdisk's
+  `adb` on every later boot. What writes it is not known. So an Echo
+  power-cycled during its first boot never shows the restore it finished,
+  as 8142 did on 2026-11-08. A restore that sees nothing on USB for 5
+  minutes after the reboot into Fire OS ends there: its writes all verified
+  before it. A restore left in fastboot still fails, because fastboot shows
+  on USB and a silent one means fastboot never came up.
+  The unlock is unaffected. Stock sets `ro.adb.secure=1`, so firebreak
+  cannot use stock's adb anyway, and every unlock from stock starts with
+  the button hold.
 - Measured on a Dot, 2026-10-13: each Fire OS 5 build restored in about
   2.5 min, then read locked with its own `lk_build_desc`, and unlocked again.
 - Measured on a Dot, 2026-10-14: 5.5.0.3 restored from amonet v2.0.0 in
@@ -1830,6 +1848,13 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   waits for the Echo to reconnect and is read again, up to 3 times, as the
   table and block-device reads are. Only a whole answer that differs is a
   wrong table.
+- A push to a partition's node also gets 3 tries, with a wait for the Echo to
+  reconnect between them. On a donut, 2026-11-07, `stock 6009` pushed the
+  whole 1 GiB `system` image to `system_b` and then lost adb's reply:
+  `failed to read copy response: EOF`. The run stopped, and a rerun wrote the
+  same image cleanly. A push that fails part way leaves a partial image, which
+  the next try overwrites from its start, and the md5 read-back after the
+  last push decides.
 - boot0 is the one write whose read-back names the node it wrote, so there a
   regular file would match itself and pass. Hence the check that it is a block
   device. For the same reason the cleared header is counted twice, bytes read
@@ -2974,6 +2999,18 @@ note is skipped where `ELEVATES` is false, because Linux is covered by the
 udev rules and is never asked. A blank line goes either side of the prompt,
 because sudo writes `Password:` to the terminal itself and nothing else would
 separate it from the text around it.
+
+**A run that starts at the bootrom gets the sentence from the step.**
+`password_first` runs only where the route asks for a gesture, so a run that
+found the Echo already in its bootrom, as after a restore that stopped with
+boot0 cleared, reached `kamakiri_step` with nothing said. On 2026-11-07 that
+run printed a bare `Password:` mid-run, and it was stopped there with Ctrl-C,
+which sudo reports as `a password is required`. So `authorized` says why
+itself, unless `password_first` already has or `sudo -n -v` shows the
+credentials are still cached, so a prompt never arrives alone. It also writes
+the blank lines around the prompt, so every prompt gets them. The second call,
+after the bootrom answers, counts as explained: the button is held by then,
+and only an unlock that waited past sudo's 5-minute cache prompts there.
 
 **What a guided unlock prints was read back from a run and cut.** Four lines
 went, each for a reason worth keeping:

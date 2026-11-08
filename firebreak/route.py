@@ -19,6 +19,7 @@ from firebreak.cache import (
     unpack,
 )
 from firebreak.devices import (
+    ADB_OFF_BUILDS,
     BOOTROM_UNLOCKS,
     BUILDS,
     FASTBRICKS,
@@ -105,6 +106,7 @@ NO_FASTBOOT_DRIVER = (
 )
 POWER_CYCLE = 60
 RESTARTS = 5
+STOCK_QUIET = 5 * MINUTE
 TWRPS = frozenset({
     State.AMONET_FIREOS5_TWRP,
     State.UNLOCKED_TWRP,
@@ -352,9 +354,7 @@ def password_first(*, device: Device) -> None:
         " password here rather than while the button is held. Nothing is"
         " written yet, and nothing else in the run asks again."
     )
-    show(text="")
-    authorized()
-    show(text="")
+    authorized(explained=True)
 
 
 def power_cycle() -> str:
@@ -613,7 +613,8 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             current in {State.STOCK_BOOTED, State.STOCK_FASTBOOT}
             or (
                 restored
-                and ARGUMENTS.build in FIREOS5_BUILDS[target.device]
+                and ARGUMENTS.build
+                in FIREOS5_BUILDS[target.device] | ADB_OFF_BUILDS[target.device]
                 and current not in TWRPS
             )
         ):
@@ -645,6 +646,17 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                         f" so firebreak does not wait for it. Keep the {title()}"
                         " plugged in until the orange ring circles or it speaks"
                         ' "Hello, your device is now ready".'
+                    )
+                elif ARGUMENTS.build in ADB_OFF_BUILDS[target.device]:
+                    passed(
+                        message=f"Stock {ARGUMENTS.build} is written, and the {title()}"
+                        " is rebooting into it."
+                    )
+                    say(
+                        text=f"Stock {ARGUMENTS.build} starts with adb off, so"
+                        " firebreak cannot see it finish starting and does not"
+                        f" wait for it. Keep the {title()} plugged in for a few"
+                        " minutes while it starts."
                     )
                 else:
                     passed(message=f"The {title()} runs stock {ARGUMENTS.build}.")
@@ -679,6 +691,27 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 waits = set()
             if stranded:
                 waits.add(current)
+            if (
+                restored
+                and current == State.NONE
+                and not ends_in_fastboot()
+                and time.monotonic() - since > STOCK_QUIET
+            ):
+                PROGRESS.end()
+                passed(
+                    message=f"Stock {ARGUMENTS.build} is written and verified, and"
+                    f" the {title()} rebooted into it."
+                )
+                say(
+                    text=f"The {title()} has shown nothing on USB for"
+                    f" {STOCK_QUIET // MINUTE} minutes since. Stock turns adb off"
+                    " during its first boot, so an Echo power-cycled during that boot"
+                    " shows nothing on USB from then on, and firebreak stops"
+                    " waiting. Keep it plugged in until its ring shows it has"
+                    " started."
+                )
+                cache_note()
+                return
             if current not in waits and time.monotonic() > deadline:
                 if restored:
                     raise FatalError(

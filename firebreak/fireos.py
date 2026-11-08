@@ -338,13 +338,13 @@ def installed_build(*, slot: str) -> str:
     ).split(sep="\n")
     if said[-1:] != [BUILD_OK]:
         raise FatalError(
-            message=f"the {title()} did not say which Fire OS slot {slot} holds; it"
-            " was not modified. " + again()
+            message=f"the {title()} did not say which Fire OS slot {slot} holds;"
+            " its Fire OS and data are as they were. " + again()
         )
     if MOUNT_OK not in said:
         raise FatalError(
             message=f"the {title()} did not mount slot {slot}'s system, so this run"
-            f" cannot tell what it holds; the {title()} was not modified. "
+            " cannot tell what it holds; its Fire OS and data are as they were. "
             + again()
             + " A slot that never mounts needs --factory-reset, which installs Fire"
             f" OS 6 {ARGUMENTS.target.installs.build} without reading it."
@@ -358,8 +358,8 @@ def installed_build(*, slot: str) -> str:
     if build not in BUILDS[ARGUMENTS.target.device]:
         raise FatalError(
             message=f"slot {slot} holds {name}, a Fire OS 6 build firebreak does not"
-            f" know, so it does not patch it; the {title()} was not modified. Run"
-            f" again with --factory-reset to erase it and install Fire OS 6"
+            " know, so it does not patch it; its Fire OS and data are as they were."
+            f" Run again with --factory-reset to erase it and install Fire OS 6"
             f" {ARGUMENTS.target.installs.build}."
         )
     return build

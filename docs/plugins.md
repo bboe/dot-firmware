@@ -151,7 +151,9 @@ and the package re-exports it, so `DEVICES`, `TARGETS` and
 module declares one `CONFIG`, a `DeviceConfig` that names the device and
 whatever of these it has: `targets`, `default_target`,
 `lk_values`, `builds` and `default_build`, `fireos5_builds`, which of its builds
-are Fire OS 5 and so show nothing on USB once they start, `fastbrick`, the
+are Fire OS 5 and so show nothing on USB once they start, `adb_off_builds`,
+the Fire OS 6 builds that start with adb off, which a restore does not wait
+for either, `fastbrick`, the
 unlock whose archive holds its fastbrick payloads, `fireos5_chain`, the earlier
 amonet it can be on, `bootrom_unlock`, the chain to write to an Echo held in
 its bootrom, and `kamakiri_unlock`, the unlock that starts in the bootrom.

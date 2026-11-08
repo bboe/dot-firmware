@@ -407,8 +407,10 @@ def test_fire_os_6_leaves_a_slot_it_cannot_patch_alone(
 ) -> None:
     monkeypatch.setattr(name="factory_reset", target=fireos.ARGUMENTS, value=False)
     adb.answers["build-ok"] = [said]
-    with pytest.raises(FatalError, match=stops):
+    with pytest.raises(FatalError, match=stops) as stopped:
         fireos.stage_install_fireos6()
+    assert "its Fire OS and data are as they were" in stopped.value.message
+    assert "not modified" not in stopped.value.message
     assert pushed == []
     assert adb.commands(holding="twrp wipe") == []
 

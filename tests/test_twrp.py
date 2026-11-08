@@ -467,6 +467,22 @@ def test_a_write_by_partition_is_pushed_to_its_node(
     assert ["adb", "push", str(image), f"{twrp.DISK}p7"] in adb.asked
 
 
+def test_a_write_by_partition_pushes_again_after_a_lost_reply(
+    *, adb: FakeAdb, image: pathlib.Path
+) -> None:
+    adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
+    adb.answers["/start"] = [f"8 {twrp.START_OK}"]
+    adb.answers[f"{twrp.DISK}p7"] = [
+        (1, "adb: error: failed to read copy response: EOF"),
+        (0, "1 file pushed"),
+    ]
+    adb.answers["flushed"] = ["flushed"]
+    twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    pushes = [words for words in adb.asked if words[1] == "push"]
+    assert len(pushes) == 2
+    assert len(adb.commands(holding="wait-for-recovery")) == 1
+
+
 def test_a_write_by_partition_reads_a_lost_start_again(
     *, adb: FakeAdb, image: pathlib.Path
 ) -> None:
@@ -484,8 +500,10 @@ def test_a_write_by_partition_that_push_refuses_stops_it(
     adb.answers["md5sum"] = [md5(data=b"old")]
     adb.answers["/start"] = [f"8 {twrp.START_OK}"]
     adb.answers[f"{twrp.DISK}p7"] = [(1, "remote write failed")]
-    with pytest.raises(FatalError, match="remote write failed"):
+    with pytest.raises(FatalError, match=r"(?s)failed 3 times.*remote write failed"):
         twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    pushes = [words for words in adb.asked if words[1] == "push"]
+    assert len(pushes) == twrp.PUSH_TRIES
 
 
 def test_a_write_by_partition_whose_start_never_answers_stops_it(

@@ -61,6 +61,19 @@ This project adheres to [Semantic Versioning](https://semver.org).
 - A Fire OS 5 root blocks `amzdigitaldownloads.edgesuite.net`, where a 2016
   Dot downloaded its OTA. The hosts file named
   `amzndigitaldownloads.edgesuite.net`, which does not exist.
+- `stock` tries a partition write up to 3 times, waiting for the Echo to
+  reconnect between tries, where one lost reply from adb stopped the run.
+- `stock 1895` on an Echo Dot (3rd Generation) ends once the Echo reboots,
+  because that build starts with adb off and the run waited for it forever.
+- `stock` ends once its Echo has shown nothing on USB for 5 minutes after
+  the reboot, where it waited 10 and then failed. Stock turns adb off
+  during its first boot, so an Echo power-cycled then never shows again.
+- An unlock that stops on the installed Fire OS 6 build says that Fire OS and
+  its data are as they were, where it said the Echo was not modified after
+  writing its bootloaders and TWRP.
+- An Echo Dot (3rd Generation) unlock that starts with the Echo already in
+  its bootrom says why before sudo asks for a password, where it asked with
+  no word of explanation.
 
 ## 1.0.0 - 2026-11-05
 

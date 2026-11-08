@@ -5,6 +5,7 @@ from firebreak.devices.crown import CROWN
 from firebreak.devices.donut import DONUT
 from firebreak.devices.radar import RADAR
 from firebreak.devices.registry import (
+    ADB_OFF_BUILDS,
     BOOTROM_UNLOCKS,
     BUILDS,
     BY_NAME,
@@ -21,6 +22,7 @@ from firebreak.devices.registry import (
 )
 
 __all__ = [
+    "ADB_OFF_BUILDS",
     "BISCUIT",
     "BOOTROM_UNLOCKS",
     "BUILDS",

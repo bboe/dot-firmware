@@ -222,6 +222,7 @@ KAMAKIRI_V1_0_0 = Unlock(
     version="1.0.0",
 )
 CONFIG = DeviceConfig(
+    adb_off_builds=frozenset({"1895"}),
     builds=BUILDS,
     default_build=DEFAULT_BUILD,
     default_target=FIREOS6,

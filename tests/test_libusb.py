@@ -317,6 +317,24 @@ def test_authorize_asks_sudo_only_where_the_trigger_needs_it(
     assert asked == [["sudo", "-v"]]
 
 
+def test_authorized_already_asks_sudo_without_a_prompt(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[list[str]] = []
+
+    def run(arguments: list[str], **_: object) -> object:
+        asked.append(arguments)
+        return types.SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr(name="run", target=libusb.subprocess, value=run)
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=False)
+    assert libusb.authorized_already() is True
+    assert asked == []
+    monkeypatch.setattr(name="ELEVATES", target=libusb, value=True)
+    assert libusb.authorized_already() is False
+    assert asked == [["sudo", "-n", "-v"]]
+
+
 def test_chunked_never_yields_more_than_the_transfer_limit() -> None:
     chunks = list(libusb.chunked(data=bytes(0x9000), limit=0x40))
     assert len(chunks) == 3

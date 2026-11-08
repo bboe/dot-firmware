@@ -42,6 +42,7 @@ class Device:
 @dataclasses.dataclass(frozen=True)
 class DeviceConfig:
     device: Device
+    adb_off_builds: frozenset[str] = frozenset()
     bootrom_unlock: Unlock | None = None
     builds: dict[str, Download] = dataclasses.field(default_factory=dict)
     default_build: str | None = None

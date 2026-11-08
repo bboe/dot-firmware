@@ -143,6 +143,16 @@ def authorize() -> bool:
     )
 
 
+def authorized_already() -> bool:
+    return (
+        not ELEVATES
+        or subprocess.run(
+            ["sudo", "-n", "-v"], capture_output=True, check=False
+        ).returncode
+        == 0
+    )
+
+
 @functools.cache
 def backend() -> Any:  # ruff: ignore[any-type]
     if not USBDK:

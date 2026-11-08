@@ -23,6 +23,7 @@ from firebreak.mediatek.libusb import (
     NotPermittedError,
     NotThereError,
     authorize,
+    authorized_already,
     open_bootrom,
 )
 from firebreak.mediatek.usbdl import (
@@ -39,6 +40,8 @@ from firebreak.ui import (
     FatalError,
     again,
     asked_for,
+    say,
+    show,
     title,
 )
 
@@ -63,8 +66,19 @@ def answered(*, device_code: int | None) -> Bootrom | None:
         return None
 
 
-def authorized() -> None:
-    if not authorize():
+def authorized(*, explained: bool = False) -> None:
+    if authorized_already():
+        return
+    if not explained:
+        say(
+            text=f"Unlocking this {title()} needs one privileged USB call, the one"
+            " that starts its unlock running in its bootrom, so sudo asks for your"
+            " password now. Nothing is written yet."
+        )
+    show(text="")
+    granted = authorize()
+    show(text="")
+    if not granted:
         raise FatalError(
             message="this run needs one privileged USB call to start the unlock's"
             " payload, and sudo refused. Nothing was written."
@@ -176,7 +190,7 @@ def kamakiri_step(*, source: pathlib.Path, unlock: Unlock) -> bool:
     authorized()
     PROGRESS.begin(estimate="40 s", label="waiting for the bootrom")
     client = waited(device_code=unlock.device.hardware_code)
-    authorized()
+    authorized(explained=True)
     live = exploited(client=client, source=source)
     check_device_type(live=live, unlock=unlock)
     actions = bootrom.check(

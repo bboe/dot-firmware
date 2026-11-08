@@ -198,6 +198,18 @@ def partitions() -> dict[str, tuple[int, int, int]]:
     return found
 
 
+def push_to_node(*, label: str, node: str, path: pathlib.Path) -> None:
+    for attempt in range(PUSH_TRIES):
+        pushed = run(arguments=["adb", "push", path, node], timeout=1800)
+        if pushed.returncode == 0:
+            return
+        if attempt + 1 < PUSH_TRIES:
+            reconnect(remote=node)
+    raise FatalError(
+        message=f"{label} failed {PUSH_TRIES} times; do not reboot:\n{pushed.stdout}"
+    )
+
+
 def read_sectors(*, count: int, start: int) -> bytes:
     raw = command(
         arguments=[
@@ -403,9 +415,7 @@ def write(
                 message=f"{DISK}p{number} starts at {start}, not {sector},"
                 " so the running partition table is not the one this expects"
             )
-        pushed = run(arguments=["adb", "push", path, f"{DISK}p{number}"], timeout=1800)
-        if pushed.returncode != 0:
-            raise FatalError(message=f"{label} failed; do not reboot:\n{pushed.stdout}")
+        push_to_node(label=label, node=f"{DISK}p{number}", path=path)
     else:
         staged = DOT_TEMPORARY_DIRECTORY / path.name
         pushed = run(arguments=["adb", "push", path, staged], timeout=120)

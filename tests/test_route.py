@@ -252,7 +252,9 @@ def test_a_donut_in_stock_fastboot_is_asked_for_its_bootrom_again(
 ) -> None:
     asked: list[int] = []
     monkeypatch.setattr(name="ELEVATES", target=route, value=True)
-    monkeypatch.setattr(name="authorized", target=route, value=lambda: asked.append(1))
+    monkeypatch.setattr(
+        name="authorized", target=route, value=lambda **_: asked.append(1)
+    )
     monkeypatch.setattr(
         name="target", target=route.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
     )
@@ -278,7 +280,9 @@ def test_a_donut_is_asked_for_its_bootrom_and_for_the_password_first(
 ) -> None:
     asked: list[int] = []
     monkeypatch.setattr(name="ELEVATES", target=route, value=True)
-    monkeypatch.setattr(name="authorized", target=route, value=lambda: asked.append(1))
+    monkeypatch.setattr(
+        name="authorized", target=route, value=lambda **_: asked.append(1)
+    )
     monkeypatch.setattr(
         name="target", target=route.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
     )
@@ -545,6 +549,43 @@ def test_a_reset_route_takes_five_steps(*, monkeypatch: pytest.MonkeyPatch) -> N
         value=TARGETS[BISCUIT]["fireos6"],
     )
     assert route.stages()[route.State.UNLOCKED_TWRP].steps == 5
+
+
+def test_a_restore_left_for_fastboot_that_never_arrives_still_fails(
+    *, monkeypatch: pytest.MonkeyPatch, run: Run
+) -> None:
+    run.target(build="8149", name="stock")
+    twrp = route.State.UNLOCKED_TWRP
+    table = {
+        twrp: route.Stage(
+            passes=frozenset({twrp}), run=lambda: None, steps=1, then=None
+        )
+    }
+    monkeypatch.setattr(name="stages", target=route, value=lambda: table)
+    monkeypatch.setattr(name="ends_in_fastboot", target=route, value=lambda: True)
+    run.states = [twrp, *[route.State.NONE] * 5]
+    run.tick = route.WAIT / 2
+    with pytest.raises(route.FatalError, match="stock 8149 has not started 10 minutes"):
+        route.root()
+
+
+def test_a_restore_whose_echo_stays_off_usb_ends_once_it_is_written(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, run: Run
+) -> None:
+    run.target(build="8344", name="stock")
+    twrp = route.State.UNLOCKED_TWRP
+    table = {
+        twrp: route.Stage(
+            passes=frozenset({twrp}), run=lambda: None, steps=1, then=None
+        )
+    }
+    monkeypatch.setattr(name="stages", target=route, value=lambda: table)
+    run.states = [twrp, *[route.State.NONE] * 5]
+    run.tick = route.STOCK_QUIET / 2
+    route.root()
+    said = " ".join(capsys.readouterr().out.split())
+    assert "Stock 8344 is written and verified" in said
+    assert "shown nothing on USB for 5 minutes" in said
 
 
 def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
@@ -984,6 +1025,19 @@ def test_a_stock_run_leaves_a_locked_bootloader_alone(
     route.root()
     assert ran == []
     assert "nothing to restore" in said(capsys=capsys)
+
+
+def test_a_stock_run_of_a_build_with_adb_off_ends_after_the_restore(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, run: Run
+) -> None:
+    run.target(build="8146", name="stock")
+    monkeypatch.setitem(route.ADB_OFF_BUILDS, BISCUIT, frozenset({"8146"}))
+    monkeypatch.setattr(name="stages", target=route, value=dict)
+    run.states = [route.State.UNLOCKED_TWRP, route.State.NONE]
+    route.root()
+    out = said(capsys=capsys)
+    assert "Stock 8146 is written" in out
+    assert "starts with adb off" in out
 
 
 def test_a_stock_run_reboots_fire_os_5_it_has_not_restored(
