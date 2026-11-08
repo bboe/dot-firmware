@@ -1266,6 +1266,34 @@ reaching its state by hand first.
   `Expected device type ID: %s` and `Device mismatch, aborting!`, the last of
   which `stage_fastbrick` reads for. So the check guards
   against the wrong device and not at all against the wrong LK.
+- The payload has no fastboot channel of its own. Its log goes to
+  `video_printf`, and an Echo has no display. To fail, it overwrites two of
+  LK's strings in memory, `the command you input is restricted on locked hw`
+  and `This partition doesn't exist`, with its message, and LK's own failure
+  sends that message as the `FAIL` reason. The copy does not check length, so
+  a message longer than the string it replaces overruns it. On a mismatch the
+  payload formats `Expected %s` and `Actual %s` and passes them to the
+  function that sets the LED ring's colour, which does not use them. So no
+  route sends the device type to the host. This is read by disassembly of
+  biscuit's v2.0.1 `fastbrick.img`, 2026-11-08. The payload region of
+  `fastbrick-20221007.img` is byte for byte the same.
+- A missing ID gives the same refusal. When IDME holds no `device_type_id`,
+  the payload goes straight to `Device mismatch, aborting!`. So the refusal
+  does not prove that the IDs differ. An IDME that cannot be read at all
+  stops the payload earlier, with `Failed to read IDME`, on another path.
+- On 2026-11-08, from Windows, radar's default `fastbrick.img` went to a
+  biscuit on `beb022a-20211202_231918`. The exploit started, and the payload
+  refused the Dot with `FAILED (remote: 'Device mismatch, aborting!')`, with
+  no `(bootloader)` line before it. So the default image crosses devices as
+  well as LKs.
+- No other route reads the device type from a locked Echo. On the same Dot,
+  stock 5.5.5.4 showed nothing on USB for 3 minutes after `fastboot reboot`,
+  the locked LK's `getvar all` gave only `serialno` and `product`, and
+  `oem idme ?` answered `restricted on locked hw`. A user's biscuit on
+  `63cb91b-20221007_072309`, which reports `BISCUIT` in fastboot, was
+  refused on 2026-11-07 from Windows. The same flash by hand afterwards
+  answered `restricted on locked hw` after the send: the exploit did not
+  start, so the payload did not run its check that time.
 - Every image carries both `Mode: VBAR overwrite (%s handler)` and
   `Mode: PTR overwrite (func @ 0x%08lX)`. A specialised image has the LK copy
   and the function patch, so it takes the second; the default carries no
