@@ -718,6 +718,129 @@ reaching its state by hand first.
   first run on a computer that finds the Dot already in TWRP waits up to 35 s
   more for the system image.
 
+## Backing up an Echo
+
+`backup` reads enough of the eMMC to put every partition back byte for byte.
+It reaches TWRP the way `twrp` does, so a locked Echo is unlocked first, after
+the same prompt. That unlock writes boot0, lk_a, lk_b, the TEE and the
+recovery before anything is read, so on a locked Echo those come back as the
+unlock's, not the stock bytes.
+
+- A named directory that already holds files stops the run before TWRP is
+  reached, so a locked Echo is not unlocked for a backup that cannot be kept.
+- The backup records the Echo's serial and its eMMC's CID. The CID must read
+  as 32 hex digits, because a restore's check of the Echo rests on it alone.
+  A serial can be empty, and an empty CID would match any other Echo whose CID
+  also reads empty.
+- It reads every partition in the primary table, both boot areas and both
+  copies of the table. boot1 holds IDME and kb holds a key blob. In the
+  backups read so far, each differed between Echoes, and no stock image
+  can rebuild them. The table copies hold the disk and partition GUIDs.
+- Everything is unmounted first, because a mounted userdata changes during
+  the read.
+- A partition is read with `adb pull` of its `mmcblk0pN` node. On a Dot in
+  amonet v2.0.0's TWRP on 2026-10-18, `adb pull` of a block node moved 25 to
+  31 MB/s, where `adb exec-out dd` moved 1.6 MB/s. The by-name node can be a
+  RAM decoy, so the numbered node is used. The table copies are 17 KB each
+  and lie outside every partition, so they are read with `dd`.
+- Before the pull, the Echo says each node's size and md5 in one line that
+  ends with a marker, because `adb shell` can cut the end of its output. A
+  pull is kept only when its size and md5 match that line. The size of a
+  partition must also match the table, which shows that `mmcblk0pN` is the
+  partition the table names.
+- A partition that begins with an image from an OTA in `BUILDS` names that
+  image rather than copying it. The images are the rows of
+  `firebreak/devices/<device>-partitions.csv`, the hashes `survey` reads. The
+  longest image that matches a prefix wins. When several builds hold that
+  image, as lk and the TEE often do, the backup names the build that also
+  holds the most other partitions. A restore then downloads fewer OTAs. The
+  rest of the partition is copied, because `dd` leaves the old bytes past an
+  image's end. On the radars backed up on 2026-10-21, lk_a was amonet's
+  `lk.bin` for 356,856 bytes and the earlier contents after that.
+- A reference names the OTA by its file name, URL and sha256, not by a build
+  number. A restore can then download it after the build leaves `BUILDS`, for
+  as long as Amazon serves it. The OTAs are not mirrored. Only a build in
+  `BUILDS` is matched, because a restore must be able to download the OTA.
+- Each copy is gzip. Most tails are zeros, and gzip makes them small without
+  a kind of extent of their own.
+- The gaps between partitions are listed in `backup.json` and not read.
+  Nothing reads a sector outside a partition: the preloader reads boot0, and
+  LK and the kernel find everything else through the table. A restore writes
+  the same table back, so the gaps stay unreachable. **What they hold is not
+  known.** On a radar, 8 gaps hold 113,629 sectors, about 55 MiB, and nothing
+  has read them. They can hold what an earlier table, such as amonet v1's
+  boot-moved layout, put there. The donut's one gap, the 2,014 sectors before
+  kb, read as zeros on 2026-11-02.
+- The RPMB cannot be read from TWRP, so it is not in a backup.
+- Measured on every device and host: a donut on macOS, 2026-11-08; biscuits on
+  Windows, Linux and macOS and a radar on Linux, 2026-11-09. A biscuit's
+  backup took 669 MiB and a radar's 403 MiB.
+
+### Restoring a backup
+
+- `restore` writes a backup only onto the Echo it was read from: the device
+  must match, and so must the eMMC's CID. boot1 and kb hold that Echo's IDME
+  and keys, and a copy of them on another Echo would give it a second
+  identity.
+- The serial that adb or fastboot gives is checked against the backup's
+  before TWRP. Reaching TWRP unlocks a locked Echo, which rewrites its
+  bootloaders, TEE and recovery, so a check made only in TWRP would come after
+  those writes on the wrong Echo. The CID can be read only in TWRP, and it is
+  checked there too. An Echo in its bootrom gives no serial, and only the CID
+  check covers it.
+- Every area is rebuilt on this computer, and its size and sha256 must match
+  the backup's, before anything is written. An OTA the backup names is downloaded
+  from its URL, as `stock` downloads one, and checked by its sha256. Its
+  image is checked too, over the length the backup gives. So a bad download
+  or a damaged copy stops the run while the Echo is still as it was.
+- The images are extracted into the folder `stock` uses for that build,
+  `stock-<device>-<build>` in the cache, so the two commands share one copy.
+  The extract runs every time and keeps each image that checks out, so an
+  image cut short by an earlier run is rebuilt, not trusted.
+- The rebuilt areas take as much room on this computer as the whole eMMC, 3.6
+  GiB for a biscuit. `restore` checks for that room before it starts TWRP. On
+  2026-11-09 a Windows host with 1.6 GiB free filled its disk part way through
+  the rebuild. The OTAs the backup names are downloaded before that check, and
+  the check adds each image not yet extracted, at the length the backup
+  gives. So a full disk stops the run before TWRP. The rebuilt areas are
+  deleted when the run ends, whether it wrote them or stopped.
+- The writes go in the order `stock` uses. boot0's header is cleared first,
+  for the reason given under [The writes](#the-writes): a run cut part way
+  leaves an Echo that its bootrom can reach without opening the case. boot0 is
+  written last, after every other area.
+- The table goes in next, the backup copy before the primary, for the reason
+  given under [The partition table](#the-partition-table). Then
+  `blockdev --rereadpt` makes the kernel read it, because each partition is
+  written to its `mmcblk0pN` node. `/proc/partitions` must then list each of
+  the backup's partitions at its size. A kernel that kept an older table, or a
+  node that is not there yet, stops the run before a partition is written. A
+  push to a missing node would make a plain file in TWRP's RAM and not touch
+  the eMMC.
+- boot1 keeps the Echo's own `bootcount`. IDME holds a boot counter, an
+  8-byte field of decimal digits that the bootloader raises at each boot, and
+  a backup's copy of it is as old as the backup. On the donut on 2026-11-08,
+  writing back a dump from 2026-11-02 took it from 550 to 278. The rebuilt
+  boot1 is checked against the backup first, then the Echo's current count
+  replaces the backup's, and the write is checked against that image. A
+  boot1 with no such field, or one that does not read as digits, is written
+  as backed up.
+- A partition or boot area that already holds the backup's bytes is skipped,
+  as a `stock` write is. The check covers its whole length. boot1 holds IDME,
+  and no image can rebuild it, so it is not rewritten without cause. A boot
+  area is pushed to `/tmp` and checked by md5 there before `dd` writes it, and
+  a failed push is retried as other pushes are.
+- The gaps between partitions are not written, so they keep what they held.
+- The run ends in TWRP. `reboot` starts the Echo from there.
+- Measured on a biscuit on Windows, 2026-11-09: a backup, `stock` 5.5.5.4
+  over it, then `restore`, which wrote every area back and kept the boot
+  count. Measured on a donut on macOS, 2026-11-09: the Echo stayed signed in
+  to Amazon, and its boot count went from 559 to 560 at the next boot.
+  Measured on a radar on Linux, 2026-11-09: `stock` 5.5.5.4, then `restore`
+  in 6m 20s, which wrote both boot and system slots, cache, userdata and
+  boot0 and kept the boot count at 237. The Echo booted 8149, stayed signed
+  in to Amazon past the clock sync, and kept the adb key list and update
+  blocks the backup held.
+
 ## Reporting a problem
 
 - `report` collects firebreak's version, the host, the state, the build,

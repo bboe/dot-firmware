@@ -19,6 +19,7 @@ import textwrap
 from typing import TYPE_CHECKING
 
 from firebreak import __version__
+from firebreak.backup import backup
 from firebreak.cache import make_cache
 from firebreak.devices import (
     BUILDS,
@@ -46,6 +47,7 @@ from firebreak.entry import (
 from firebreak.host import check_adb, check_python, check_root, check_user
 from firebreak.identify import choices, choose_target
 from firebreak.plugin import FireOs6
+from firebreak.restore import restore
 from firebreak.route import root
 from firebreak.support import report, write_test
 from firebreak.survey import survey_all
@@ -70,6 +72,7 @@ if TYPE_CHECKING:
 
     from firebreak.plugin import Device
 
+BACKUP = "backup"
 BUILDS_COMMAND = "builds"
 CREDITS = """firebreak automates work that other people did first.
 
@@ -107,6 +110,7 @@ FACTORY_RESETS = {
 NO_WAIT = "--no-wait"
 NS_VERSION = re.compile(pattern=r"-NS(\d)(\d)(\d)(\d)(\d*)_")
 REPORT = "report"
+RESTORE = "restore"
 SURVEY = "survey"
 UNLOCK = "unlock"
 WRITE_TEST = "write-test"
@@ -114,6 +118,12 @@ WRITE_TEST = "write-test"
 
 def build_parser() -> argparse.ArgumentParser:
     about = {
+        BACKUP: "copy every partition of the Echo's eMMC, its boot areas and"
+        " both copies of its partition table into DIRECTORY, and write"
+        " backup.json, which says how to put each byte back. A partition that"
+        " begins with an image from an OTA firebreak can download names that"
+        " image instead of copying it. It starts the Echo's TWRP to read them,"
+        " which unlocks a locked Echo first and asks before that.",
         BUILDS_COMMAND: "list every build `stock` takes for each Echo, newest"
         " first, with its Fire OS version. It needs no Echo.",
         BOOTROM: "hold the Echo in its bootrom, where amonet's payload can reach"
@@ -131,6 +141,11 @@ def build_parser() -> argparse.ArgumentParser:
         REPORT: "print what the Echo and this computer are, and the Echo's"
         " partition table, for a support request. It starts the Echo's recovery"
         " to read them and writes no partition.",
+        RESTORE: "put back every byte a backup read, from DIRECTORY, onto the"
+        " Echo it was read from. It rebuilds each partition first, downloading"
+        " the OTAs the backup names, and checks each against the backup before"
+        " it writes anything. It asks before it writes, and leaves the Echo in"
+        " its TWRP.",
         SHORT: "hold the bootrom of an Echo that shows no light, by shorting its"
         " test point. It says where to short, waits for the bootrom, says when"
         " the short may come off, and leaves amonet's payload holding it. It"
@@ -148,7 +163,12 @@ def build_parser() -> argparse.ArgumentParser:
         " USB cable because nothing crosses USB. It leaves a fresh empty"
         " filesystem there, or says it could not.",
     }
-    labels = {SURVEY: " OTA [OTA ...]", UNLOCK: " [TARGET]"}
+    labels = {
+        BACKUP: " [DIRECTORY]",
+        RESTORE: " DIRECTORY",
+        SURVEY: " OTA [OTA ...]",
+        UNLOCK: " [TARGET]",
+    }
     parents = option_parents()
     quiet = option_parents(hidden=True)
     navigating = ["--force", "--no-update-check", "--verbose"]
@@ -162,11 +182,13 @@ def build_parser() -> argparse.ArgumentParser:
     rooting = ["--factory-reset", "--no-update-check", "--verbose"]
     every = sorted({"--credits", "--device", *navigating, *restoring, *rooting})
     uses = {
+        BACKUP: navigating,
         BOOTROM: navigating,
         BUILDS_COMMAND: [],
         FASTBOOT: ["--no-update-check", "--verbose"],
         REBOOT: ["--no-update-check", "--verbose"],
         REPORT: ["--no-update-check", "--verbose"],
+        RESTORE: navigating,
         SHORT: ["--device", "--no-update-check", "--verbose"],
         STOCK: restoring,
         SURVEY: ["--no-update-check", "--verbose"],
@@ -261,6 +283,20 @@ other commands:
                 metavar="BUILD",
                 nargs="?",
             )
+        elif name == BACKUP:
+            made.add_argument(
+                "directory",
+                help="where to write the backup, a new or empty directory;"
+                " DEVICE-SERIAL-DATE in this directory when left out",
+                metavar="DIRECTORY",
+                nargs="?",
+            )
+        elif name == RESTORE:
+            made.add_argument(
+                "directory",
+                help="a directory that backup wrote",
+                metavar="DIRECTORY",
+            )
         elif name == SURVEY:
             made.add_argument(
                 "otas", help="an Amazon OTA zip", metavar="OTA", nargs="+"
@@ -347,10 +383,16 @@ def cli() -> None:
     SESSION.short = options.command == SHORT
     SESSION.device = DEVICES.get(options.device)
     command = {
+        BACKUP: functools.partial(
+            backup, directory=options.directory, force=options.force
+        ),
         BOOTROM: functools.partial(bootrom_entry, force=options.force),
         FASTBOOT: fastboot_entry,
         REBOOT: reboot_entry,
         REPORT: report,
+        RESTORE: functools.partial(
+            restore, directory=options.directory, force=options.force
+        ),
         SHORT: short_entry,
         TWRP: functools.partial(twrp_entry, force=options.force),
         WRITE_TEST: write_test,
@@ -511,6 +553,7 @@ def parsed() -> argparse.Namespace:
     for option, default in (
         ("build", ""),
         ("device", None),
+        ("directory", ""),
         ("end_in_fireos", False),
         ("factory_reset", False),
         ("force", False),
@@ -524,10 +567,12 @@ def parsed() -> argparse.Namespace:
         parser.print_help()
         sys.exit(1)
     takes = {
+        BACKUP: {"force"},
         BOOTROM: {"force"},
         BUILDS_COMMAND: set(),
         FASTBOOT: set(),
         REPORT: set(),
+        RESTORE: {"force"},
         SHORT: {"device"},
         STOCK: {"end_in_fireos", "force", "no_wait"},
         SURVEY: set(),

@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](https://semver.org).
   three, each unlocked from stock on 2026-11-07, a donut on 8349 and a
   biscuit and a radar on 8149: `otad` did not start after a reboot, and the
   update hosts resolved to `127.0.0.1`.
+- `backup` copies every partition of an Echo's eMMC, both boot areas and both
+  copies of its partition table into a directory, with a `backup.json` that
+  says how to put each byte back. A partition that begins with an image from
+  an OTA firebreak can download names that image and copies only the rest.
+  The partition hash tables moved from `docs/` into the package, so a backup
+  can read them.
+- `restore` writes a backup back onto the Echo it was read from, byte for
+  byte, except the gaps between partitions. It rebuilds and checks every area
+  before it writes, and downloads the OTAs the backup names from Amazon.
 - `stock` takes 8344 on an Echo Dot (3rd Generation) and 8349 on an Echo Dot
   (2nd Generation). Each writes the same LK, TEE and preloader as a build
   already supported on that device.

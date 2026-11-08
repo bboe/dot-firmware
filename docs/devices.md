@@ -120,9 +120,10 @@ reports them as `antirback_pl_version`, `antirback_tee_version` and
 
 ### Partition hashes
 
-[biscuit-partitions.csv](biscuit-partitions.csv) has the sha256 of the 5
-partitions each OTA writes, for every build above: boot, `/system`, lk, tee
-and the preloader.
+[biscuit-partitions.csv](../firebreak/devices/biscuit-partitions.csv)
+has the sha256 of the 5 partitions each OTA writes, for every build above:
+boot, `/system`, lk, tee and the preloader. `firebreak backup` reads the same
+file to name an OTA image in place of a copy.
 
 - A hash covers the image's own length, in `bytes`, and the partition is
   larger. Hash that many bytes from the partition's start, on the active slot
@@ -267,8 +268,9 @@ does.
 
 ### Partition hashes
 
-[radar-partitions.csv](radar-partitions.csv) has the sha256 of the 5
-partitions each OTA writes, for every build above, read as biscuit's are.
+[radar-partitions.csv](../firebreak/devices/radar-partitions.csv)
+has the sha256 of the 5 partitions each OTA writes, for every build above,
+read as biscuit's are.
 
 - 5.5.5.4, 4305 and 4315 are block OTAs. As on biscuit, a radar that Amazon's
   updater installed matches their `/system` only if its eMMC reads erased
@@ -368,8 +370,9 @@ reaches it.
 
 ### Partition hashes
 
-[crown-partitions.csv](crown-partitions.csv) has the sha256 of the 5
-partitions each OTA writes, for every build above, read as biscuit's are.
+[crown-partitions.csv](../firebreak/devices/crown-partitions.csv)
+has the sha256 of the 5 partitions each OTA writes, for every build above,
+read as biscuit's are.
 
 - Every crown OTA is a block OTA. As on biscuit, a crown that Amazon's updater
   installed matches its `/system` hash only if its eMMC reads erased blocks as
@@ -435,8 +438,9 @@ The Echo Dot (3rd Generation) Refresh of 2019 is a different device, model
 
 ### Partition hashes
 
-[donut-partitions.csv](donut-partitions.csv) has the sha256 of the 6
-partitions each OTA writes, for every build above, read as biscuit's are.
+[donut-partitions.csv](../firebreak/devices/donut-partitions.csv)
+has the sha256 of the 6 partitions each OTA writes, for every build above,
+read as biscuit's are.
 
 - donut's payload names `tee1` and `tee2` as two partitions and writes the
   same TEE image to both, in all 17 builds. Every other device here names one

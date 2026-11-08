@@ -209,6 +209,13 @@ commands that reach one entry point and stop there:
       writes nothing, and --device picks whose test point to describe.
 
 other commands:
+  backup [DIRECTORY]
+      copy every partition of the Echo's eMMC, its boot areas and both
+      copies of its partition table into DIRECTORY, and write backup.json,
+      which says how to put each byte back. A partition that begins with
+      an image from an OTA firebreak can download names that image instead
+      of copying it. It starts the Echo's TWRP to read them, which unlocks
+      a locked Echo first and asks before that.
   builds
       list every build `stock` takes for each Echo, newest first, with its
       Fire OS version. It needs no Echo.
@@ -216,6 +223,12 @@ other commands:
       print what the Echo and this computer are, and the Echo's partition
       table, for a support request. It starts the Echo's recovery to read
       them and writes no partition.
+  restore DIRECTORY
+      put back every byte a backup read, from DIRECTORY, onto the Echo it
+      was read from. It rebuilds each partition first, downloading the
+      OTAs the backup names, and checks each against the backup before it
+      writes anything. It asks before it writes, and leaves the Echo in
+      its TWRP.
   survey OTA [OTA ...]
       read each Amazon OTA zip for the tables in docs/devices.md. It needs
       no Echo.

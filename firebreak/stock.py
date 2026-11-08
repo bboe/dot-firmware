@@ -71,11 +71,11 @@ TWRP_VERSIONS = ("3.2.", "3.7.")
 
 
 class Shell(enum.Enum):
-    BOOT0 = (
+    BOOT_AREA = (
         "d=dd; toybox dd --help >/dev/null 2>&1 && d='toybox dd'; "
-        "echo 0 > /sys/block/mmcblk0boot0/force_ro; "
-        "$d if={source} of=/dev/block/mmcblk0boot0 bs=1048576 2>/dev/null; "
-        "echo 1 > /sys/block/mmcblk0boot0/force_ro; sync; "
+        "echo 0 > /sys/block/mmcblk0{area}/force_ro; "
+        "$d if={source} of=/dev/block/mmcblk0{area} bs=1048576 2>/dev/null; "
+        "echo 1 > /sys/block/mmcblk0{area}/force_ro; sync; "
         "echo 3 > /proc/sys/vm/drop_caches"
     )
     TOOLS = (
@@ -396,7 +396,7 @@ def restore(  # ruff: ignore[complex-structure]
         raise FatalError(
             message=f"the preloader did not reach the {title()}; do not reboot"
         )
-    adb_shell(command=Shell.BOOT0.value.format(source=staged))
+    adb_shell(command=Shell.BOOT_AREA.value.format(area="boot0", source=staged))
     wrong = md5_mismatch(
         command="md5sum /dev/block/mmcblk0boot0",
         want=digest(kind="md5", path=preloader),
