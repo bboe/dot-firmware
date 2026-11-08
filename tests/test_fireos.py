@@ -289,7 +289,7 @@ def test_fire_os_5_goes_in_and_the_dot_reboots(
     assert fireos5[0]["blocks"] == 8
     assert scripts["data.sh"] == fireos.Shell.DATA.value
     assert f"mount -t ext4 {system}" in scripts["system.sh"]
-    assert "softwareupdates.amazon.com" in scripts["system.sh"]
+    assert all(host in scripts["system.sh"] for host in fireos.UPDATE_HOSTS)
     assert pushed[0][1] == str(fireos.DOT_TEMPORARY_DIRECTORY / "boot.img")
     assert f"of={fireos.BY_NAME}/boot_b_x" in adb.commands(holding="dd if=")[0]
     assert "magisk" in fireos5[1]

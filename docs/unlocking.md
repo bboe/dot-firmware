@@ -1440,7 +1440,7 @@ reaching its state by hand first.
   from the stock `/system` of biscuit 8149, radar 8349 and donut 8349.
 - The version number alone was never tested against an offered update. So
   after `boot-root.zip` the run mounts each slot's `system` in TWRP, adds
-  `disabled` to the `otad` stanza, and points the 5 update hosts at
+  `disabled` to the `otad` stanza, and points the 6 update hosts at
   `127.0.0.1` in `/system/etc/hosts`. The stanza is in `/init.mt8516.rc` on
   donut and `/init.mt8163_amazon.rc` on biscuit, so the run finds it with
   `grep`. A slot with no `otad` stanza or no hosts file is not Fire OS 6 and
@@ -1452,8 +1452,9 @@ reaching its state by hand first.
   `otad`. A second run adds nothing. The stanza is in the root
   `/init.mt8163_amazon.rc` of biscuit 8149's and radar 8349's stock
   `/system` too. The edits have run on all three.
-- The 5 hosts, as found on 2026-11-06 in the stock `/system` of Fire OS
-  5.5.4.9 and donut's 8349, dex inside APKs included, and resolved in DNS:
+- The 6 hosts, each looked for on 2026-11-06 in the stock `/system` of Fire
+  OS 5.5.4.9 and donut's 8349, dex inside APKs included, and resolved in
+  DNS. The last was added on 2026-11-08, from Amazon's check-in replies:
   - `softwareupdates.amazon.com` is the system OTA check-in: Fire OS 5's
     `DeviceSoftwareOTA` asks its `/software/inventory`, and it is the one
     update host in Fire OS 6's TLS configuration. Its own hosts entry blocks
@@ -1471,6 +1472,15 @@ reaching its state by hand first.
     2026-11-06. Neither Fire OS names either host. The device takes its
     download URL from the check-in's reply, so they block a download whose
     check-in got through.
+  - `d1s31zyz7dcc2d.cloudfront.prod.ota-cloudfront.net` is the host in the
+    URLs the check-in hands out today: all 159 full URLs in a record of
+    check-in replies for 185 device types use it, among them biscuit's,
+    radar's and donut's 8149 of 2026-09-29 and 8338 of 2026-10-14. On
+    2026-11-08 it was a CNAME of `d2jmp5j6kma5v6.cloudfront.net`, as
+    `prod.ota-cloudfront.net` is, and served radar's 8338 with 200. A hosts
+    file matches whole names, and a random name under
+    `prod.ota-cloudfront.net` does not resolve, so this one needs its own
+    entry. It was added after the measurements below, which read 5 hosts.
   - `amzdigitaldownloads.edgesuite.net`, a CNAME of `a1910.d.akamai.net`, is
     where a Fire OS 5 biscuit fetched 272.5.6.4 over plain HTTP in a 2016
     capture published on Medium, as
@@ -2265,7 +2275,7 @@ either amonet v1.1.0 TWRP, and amonet v1.1.0's from v2.0.0's TWRP.
 - `/system/etc/init.fosflags.sh` strips adb from the USB configuration on
   every boot after the first. The script forces its `FOS_FLAGS_ADB_ON` branch
   true, neutralizes its `unset_adb_persistent_property` calls, and checks both
-  edits. The 5 Amazon update hosts go into `/system/etc/hosts` as `127.0.0.1`.
+  edits. The 6 Amazon update hosts go into `/system/etc/hosts` as `127.0.0.1`.
   [Install: Fire OS 6 with boot-root.zip](#install-fire-os-6-with-boot-rootzip)
   says why each host is there.
 

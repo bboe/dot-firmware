@@ -66,6 +66,7 @@ UPDATES_OK = "updates-ok"
 UPDATE_HOSTS = (
     "amzdigitaldownloads.edgesuite.net",
     "d1s31zyz7dcc2d.cloudfront.net",
+    "d1s31zyz7dcc2d.cloudfront.prod.ota-cloudfront.net",
     "prod.ota-cloudfront.net",
     "softwareupdates.amazon.com",
     "updates.amazon.com",

@@ -16,9 +16,12 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
-- A Fire OS 5 root blocks `d1s31zyz7dcc2d.cloudfront.net` and
-  `prod.ota-cloudfront.net` too, which both serve every Echo's OTAs, and no
-  longer lists Fire TV's `amzdigital-a.akamaihd.com`.
+- A Fire OS 5 root, like the new Fire OS 6 step, blocks
+  `d1s31zyz7dcc2d.cloudfront.net`, `prod.ota-cloudfront.net` and
+  `d1s31zyz7dcc2d.cloudfront.prod.ota-cloudfront.net` too, where Amazon
+  serves Echo OTAs. The last is the host in the download URLs Amazon's
+  check-in hands out today. A Fire OS 5 root no longer lists Fire TV's
+  `amzdigital-a.akamaihd.com`.
 - `--help` names all three Echoes, and its description is shorter.
 - `--credits` ends its help in "and exit", as `--help` and `--version` do.
 - Support moved to `#echo-support` in the
