@@ -209,6 +209,9 @@ commands that reach one entry point and stop there:
       writes nothing, and --device picks whose test point to describe.
 
 other commands:
+  builds
+      list every build `stock` takes for each Echo, newest first, with its
+      Fire OS version. It needs no Echo.
   report
       print what the Echo and this computer are, and the Echo's partition
       table, for a support request. It starts the Echo's recovery to read

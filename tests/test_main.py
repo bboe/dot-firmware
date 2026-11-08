@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 from typing import TYPE_CHECKING
 
@@ -8,7 +9,7 @@ import pytest
 import update_checker
 
 from firebreak import __main__ as main
-from firebreak.devices import BISCUIT, DEFAULTS, RADAR, TARGETS
+from firebreak.devices import BISCUIT, BUILDS, DEFAULTS, RADAR, TARGETS
 
 if TYPE_CHECKING:
     from firebreak.plugin import Device
@@ -107,8 +108,8 @@ def test_a_build_the_device_has_no_ota_for_is_refused(
     )
     with pytest.raises(
         main.FatalError,
-        match=r"the Echo \(2nd Generation\) has no stock build 5\.5\.0\.3: use"
-        r" one of 8349, 8344, 8338, 8149",
+        match=r"the Echo \(2nd Generation\) has no stock build 5\.5\.0\.3\."
+        r" `firebreak builds` lists",
     ):
         main.cli()
 
@@ -411,6 +412,15 @@ def test_options_count_before_or_after_the_target_or_command(
     ) == parsed
 
 
+def test_ordered_puts_a_rebuild_after_its_version() -> None:
+    assert main.ordered(builds=["5.5.0.3", "8149", "5.5.0.3-1973", "5.5.3.1"]) == [
+        "8149",
+        "5.5.3.1",
+        "5.5.0.3-1973",
+        "5.5.0.3",
+    ]
+
+
 def test_reset_is_refused_on_a_command_that_installs_no_fire_os_6(
     *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -456,6 +466,42 @@ def test_reset_reaches_a_fire_os_6_unlock(
     assert main.ARGUMENTS.factory_reset is True
 
 
+def test_stock_asks_before_a_build_not_verified(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[tuple[bool, str]] = []
+    monkeypatch.setattr(
+        name="confirm",
+        target=main,
+        value=lambda *, force, what: asked.append((force, what)),
+    )
+    monkeypatch.setitem(
+        BUILDS[RADAR],
+        "8338",
+        dataclasses.replace(BUILDS[RADAR]["8338"], verified=False),
+    )
+    main.stock_build(device=RADAR, force=False, wanted="8149")
+    assert not asked
+    main.stock_build(device=RADAR, force=True, wanted="8338")
+    assert asked == [
+        (
+            True,
+            (
+                "stock 8338 has not been restored to and unlocked from on an Echo"
+                " (2nd Generation), so this run would be its first"
+            ),
+        )
+    ]
+
+
+def test_stock_help_hides_no_wait(*, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main.build_parser().parse_args(["stock", "--help"])
+    said = capsys.readouterr().out
+    assert "--no-wait" not in said
+    assert "--force" in said
+
+
 @pytest.mark.parametrize("build", [[], ["8338"]])
 def test_stock_takes_end_in_fireos(
     *, build: list[str], monkeypatch: pytest.MonkeyPatch
@@ -466,13 +512,26 @@ def test_stock_takes_end_in_fireos(
     assert main.parsed().end_in_fireos is True
 
 
-def test_stock_takes_no_wait(*, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stock_takes_force(*, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        name="argv", target=sys, value=["firebreak", "stock", "4405", "--force"]
+    )
+    assert main.parsed().force is True
+
+
+def test_stock_takes_no_wait_as_force(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         name="argv", target=sys, value=["firebreak", "stock", "--no-wait"]
     )
-    assert main.parsed().no_wait is True
+    assert main.parsed().force is True
+    assert "--no-wait is deprecated and goes away in firebreak 2.0" in (
+        capsys.readouterr().out
+    )
     monkeypatch.setattr(name="argv", target=sys, value=["firebreak", "stock"])
-    assert main.parsed().no_wait is False
+    assert main.parsed().force is False
+    assert not capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -499,23 +558,30 @@ def test_the_build_each_target_gets(
     assert main.ARGUMENTS.build == build
 
 
-def test_the_help_gives_each_device_s_builds_a_block_of_its_own() -> None:
-    said = main.stock_builds_help()
-    blocks = {
-        title: body.partition("\n\n  ")[0]
-        for title in (
-            "Echo Dot (2nd Generation)",
-            "Echo Dot (3rd Generation)",
-            "Echo (2nd Generation)",
-        )
-        for body in (said.partition(f"\n\n  {title}, ")[2],)
-    }
-    assert all(blocks.values()), blocks
-    assert blocks["Echo Dot (2nd Generation)"].startswith("8149 when left out:")
-    assert blocks["Echo (2nd Generation)"].startswith("8149 when left out:")
-    assert "8349" not in blocks["Echo Dot (2nd Generation)"]
-    assert "8349" in blocks["Echo (2nd Generation)"]
-    assert blocks["Echo Dot (3rd Generation)"] == "8349 when left out:\n      8349"
+def test_the_builds_list_gives_each_device_a_block_newest_first() -> None:
+    blocks = main.builds_list().split("\n\n")
+    assert [block.partition("\n")[0] for block in blocks] == [
+        "Echo Dot (2nd Generation), 8149 when left out:",
+        "Echo Dot (3rd Generation), 8349 when left out:",
+        "Echo (2nd Generation), 8149 when left out:",
+    ]
+    donut = blocks[1].split("\n")[1:]
+    assert donut[0] == "  8349          Fire OS 6.5.7.5"
+    assert donut[-1] == "  1895          Fire OS 6.5.2.9"
+
+
+def test_the_builds_list_marks_a_build_not_verified(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(
+        BUILDS[RADAR],
+        "8338",
+        dataclasses.replace(BUILDS[RADAR]["8338"], verified=False),
+    )
+    assert (
+        "  8338          Fire OS 6.5.7.5, not yet verified on hardware"
+        in main.builds_list()
+    )
 
 
 def test_the_help_lists_each_device_s_targets_its_default_first() -> None:
@@ -527,3 +593,9 @@ def test_the_help_lists_each_device_s_targets_its_default_first() -> None:
     assert lines[lines.index("  unlock [TARGET], where TARGET is one of:") + 1] == (
         "    fireos6, the default"
     )
+
+
+def test_the_stock_help_names_each_default_and_the_builds_command() -> None:
+    text = " ".join(main.stock_builds_help().split())
+    assert "8349 on the Echo Dot (3rd Generation)" in text
+    assert "`firebreak builds` lists every build" in text

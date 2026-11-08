@@ -365,7 +365,7 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
   holds no `\0product\0DONUT\0` anywhere. So the product check above would
   refuse a donut rather than name it, where amonet's own `bin/lk.bin` holds
   `\0product\0BISCUIT\0` for biscuit and `\0product\0RADAR\0` for radar. The
-  kit writes this LK byte for byte for 6009 and later, so it is a stock donut
+  kit writes this LK byte for byte for 4769 and later, so it is a stock donut
   LK. All four readings are from v1.0.0's files on 2026-11-02; no donut ran
   them.
 - It reads ports from pyserial's USB list and opens only the bootrom's, where
@@ -1573,10 +1573,30 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
 
 - Only `stock` takes a `BUILD`, and without one it installs 8149. The run
   downloads the build before it touches the Echo.
+- `stock` takes every OTA ftvdb lists for the device, so an Echo can go back to
+  whatever it ran before. A build is **verified** on a device once it has been
+  restored to and an `unlock` has run from it on that device, in a run these
+  docs or the changelog record. `stock` asks before it restores a
+  build that is not, because its LK, its fastbrick or its images have not run
+  on hardware, and `--force` answers for it. Verified: every biscuit, radar
+  and donut build. 42 of biscuit's were verified on 2026-11-06, 14 of radar's on
+  2026-11-07 and 25 of donut's on 2026-11-07 and 11-08, each in one run of
+  `stock BUILD` then `unlock`, which
+  [measurements.md](measurements.md#whole-run-timings) records. For a Fire OS
+  5 build that unlock installs 8149, so the run shows the restore and the
+  unlock from its LK, not that its own Fire OS 5 starts. radar's 6436 had
+  been unlocked from with amonet-radar v1.0.0 only, and the radar run
+  verified it on v1.0.1. `firebreak builds` lists every build `stock` takes,
+  newest first, with the Fire OS version named in its OTA's `NS` code, and
+  marks any not verified. `stock --help` names only each device's default,
+  because the verified list grew to every build, and it buried the options.
+- `--no-wait` was the flag that started the writes without the 10-second
+  countdown. `--force` does that now, and `--no-wait` is a hidden alias for it
+  until 2.0, with a warning.
 - Each device has its own builds. biscuit's and radar's OTAs share build
   numbers but not firmware, so the run picks the build only after it knows
-  the device. radar has thirteen, and 8149, Fire OS 6574.1, is the newest of
-  them and what both of its targets install when no build is named.
+  the device. radar has 21, and 8149, Fire OS 6574.1, is what both of its
+  targets install when no build is named.
 - Before it writes anything, the restore checks that the OTA's
   `ro.product.device`, without `_puffin`, names the device. A wrong entry in
   the build table would otherwise write one device's bootloaders on another.

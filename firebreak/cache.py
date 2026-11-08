@@ -50,6 +50,7 @@ class Download:
     mirror: bool = False
     root: str = "amonet"
     size: int = 0
+    verified: bool = False
 
 
 MAGISK = Download(

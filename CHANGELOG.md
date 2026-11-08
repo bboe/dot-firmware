@@ -13,6 +13,27 @@ This project adheres to [Semantic Versioning](https://semver.org).
   three, each unlocked from stock on 2026-11-07, a donut on 8349 and a
   biscuit and a radar on 8149: `otad` did not start after a reboot, and the
   update hosts resolved to `127.0.0.1`.
+- `stock` takes 8344 on an Echo Dot (3rd Generation) and 8349 on an Echo Dot
+  (2nd Generation). Each writes the same LK, TEE and preloader as a build
+  already supported on that device.
+- `stock` takes every OTA ftvdb lists: 49 builds for the Echo Dot (2nd
+  Generation), 21 for the Echo (2nd Generation) and 26 for the Echo Dot (3rd
+  Generation). Each is marked verified once it has been restored to and
+  unlocked from on hardware. `stock` asks before it restores any other, and
+  `--force` answers for it. Every OTA was
+  downloaded, matched against ftvdb's md5 and surveyed, and the partition hash
+  tables gained the 17 builds they lacked.
+- `firebreak builds` lists every build `stock` takes for each Echo, with its
+  Fire OS version. `stock --help` names only each Echo's default build, and
+  a build `stock` does not take points to `firebreak builds`.
+- Every Echo Dot (2nd Generation) build on ftvdb is verified.
+- Every Echo (2nd Generation) build on ftvdb is verified.
+- Every Echo Dot (3rd Generation) build on ftvdb is verified.
+- `stock 5.5.0.3-1973` installs the second 5.5.0.3 build Amazon shipped for
+  the Echo Dot (2nd Generation), which added the `COMPUTER` wake word.
+  `5.5.0.3` is still the first, build 1969.
+- An Echo Dot (3rd Generation) on 4655's LK, `0db8914-20221005_072344`, is
+  recognised.
 
 ### Changed
 
@@ -27,6 +48,13 @@ This project adheres to [Semantic Versioning](https://semver.org).
 - Support moved to `#echo-support` in the
   [0x7E Labs Discord](https://discord.gg/huE5XhWbsz): the README, `report`
   and a failed run's advice name it.
+- `stock --force` starts the writes without the 10-second countdown, as
+  `--no-wait` did.
+
+### Deprecated
+
+- `--no-wait` is a hidden alias for `--force`, and prints a warning. It goes
+  away in 2.0.
 
 ### Fixed
 

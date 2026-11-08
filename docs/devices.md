@@ -28,10 +28,30 @@ not mark a move from Fire OS 5, and what it does mark is unread. No OTA says.
 
 ## biscuit
 
-The Echo Dot (2nd Generation). Read in October 2026 from 37 Fire OS 6 OTAs on
-ftvdb, 4310 to 8149, and from the Fire OS 5.5.0.3, 5.5.3.1, 5.5.4.6, 5.5.4.9,
-5.5.5.0 and 5.5.5.4 OTAs. 8338 and 8344 are read from the OTAs Amazon's own
-CDN serves, which is where a Dot on 8338 led: ftvdb lists neither.
+The Echo Dot (2nd Generation). Read on 2026-11-06 from all 50 OTAs ftvdb
+lists: 40 Fire OS 6 builds, 4310 to 8349, and Fire OS 5.4.2.7, two of
+5.5.0.3, 5.5.3.1, 5.5.3.3, 5.5.3.6, 5.5.4.6, 5.5.4.9, 5.5.5.0 and 5.5.5.4.
+8338 and 8344 were first read in October from the OTAs Amazon's own CDN
+serves, which is where a Dot on 8338 led, before ftvdb listed them.
+
+ftvdb lists two 5.5.0.3 builds, 564196920 and 564197320. Each OTA's
+`target.build.prop` gives the first `ro.build.lab126.build` 1969 and a build
+date of 2016-12-01, and the second 1973 and 2016-12-29. They share the LK, the
+TEE and the preloader's description and version. 1973 adds the `COMPUTER`
+wake word for en-US, en-GB and de-DE, two alert sounds and the locale code
+that finds the new models. Its kernel is 1969's rebuilt: the two decompress to
+the same length and differ in 140 bytes, its timestamps and build ID among
+them. Everything else that differs is a signature, a version string or a file
+built from one. 1969 keeps the name `5.5.0.3`, which 1.0 used, and 1973 is
+`5.5.0.3-1973`. `survey` labels both `Fire OS 5.5.0.3`, so 1973's rows in the
+table are named by hand.
+
+`ro.build.lab126.build` is the number in every Fire OS 6 build's name, read on
+2026-11-06 from the OTAs of 1895, 4305, 4310, 4315, 4655, 5041, 6302, 8149
+and 8349. Fire OS 5 counts its own: 1969 to 7676, from 2016 to 2022, the
+middle four digits of `ro.build.version.number`. The two counters overlap in
+range though no build here shares a number, so only a version can name a
+Fire OS 5 build safely.
 [unlocking.md](unlocking.md#echo-dot-2nd-generation) has the routes this
 device alone takes.
 
@@ -39,14 +59,14 @@ device alone takes.
 
 | ships in | `lk_build_desc` | `pl_build_desc` | TEE | anti-rollback PL, TEE, LK | fastbrick image |
 | --- | --- | --- | --- | --- | --- |
-| Fire OS 6 8338, 8344 | `2c3569d-20260617_045829` | `bd7ae89-20221003_215949` | [6](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick-20260617.img` |
+| Fire OS 6 8338 to 8349 | `2c3569d-20260617_045829` | `bd7ae89-20221003_215949` | [6](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick-20260617.img` |
 | Fire OS 6 4929 to 8149, except 5041 | `63cb91b-20221007_072309` | `bd7ae89-20221003_215949` | [5](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick-20221007.img` |
 | Fire OS 6 4405 to 4781, and 5041 | `63cb91b-20221007_072309` | `bd7ae89-20221003_215949` | [4](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick-20221007.img` |
 | Fire OS 6 4310, 4313, 4315 | `41fb3ce-20221007_151724` | `919cae9-20221006_203733` | [3](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick-20221007.img`, v2.0.0's |
 | Fire OS 5.5.5.4 | `beb022a-20211202_231918` | `ed021f9-20211202_231918` | [2](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick.img` |
 | Fire OS 5.5.4.9, 5.5.5.0 | `a828f29-20210822_210511` | `531fa14-20170929_175429` | [1](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick.img` |
-| Fire OS 5.5.3.1 to 5.5.4.6 | `f379dba-20170906_000423` | `531fa14-20170929_175429` | [1](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick.img` |
-| Fire OS 5.5.0.3 | `0e1d0d9-20161018_220224` | `292ae9d-20160915_232723` | [1](#tee-images) | 0x0003, 0x0102, 0x0001 | `fastbrick.img` |
+| Fire OS 5.4.2.7, and 5.5.3.1 to 5.5.4.6 | `f379dba-20170906_000423` | `531fa14-20170929_175429` | [1](#tee-images) | 0x0005, 0x0102, 0x0001 | `fastbrick.img` |
+| Fire OS 5.5.0.3, 5.5.0.3-1973 | `0e1d0d9-20161018_220224` | `292ae9d-20160915_232723` | [1](#tee-images) | 0x0003, 0x0102, 0x0001 | `fastbrick.img` |
 
 - Only the LK chooses the fastbrick image.
   [unlocking.md](unlocking.md#unlock-amonet-v2)
@@ -151,10 +171,10 @@ and from each boot area's `size`, in 512-byte sectors.
 
 ## radar
 
-The Echo (2nd Generation), model XC56PY. Read in October 2026 from the 16 OTAs
-on ftvdb: Fire OS 5.5.5.4 and Fire OS 6 4305, 4315, 4929, 4936, 6199, 6208,
-6220, 6302, 6425, 6436, 6813, 8149, 8338, 8344 and 8349. ftvdb has no other
-radar OTA.
+The Echo (2nd Generation), model XC56PY. Read on 2026-11-06 from all 21 OTAs
+ftvdb lists: Fire OS 5.5.5.4 and Fire OS 6 4305, 4315, 4929, 4936, 5555, 5571,
+6009, 6071, 6199, 6208, 6220, 6302, 6425, 6436, 6813, 7577, 8149, 8338, 8344
+and 8349. ftvdb has no other radar OTA.
 [unlocking.md](unlocking.md#echo-2nd-generation) has what this device alone
 does.
 
@@ -362,10 +382,11 @@ partitions each OTA writes, for every build above, read as biscuit's are.
 
 ## donut
 
-The Echo Dot (3rd Generation) of 2018, model `AEODN`. Read in October 2026 from
-the 17 OTAs on ftvdb: Fire OS 6 1895, 6009, 6071, 6077, 6086, 6176, 6193, 6199,
-6208, 6220, 6425, 6813, 8138, 8149, 8338, 8344 and 8349. ftvdb has no other
-donut OTA, and none is Fire OS 5. Its build numbers are its own, as crown's
+The Echo Dot (3rd Generation) of 2018, model `AEODN`. Read on 2026-11-06 from
+all 26 OTAs ftvdb lists: Fire OS 6 1895, 4655, 4769, 4774, 4936, 5531, 6009,
+6071, 6077, 6086, 6176, 6193, 6199, 6208, 6220, 6425, 6554, 6562, 6813, 8138,
+8142, 8146, 8149, 8338, 8344 and 8349. ftvdb has no other donut OTA, and none
+is Fire OS 5. Its build numbers are its own, as crown's
 are, and they do not follow release order: 6813 is Fire OS 6.5.6.6, where 6425
 is 6.5.7.2.
 
@@ -378,34 +399,39 @@ The Echo Dot (3rd Generation) Refresh of 2019 is a different device, model
 | --- | --- | --- | --- | --- |
 | Fire OS 6 6176 to 8349, except 6813 | `6f7225e-20230407_013816` | `<none>` | [3](#tee-images-3) | 0x0001, 0x0001, 0x0001 |
 | Fire OS 6 6009 to 6086, and 6813 | `6f7225e-20230407_013816` | `<none>` | [2](#tee-images-3) | 0x0001, 0x0001, 0x0001 |
+| Fire OS 6 4769, 4774, 4936, 5531 | `6f7225e-20230407_013816` | `<none>` | [4](#tee-images-3) | 0x0001, 0x0001, 0x0001 |
+| Fire OS 6 4655 | `0db8914-20221005_072344` | `<none>` | [4](#tee-images-3) | 0x0001, 0x0001, 0x0001 |
 | Fire OS 6 1895 | `0d18cf4-20181206_233555` | `<none>` | [1](#tee-images-3) | 0x0001, 0x0001, 0x0001 |
 
 - The table has no fastbrick column. kamakiri-donut v1.0.0 ships no fastbrick
   image and no `profile.sh`, where every amonet release here ships both, so no
   LK of donut's chooses one.
 - No donut preloader carries a build description, so `pl_build_desc` is
-  `<none>` in every build. Two preloaders ship across the 17: 1895's, of
-  147456 bytes, and one of 151552 bytes in every later build. Where biscuit's
-  and radar's preloaders of one row differ in boot0's GPT, donut's later
-  sixteen builds ship the same preloader byte for byte.
-- Only two LKs ship: 1895's, and one in every build from 6009. Each is read as
-  biscuit's are, in [Anti-rollback](#anti-rollback).
+  `<none>` in every build. Five preloaders ship across the 26: 1895's, of
+  147456 bytes, and four of 151552 bytes. 4655 has one, 4769 and 4774 share
+  one, 4936 has one, and 5531 and the twenty builds after it ship the same one
+  byte for byte. Where biscuit's and radar's preloaders of one row differ only
+  in boot0's GPT, what separates donut's four is not read.
+- Three LKs ship: 1895's, 4655's, and one in every build from 4769. Each is
+  read as biscuit's are, in [Anti-rollback](#anti-rollback).
 - Every version is 1. The PL version is 1 as crown's is, where biscuit's and
   radar's are 5, and the TEE version 0x0001 is below every other device here.
   No OTA raises one.
-- kamakiri-donut v1.0.0 writes the LK of 6009 and later byte for byte, and the
-  TEE of 6176 and later byte for byte. Its preloader is in no OTA.
+- kamakiri-donut v1.0.0 writes the LK of 4769 and later byte for byte, and
+  the TEE of 6176 and later byte for byte. Its preloader is in no OTA.
 
 ### TEE images
 
 | TEE | bytes | md5 | sha256 |
 | --- | --- | --- | --- |
+| 4 | 2367488 | `e3cf83a0d0b5479147013427112a4a83` | `c6fad5635a8760bfb741b3cf2339abf582a4b509263aacc9445dca081bdf2eb6` |
 | 3 | 2363392 | `3838fb54db104f8fe9799484afdd77e2` | `07cff71c598b7665f17c769b0504c8b7ad91647414c280b10a26be4ea5761194` |
 | 2 | 2367488 | `5f0569a8c128a3288f962937a0a0fc10` | `01e61100d278854620561dd1a8b3d2a1d1b91999c83a6d6e0ffb60cdf9cb7d95` |
 | 1 | 2301952 | `7db11fb38d534b993d80d10f5b9b7d64` | `d52ffd7e030898cb87a83db8ca572bd14b23e84a0c7e957edf5806499c975a14` |
 
 - Each donut TEE is numbered here, so a number in the table above is always
-  donut's own. TEE 3 is smaller than TEE 2 and newer.
+  donut's own. TEE 3 is smaller than TEE 2 and newer. TEE 4 is the size of
+  TEE 2 and older: it ships in 4655 to 5531, from 2023 and 2024.
 
 ### Partition hashes
 

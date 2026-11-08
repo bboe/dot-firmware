@@ -11,6 +11,7 @@ import contextlib
 import functools
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -55,6 +56,7 @@ from firebreak.ui import (
     ANSIColor,
     FatalError,
     Kind,
+    confirm,
     paint,
     show,
     stop,
@@ -68,6 +70,7 @@ if TYPE_CHECKING:
 
     from firebreak.plugin import Device
 
+BUILDS_COMMAND = "builds"
 CREDITS = """firebreak automates work that other people did first.
 
 xyz wrote amonet, a MediaTek bootrom exploit. firebreak's bootrom and payload
@@ -101,6 +104,8 @@ FACTORY_RESETS = {
     for name, target in targets.items()
     if isinstance(target.installs, FireOs6) and target.unlock
 }
+NO_WAIT = "--no-wait"
+NS_VERSION = re.compile(pattern=r"-NS(\d)(\d)(\d)(\d)(\d*)_")
 REPORT = "report"
 SURVEY = "survey"
 UNLOCK = "unlock"
@@ -108,8 +113,9 @@ WRITE_TEST = "write-test"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    builds = ordered(builds={build for each in BUILDS.values() for build in each})
     about = {
+        BUILDS_COMMAND: "list every build `stock` takes for each Echo, newest"
+        " first, with its Fire OS version. It needs no Echo.",
         BOOTROM: "hold the Echo in its bootrom, where amonet's payload can reach"
         " the eMMC with no firmware running. It asks before it clears boot0,"
         " which is what leaves an Echo startable from its bootrom alone. An"
@@ -146,11 +152,18 @@ def build_parser() -> argparse.ArgumentParser:
     parents = option_parents()
     quiet = option_parents(hidden=True)
     navigating = ["--force", "--no-update-check", "--verbose"]
-    restoring = ["--end-in-fireos", "--no-update-check", "--no-wait", "--verbose"]
+    restoring = [
+        "--end-in-fireos",
+        "--force",
+        "--no-update-check",
+        "--no-wait",
+        "--verbose",
+    ]
     rooting = ["--factory-reset", "--no-update-check", "--verbose"]
     every = sorted({"--credits", "--device", *navigating, *restoring, *rooting})
     uses = {
         BOOTROM: navigating,
+        BUILDS_COMMAND: [],
         FASTBOOT: ["--no-update-check", "--verbose"],
         REBOOT: ["--no-update-check", "--verbose"],
         REPORT: ["--no-update-check", "--verbose"],
@@ -236,16 +249,15 @@ other commands:
             if name == STOCK
             else argparse.HelpFormatter,
             parents=[
-                (parents if each in uses[name] else quiet)[each]
+                (parents if each in uses[name] and each != NO_WAIT else quiet)[each]
                 for each in sorted({*uses[name], "--device"})
             ],
         )
         if name == STOCK:
             made.add_argument(
                 "build",
-                choices=builds,
                 default=None,
-                help="the build to install, from the list below",
+                help="the build to install; `firebreak builds` lists them",
                 metavar="BUILD",
                 nargs="?",
             )
@@ -264,6 +276,22 @@ other commands:
                 nargs="?",
             )
     return parser
+
+
+def builds_list() -> str:
+    lines: list[str] = []
+    for device, each in BUILDS.items():
+        if STOCK not in TARGETS.get(device, {}):
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"{device.title}, {DEFAULT_BUILDS[device]} when left out:")
+        lines.extend(
+            f"  {build:<14}Fire OS {fireos_version(build=build, name=each[build].name)}"
+            + ("" if each[build].verified else ", not yet verified on hardware")
+            for build in ordered(builds=each)
+        )
+    return "\n".join(lines)
 
 
 def check_for_update() -> None:
@@ -293,6 +321,9 @@ def chosen_device(*, name: str | None) -> Device | None:
 
 def cli() -> None:
     options = parsed()
+    if options.command == BUILDS_COMMAND:
+        print(builds_list())
+        return
     if options.command == SURVEY:
         check_root()
         make_cache()
@@ -312,7 +343,7 @@ def cli() -> None:
     check_adb()
     make_cache()
     SESSION.fastboot = not options.end_in_fireos
-    SESSION.no_wait = options.no_wait
+    SESSION.no_wait = options.force
     SESSION.short = options.command == SHORT
     SESSION.device = DEVICES.get(options.device)
     command = {
@@ -340,8 +371,15 @@ def cli() -> None:
         )
     device = ARGUMENTS.target.device
     if ARGUMENTS.target.name == STOCK:
-        stock_build(device=device, wanted=options.build)
+        stock_build(device=device, force=options.force, wanted=options.build)
     root()
+
+
+def fireos_version(*, build: str, name: str) -> str:
+    found = NS_VERSION.search(name)
+    if found is None:
+        return build.partition("-")[0]
+    return ".".join(digit for digit in found.groups() if digit)
 
 
 def leave(*, status: object) -> None:
@@ -408,7 +446,8 @@ def option_parents(*, hidden: bool = False) -> dict[str, argparse.ArgumentParser
             "--force",
             (
                 "do not ask before a write that a command needs to reach the"
-                " state it is named for"
+                " state it is named for, and start stock's writes without the 10"
+                " seconds that Ctrl-C cancels in"
             ),
         ),
         (
@@ -460,7 +499,7 @@ def ordered(*, builds: Iterable[str]) -> list[str]:
         builds,
         key=lambda build: (
             build not in fireos5,
-            tuple(map(int, build.split("."))),
+            tuple(map(int, build.replace("-", ".").split("."))),
         ),
         reverse=True,
     )
@@ -486,10 +525,11 @@ def parsed() -> argparse.Namespace:
         sys.exit(1)
     takes = {
         BOOTROM: {"force"},
+        BUILDS_COMMAND: set(),
         FASTBOOT: set(),
         REPORT: set(),
         SHORT: {"device"},
-        STOCK: {"end_in_fireos", "no_wait"},
+        STOCK: {"end_in_fireos", "force", "no_wait"},
         SURVEY: set(),
         TWRP: {"force"},
         WRITE_TEST: set(),
@@ -507,6 +547,20 @@ def parsed() -> argparse.Namespace:
         if getattr(options, option):
             dashed = option.replace("_", "-")
             parser.error(message=f"{options.command} takes no --{dashed}")
+    if options.command == STOCK and options.build not in {
+        "",
+        *(build for each in BUILDS.values() for build in each),
+    }:
+        parser.error(
+            message=f"argument BUILD: no Echo has a stock build {options.build}."
+            f" `firebreak builds` lists the builds {STOCK} takes."
+        )
+    if options.no_wait:
+        warn(
+            text=f"{NO_WAIT} is deprecated and goes away in firebreak 2.0. It is"
+            " --force now, which this run takes in its place."
+        )
+        options.force = True
     return options
 
 
@@ -526,12 +580,18 @@ def reported() -> None:
         )
 
 
-def stock_build(*, device: Device, wanted: str) -> None:
+def stock_build(*, device: Device, force: bool, wanted: str) -> None:
     ARGUMENTS.build = wanted or DEFAULT_BUILDS[device]
     if ARGUMENTS.build not in BUILDS[device]:
         raise FatalError(
-            message=f"the {device.title} has no stock build {ARGUMENTS.build}:"
-            f" use one of {', '.join(ordered(builds=BUILDS[device]))}"
+            message=f"the {device.title} has no stock build {ARGUMENTS.build}."
+            f" `firebreak builds` lists the builds {STOCK} takes for each Echo."
+        )
+    if not BUILDS[device][ARGUMENTS.build].verified:
+        confirm(
+            force=force,
+            what=f"stock {ARGUMENTS.build} has not been restored to and unlocked"
+            f" from on an {device.title}, so this run would be its first",
         )
     if ARGUMENTS.build in biscuit.BOOTROM_BUILDS and SESSION.fastboot:
         warn(
@@ -543,18 +603,20 @@ def stock_build(*, device: Device, wanted: str) -> None:
 
 
 def stock_builds_help() -> str:
-    lines = ["the builds BUILD takes:"]
-    for device, each in BUILDS.items():
-        if STOCK not in TARGETS.get(device, {}):
-            continue
-        lines.append("")
-        lines.extend(
-            listed(
-                label=f"{device.title}, {DEFAULT_BUILDS[device]} when left out:",
-                summary=", ".join(ordered(builds=each)),
-            )
+    defaults = [
+        f"{DEFAULT_BUILDS[device]} on the {device.title}"
+        for device in BUILDS
+        if STOCK in TARGETS.get(device, {})
+    ]
+    return "\n".join(
+        textwrap.wrap(
+            "BUILD is the stock build to install. Left out, it is "
+            + ", ".join(defaults[:-1])
+            + f" and {defaults[-1]}. `firebreak builds` lists every build it"
+            " takes, with its Fire OS version.",
+            width=74,
         )
-    return "\n".join(lines)
+    )
 
 
 def target_help() -> str:

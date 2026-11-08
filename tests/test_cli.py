@@ -22,6 +22,21 @@ PLAIN = {
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
+def test_builds_lists_every_build_with_its_fire_os_version() -> None:
+    output = subprocess.run(
+        args=[sys.executable, "-m", "firebreak", "builds"],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+    listed = re.findall(r"^  (\S+) +Fire OS (\S+)$", output, flags=re.MULTILINE)
+    assert sorted(build for build, _ in listed) == sorted(
+        build for builds in BUILDS.values() for build in builds
+    )
+    assert ("8138", "6.5.7.4.1") in listed
+    assert ("5.5.0.3-1973", "5.5.0.3") in listed
+
+
 def test_credits_name_every_link_the_readme_credits() -> None:
     output = subprocess.run(
         args=[sys.executable, "-m", "firebreak", "--credits"],
@@ -66,17 +81,6 @@ def test_only_stock_takes_a_build() -> None:
     assert "unrecognized arguments: 8146" in finished.stderr
 
 
-def test_stock_help_lists_the_builds() -> None:
-    output = subprocess.run(
-        args=[sys.executable, "-m", "firebreak", "stock", "-h"],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
-    text = " ".join(output.split())
-    assert all(build in text for builds in BUILDS.values() for build in builds)
-
-
 def test_survey_takes_options_before_it(*, tmp_path: pathlib.Path) -> None:
     bad = tmp_path / "bad.zip"
     bad.write_bytes(data=b"not a zip")
@@ -94,7 +98,10 @@ def test_survey_takes_options_before_it(*, tmp_path: pathlib.Path) -> None:
     argnames=("arguments", "message"),
     argvalues=[
         (["stock", "4315", "8146"], "unrecognized arguments: 8146"),
-        (["stock", "9999"], "argument BUILD: invalid choice: '9999'"),
+        (
+            ["stock", "9999"],
+            "no Echo has a stock build 9999. `firebreak builds` lists",
+        ),
         (["survey"], "the following arguments are required: OTA"),
         (["--force", "survey", "x.zip"], "survey takes no --force"),
         (["report", "--force"], "unrecognized arguments: --force"),
