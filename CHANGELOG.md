@@ -2,6 +2,15 @@
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Fixed
+
+- `unlock fireos6` deletes `update.zip` and `boot-root.zip` from `/sdcard`
+  after it installs them, and zeroes them first where it wiped userdata. They
+  were left in userdata, where the OTA took 109 MB that every backup then
+  copied. `update.zip` is pushed once, not once for each slot.
+
 ## 1.1.0 - 2026-11-10
 
 ### Added

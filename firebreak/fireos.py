@@ -33,6 +33,7 @@ from firebreak.host import (
     PUSH_TRIES,
     adb_script,
     adb_shell,
+    last_line,
     md5_mismatch,
     push_checked,
     run,
@@ -57,6 +58,7 @@ BOOT_ROOT = Download(
 BOOT_ROOT_INSTALL = "Installing zip file '/sdcard/boot-root.zip'"
 BUILD_NAME = "ro.build.version.name="
 BUILD_OK = "build-ok"
+ERASED_OK = "erased-ok"
 HIDE_WAIT = 60
 MOUNT_OK = "mount-ok"
 SLOT_OK = "slot-ok"
@@ -75,6 +77,12 @@ ZIP_OK = "zip-ok"
 
 
 class Shell(enum.Enum):
+    DELETED = "rm -f {path}; [ -e {path} ] || echo {ok}"
+    ZEROED = (
+        "n=$(( ($(wc -c < {path}) + 4095) / 4096 ));"
+        " dd if=/dev/zero bs=4096 count=$n 1<>{path} 2>/dev/null && z=1;"
+        ' sync; rm -f {path}; [ -e {path} ] || [ -z "$z" ] || echo {ok}'
+    )
     DATA = f"""\
 set -e
 umount /sdcard /data 2>/dev/null || true
@@ -202,6 +210,16 @@ def build_system(*, package: Download, target: pathlib.Path) -> None:
     part.replace(target=target)
 
 
+def erased(*, path: str, wiped: bool) -> None:
+    shell = Shell.ZEROED if wiped else Shell.DELETED
+    said = adb_shell(command=shell.value.format(ok=ERASED_OK, path=path))
+    if last_line(said=said).strip() != ERASED_OK:
+        warn(
+            text=f"{path} may still be in userdata: its"
+            f" {'zeroing and ' if wiped else ''}delete did not report back."
+        )
+
+
 def hide_updater() -> None:
     def hidden() -> bool:
         output = adb_shell(command=f"su -c 'dumpsys package {UPDATER}'", timeout=60)
@@ -242,7 +260,8 @@ def install_and_root() -> None:
     build = "" if ARGUMENTS.factory_reset else installed_build(slot=active_slot())
     if not ARGUMENTS.factory_reset:
         PROGRESS.steps = PROGRESS.step + (5 if not build else 2)
-    if not build:
+    wiped = not build
+    if wiped:
         install_fireos6()
         build = ARGUMENTS.target.installs.build
     PROGRESS.begin(estimate="10 s", label="installing boot-root")
@@ -252,6 +271,7 @@ def install_and_root() -> None:
     if errors:
         raise FatalError(message="boot-root.zip failed: " + errors[0])
     ended = boot_root_ended()
+    erased(path="/sdcard/boot-root.zip", wiped=wiped)
     if not ended.endswith("RC=0"):
         raise FatalError(message="boot-root.zip failed: " + ended)
     slot = active_slot()
@@ -298,10 +318,15 @@ def install_fireos6() -> None:
         if index:
             run(arguments=["adb", "reboot", "recovery"], check=True, timeout=60)
             wait_for_twrp()
-        push_checked(local=update_file, remote=update)
+        if not index or md5_mismatch(
+            command=f"md5sum {update}", want=digest(kind="md5", path=update_file)
+        ):
+            push_checked(local=update_file, remote=update)
         before = active_slot()
         adb_shell(command="twrp install " + update, timeout=600)
         after = active_slot()
+        if index:
+            erased(path=update, wiped=True)
         if {before, after} != {"a", "b"}:
             raise FatalError(
                 message=f"installing Fire OS 6 {build} left the"

@@ -70,6 +70,7 @@ def fireos6(
     tmp_path: pathlib.Path,
 ) -> list[str]:
     del pushed
+    (tmp_path / "ota").write_bytes(data=b"ota")
     monkeypatch.setattr(
         name="target",
         target=fireos.ARGUMENTS,
@@ -267,6 +268,26 @@ def test_an_updater_that_stays_visible_stops_the_run_after_a_minute(
     assert len(adb.commands(holding="pm hide " + fireos.UPDATER)) == 7
 
 
+@pytest.mark.parametrize(("said", "warned"), [("erased-ok", 0), ("rm: busy", 1)])
+@pytest.mark.parametrize("wiped", [True, False])
+def test_erased_warns_when_the_delete_does_not_report_back(
+    *,
+    adb: FakeAdb,
+    monkeypatch: pytest.MonkeyPatch,
+    said: str,
+    warned: int,
+    wiped: bool,
+) -> None:
+    warnings: list[dict] = []
+    monkeypatch.setattr(
+        name="warn", target=fireos, value=lambda **said: warnings.append(said)
+    )
+    adb.answers["/sdcard/x.zip"] = [said]
+    fireos.erased(path="/sdcard/x.zip", wiped=wiped)
+    assert len(warnings) == warned
+    assert ("if=/dev/zero" in adb.commands(holding="x.zip")[0]) == wiped
+
+
 def test_fire_os_5_before_the_preloader_takes_its_slot_and_does_not_reboot(
     *, adb: FakeAdb, fireos5: list[dict[str, object]]
 ) -> None:
@@ -347,7 +368,30 @@ def test_fire_os_6_goes_into_both_slots_then_boot_root(
         "/sdcard/update.zip",
         "/sdcard/boot-root.zip",
     ]
+    erased = adb.commands(holding="if=/dev/zero")
+    assert [command.split("1<>")[1].split()[0] for command in erased] == [
+        "/sdcard/update.zip",
+        "/sdcard/boot-root.zip",
+    ]
+    assert (
+        adb.commands(holding="twrp install /sdcard/update.zip")
+        == ["twrp install /sdcard/update.zip"] * 2
+    )
     assert adb.commands(holding="twrp wipe") == ["twrp wipe cache", "twrp wipe data"]
+    said = [words[-1] for words in adb.asked]
+    for zipped, ended in (
+        ("update.zip", "get_active"),
+        ("boot-root.zip", "Updater process ended"),
+    ):
+        erase = max(
+            at for at, each in enumerate(said) if f"1<>/sdcard/{zipped}" in each
+        )
+        install = max(
+            at
+            for at, each in enumerate(said)
+            if each == f"twrp install /sdcard/{zipped}"
+        )
+        assert any(ended in each for each in said[install:erase])
     assert fireos6 == ["twrp"]
     assert adb.asked[-1] == ["adb", "reboot"]
 
@@ -438,9 +482,30 @@ def test_fire_os_6_patches_the_installed_build_unless_reset(
     fireos.stage_install_fireos6()
     assert [remote for _, remote in pushed] == ["/sdcard/boot-root.zip"]
     assert adb.commands(holding="twrp wipe") == []
+    assert adb.commands(holding="/dev/zero") == []
+    assert adb.commands(holding="rm -f") == [
+        fireos.Shell.DELETED.value.format(
+            ok=fireos.ERASED_OK, path="/sdcard/boot-root.zip"
+        )
+    ]
     assert "system_b" in adb.commands(holding="build-ok")[0]
     assert "slot _b:" in adb.commands(holding="neutering")[0]
     assert adb.asked[-1] == ["adb", "reboot"]
+
+
+@pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_pushes_the_ota_once_when_it_is_still_there(
+    *, adb: FakeAdb, pushed: list[tuple[pathlib.Path, str]]
+) -> None:
+    adb.answers["md5sum /sdcard/update.zip"] = [
+        hashlib.md5(b"ota", usedforsecurity=False).hexdigest() + "  /sdcard/update.zip"
+    ]
+    fireos.stage_install_fireos6()
+    assert [remote for _, remote in pushed] == [
+        "/sdcard/update.zip",
+        "/sdcard/boot-root.zip",
+    ]
+    assert len(adb.commands(holding="1<>/sdcard/update.zip")) == 1
 
 
 @pytest.mark.usefixtures("fireos6")

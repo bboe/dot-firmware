@@ -1519,6 +1519,40 @@ unlock's, not the stock bytes.
 - It pushes the OTA to `/sdcard` before each install. A `/sdcard` on a
   `/data` that did not mount is TWRP's RAM: the push and its read-back pass,
   and the reboot loses the file.
+- Each file it pushes to `/sdcard` is deleted once it is no longer needed:
+  `boot-root.zip` after its install, and `update.zip` after the second slot's,
+  since `/sdcard` keeps it through the reboot between the two. The second
+  slot pushes it again only when the copy there no longer has the OTA's md5,
+  so the eMMC takes the 109 MB once. Each delete waits until TWRP is done with
+  the file: `update.zip`'s until no `update_engine` runs, and
+  `boot-root.zip`'s until `recovery.log` shows its updater ended. adb can
+  drop while TWRP goes on installing, so the end of `twrp install` is not
+  proof. `/sdcard` is
+  `/data/media` in userdata, so a file left there stays through every boot and
+  goes into every backup. On 2026-11-09 a white biscuit held a 109 MB
+  `update.zip` from an unlock on 2026-10-12. The delete ends in a marker that
+  only prints once the file is gone. Without it the run warns that the file
+  may still be in userdata and goes on, because the Echo is rooted by then.
+- After a `twrp wipe data` in the same run, each file is zeroed before the
+  delete. A deleted file's blocks still hold its bytes, and a backup reads the
+  whole partition. The wipe leaves userdata reading as zeros, so the zeros put
+  it back as the wipe left it. Measured on a radar on 2026-11-10: a 4 MiB file
+  in `/data/local/tmp` put 220,753 copies of a marker on userdata, and after
+  `unlock fireos6 --factory-reset` none were left. The wipe took 3 seconds, so
+  it discards blocks rather than writing zeros, and this eMMC reads a
+  discarded block as zeros. After Fire OS 6's first boot, 89% of userdata's
+  4 KiB blocks read as zeros. Without a wipe the blocks held old bytes before
+  the push, and zeroing them would only add a write.
+- ext4 overwrites a file's own blocks in place, so `dd` from `/dev/zero` over
+  the file's length reaches them. It writes through the shell's `1<>`, which
+  opens the file without truncating it. amonet's TWRP builds toybox with
+  `conv` turned off: `conv=notrunc` prints "dd: conv option disabled" and
+  writes nothing. Measured on a biscuit on 2026-11-09: 123,362 copies of a
+  marker in a 4 MiB file read back from userdata, and none after the zeroing
+  and delete. The reads dropped the kernel's caches first; without that, a
+  second read returned the first read's stale blocks.
+- A TRIM is not used: whether a discarded block reads back as zeros depends
+  on the eMMC.
 - The XDA procedure flips the active slot with `bcbtool` between the two
   installs. The run does not: a TWRP install of an A/B OTA writes the
   inactive slot and makes it active, so the flip would make the second
