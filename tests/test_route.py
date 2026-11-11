@@ -24,6 +24,7 @@ class Run:
         self.prefetched: list[list[object]] = []
         self.said: dict[str, str] = {
             "getenforce": "Permissive",
+            "getprop ro.adb.secure": "1",
             "getprop ro.build.version.name": "Fire OS 5.5.5.4",
         }
         self.started = 0
@@ -320,7 +321,23 @@ def test_a_dot_at_v2_0_0_s_goal_says_it_has_root_adb(
     run.said["getprop ro.build.version.name"] = "Fire OS 6.5.7.4"
     run.states = [route.State.UNLOCKED_BOOTED]
     route.root()
-    assert "rooted: Fire OS 6.5.7.4, with root adb" in said(capsys=capsys)
+    assert (
+        "rooted: Fire OS 6.5.7.4, with root adb, locked to this computer's adb key"
+        in said(capsys=capsys)
+    )
+
+
+def test_a_dot_rooted_before_the_lock_says_only_that_it_has_root_adb(
+    *, capsys: pytest.CaptureFixture[str], run: Run
+) -> None:
+    run.target(name="fireos6")
+    run.said["getprop ro.adb.secure"] = "0"
+    run.said["getprop ro.build.version.name"] = "Fire OS 6.5.7.4"
+    run.states = [route.State.UNLOCKED_BOOTED]
+    route.root()
+    out = said(capsys=capsys)
+    assert "rooted: Fire OS 6.5.7.4, with root adb." in out
+    assert "locked" not in out
 
 
 def test_a_dot_that_stays_dark_after_boot_root_asks_for_a_power_cycle(

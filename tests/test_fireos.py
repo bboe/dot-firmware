@@ -9,6 +9,7 @@ import zipfile
 from typing import TYPE_CHECKING
 
 import pytest
+from conftest import ADB_KEY
 
 from firebreak import fireos
 from firebreak.devices import BISCUIT, DONUT, TARGETS, biscuit
@@ -95,7 +96,9 @@ def fireos6(
     adb.answers["boot-root.zip"] = ["Installing\nDone"]
     adb.answers["Installing zip file"] = [ended(rc=0)]
     adb.answers["neutering ota updates"] = ["1\nzip-ok"]
-    adb.answers["updates-ok"] = ["fos6-a\noff-a\nfos6-b\noff-b\nupdates-ok"]
+    adb.answers["updates-ok"] = [
+        "fos6-a\noff-a\nlocked-a\nfos6-b\noff-b\nlocked-b\nupdates-ok"
+    ]
     return waited
 
 
@@ -172,6 +175,27 @@ def test_a_boot_root_error_stops_the_run(*, adb: FakeAdb) -> None:
     adb.answers["boot-root.zip"] = ["Installing\n(!) Error: no space"]
     with pytest.raises(FatalError, match=r"boot-root\.zip failed: \(!\) Error"):
         fireos.stage_install_fireos6()
+
+
+@pytest.mark.parametrize(
+    ("content", "message"), [(None, "cannot be read"), (b"\n", "is empty")]
+)
+def test_a_missing_or_empty_adb_key_stops_before_any_write(
+    *,
+    adb: FakeAdb,
+    content: bytes | None,
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+) -> None:
+    folder = tmp_path / "other"
+    folder.mkdir()
+    monkeypatch.setattr(name="HOST_KEY", target=fireos, value=folder / "adbkey.pub")
+    if content is not None:
+        (folder / "adbkey.pub").write_bytes(content)
+    with pytest.raises(FatalError, match=f"adbkey.pub {message}.*nothing was written"):
+        fireos.adb_key()
+    assert (["adb", "start-server"] in adb.asked) == (content is None)
 
 
 def test_a_rooted_dot_swaps_its_twrp_for_the_target_s(
@@ -355,6 +379,13 @@ def test_fire_os_6_disables_otad_and_blocks_the_update_hosts(*, adb: FakeAdb) ->
     assert "/system_$s $m" in command
     assert "&\\n    disabled|" in command
     assert "|| { echo fos6-$s; continue; }" in command
+    assert "if [ -f $p ] && [ -f $h ]; then" in command
+    assert "$m/*.rc $m/system/etc/init/*.rc" in command
+    assert "sed -i 's|^service update_engine .*|&\\n    disabled|' $u" in command
+    assert (
+        "[ -n \"$u\" ] && ! sed -n '/^service update_engine /,/^[^ ]/p' $u" in command
+    )
+    assert "[ -n \"$r\" ] && ! grep -h -A 1 '^service otad ' $r" in command
     assert all(host in command for host in fireos.UPDATE_HOSTS)
     assert adb.asked[-1] == ["adb", "reboot"]
 
@@ -367,6 +398,7 @@ def test_fire_os_6_goes_into_both_slots_then_boot_root(
         "/sdcard/update.zip",
         "/sdcard/update.zip",
         "/sdcard/boot-root.zip",
+        "/tmp/adbkey.pub",
     ]
     erased = adb.commands(holding="if=/dev/zero")
     assert [command.split("1<>")[1].split()[0] for command in erased] == [
@@ -422,6 +454,7 @@ def test_fire_os_6_installs_where_no_fire_os_6_is_installed(
         "/sdcard/update.zip",
         "/sdcard/update.zip",
         "/sdcard/boot-root.zip",
+        "/tmp/adbkey.pub",
     ]
     assert fireos.PROGRESS.steps == 6
 
@@ -468,6 +501,29 @@ def test_fire_os_6_leaves_a_system_that_already_started_alone(*, adb: FakeAdb) -
 
 
 @pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_locks_adb_to_this_computer_s_key(
+    *, adb: FakeAdb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keys: list[bytes] = []
+    monkeypatch.setattr(
+        name="push_checked",
+        target=fireos,
+        value=lambda **o: (
+            keys.append(o["local"].read_bytes())
+            if o["remote"] == fireos.ADB_KEY
+            else None
+        ),
+    )
+    fireos.stage_install_fireos6()
+    [command] = adb.commands(holding="updates-ok")
+    assert "sed -i 's|^ro.adb.secure=.*|ro.adb.secure=1|' $p" in command
+    assert "cat /tmp/adbkey.pub > $m/adb_keys" in command
+    assert "cmp -s /tmp/adbkey.pub $m/adb_keys && echo locked-$s" in command
+    assert "rm -f /tmp/adbkey.pub" in command
+    assert keys == [ADB_KEY]
+
+
+@pytest.mark.usefixtures("fireos6")
 def test_fire_os_6_patches_the_installed_build_unless_reset(
     *,
     adb: FakeAdb,
@@ -480,10 +536,13 @@ def test_fire_os_6_patches_the_installed_build_unless_reset(
         "mount-ok\nro.build.version.name=Fire OS 6574.1 (NS65741/8146)\nbuild-ok"
     ]
     fireos.stage_install_fireos6()
-    assert [remote for _, remote in pushed] == ["/sdcard/boot-root.zip"]
+    assert [remote for _, remote in pushed] == [
+        "/sdcard/boot-root.zip",
+        "/tmp/adbkey.pub",
+    ]
     assert adb.commands(holding="twrp wipe") == []
     assert adb.commands(holding="/dev/zero") == []
-    assert adb.commands(holding="rm -f") == [
+    assert adb.commands(holding="rm -f /sdcard") == [
         fireos.Shell.DELETED.value.format(
             ok=fireos.ERASED_OK, path="/sdcard/boot-root.zip"
         )
@@ -504,6 +563,7 @@ def test_fire_os_6_pushes_the_ota_once_when_it_is_still_there(
     assert [remote for _, remote in pushed] == [
         "/sdcard/update.zip",
         "/sdcard/boot-root.zip",
+        "/tmp/adbkey.pub",
     ]
     assert len(adb.commands(holding="1<>/sdcard/update.zip")) == 1
 
@@ -601,6 +661,25 @@ def test_fire_os_6_stops_when_a_donut_never_reaches_fastboot(
     monkeypatch.setattr(name="FASTBOOT_WAIT", target=fireos, value=-1)
     with pytest.raises(FatalError, match="did not reach fastboot"):
         fireos.install_fireos6()
+
+
+@pytest.mark.parametrize(
+    ("said", "slots"),
+    [
+        ("fos6-a\noff-a\nfos6-b\noff-b\nlocked-b\nupdates-ok", "slot a"),
+        ("fos6-a\noff-a\nfos6-b\noff-b\nupdates-ok", "slot a and b"),
+    ],
+)
+@pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_stops_when_adb_stays_open_in_a_slot(
+    *, adb: FakeAdb, said: str, slots: str
+) -> None:
+    adb.answers["updates-ok"] = [said]
+    with pytest.raises(
+        FatalError, match=f"not locked to this computer's key in Fire OS 6's {slots}\\."
+    ):
+        fireos.stage_install_fireos6()
+    assert ["adb", "reboot"] not in adb.asked
 
 
 @pytest.mark.usefixtures("fireos6")
@@ -769,6 +848,10 @@ def test_magisk_that_does_not_land_stops_the_run(
     adb.answers["md5sum"] = ["0" * 32 + "  -"]
     with pytest.raises(FatalError, match=said or "files did not verify"):
         fireos.install_magisk(magisk=tmp_path / "magisk.zip", work=tmp_path)
+
+
+def test_the_adb_key_is_the_one_in_the_home_folder() -> None:
+    assert fireos.adb_key() == ADB_KEY
 
 
 @pytest.mark.parametrize("verified", [True, False])

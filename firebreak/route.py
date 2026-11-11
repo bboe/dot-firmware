@@ -33,6 +33,7 @@ from firebreak.fireos import (
     BOOT_ROOT,
     TWRP,
     UPDATER,
+    adb_key,
     hide_updater,
     install_steps,
     stage_install_fireos,
@@ -317,6 +318,12 @@ def keeps_restarting() -> str:
         f" move this {title()} to another USB port: this run waits for it."
         f" {MOST_RELIABLE}"
     )
+
+
+def locked() -> str:
+    if adb_shell(command="getprop ro.adb.secure") == "1":
+        return ", locked to this computer's adb key"
+    return ""
 
 
 def needed(*, start: State, table: dict[State, Stage]) -> list[Need]:
@@ -608,7 +615,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 say(text=usb_ask(device=target.device))
         if current == State.UNLOCKED_BOOTED == target.goal and not resetting:
             version = adb_shell(command="getprop ro.build.version.name")
-            warn(text=f"The {title()} is rooted: {version}, with root adb.")
+            warn(text=f"The {title()} is rooted: {version}, with root adb{locked()}.")
             cache_note()
             return
         if target.unlock is None and (
@@ -677,7 +684,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             selinux = adb_shell(command="getenforce")
             warn(
                 text=f"The {title()} is rooted: {version}, SELinux {selinux},"
-                f" {UPDATER} hidden."
+                f" {UPDATER} hidden{locked()}."
             )
             cache_note()
             return
@@ -722,8 +729,9 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     )
                 if current == State.STOCK_BOOTED:
                     raise FatalError(
-                        message="Fire OS 6 started without root adb, so"
-                        " boot-root.zip did not take. " + again()
+                        message="Fire OS 6 started without root adb for this"
+                        " computer: boot-root.zip did not take, or adb uses a key"
+                        " other than the one the unlock let in. " + again()
                     )
                 if current == State.BOOTED:
                     raise FatalError(
@@ -763,6 +771,8 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             continue
         if not done:
             check_target(target=target)
+            if target.unlock is not None:
+                adb_key()
         prefetch(needs=needed(start=current, table=table))
         if not done:
             warn(text=f"Keep the {title()} plugged in until firebreak finishes.")

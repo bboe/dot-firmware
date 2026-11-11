@@ -277,6 +277,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 - The build comes from `build.prop` at the root of `system_X`, where Fire
   OS 5 keeps it, or from `system/build.prop`, where Fire OS 6's
   system-as-root image keeps it.
+- `ro.adb.secure` comes from where an Echo keeps it: on Fire OS 6 the
+  booted slot's `/default.prop`, on Fire OS 5 the `default.prop` in the
+  ramdisk of the boot image in `boot_X_x` or `boot_X`. It reads 0 when
+  neither sets it. Nothing models a refused key: adb lets every key in.
 - A new Echo holds its stock build in both `system_a` and `system_b`, as every
   Echo backed up here does. The `unlock fireos6` check that `otad` is off
   reads a slot it cannot mount as one it could not block, so an unformatted

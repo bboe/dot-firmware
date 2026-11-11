@@ -241,6 +241,25 @@ other commands:
 Run `firebreak COMMAND --help` for what that command takes.
 ```
 
+### adb after an unlock
+
+An unlocked Echo answers root adb over USB and, on Fire OS 6, over Wi-Fi on
+port 5555. `unlock` lets in only the computer that ran it: the key in that
+computer's `~/.android/adbkey.pub`. Any other computer sees the Echo as
+`unauthorized`. From the computer that ran the unlock:
+
+```sh
+adb connect ECHO-IP:5555
+adb shell
+```
+
+Keep `~/.android/adbkey`. Without it, adb cannot reach rooted Fire OS from
+any computer. TWRP is not locked, so to move to another computer, or after
+losing the key, run `firebreak unlock` from that computer. It asks for the
+button gesture, and the install it does from TWRP lets in that computer's key
+in place of the old one. On Fire OS 5 that install also erases the Echo's
+setup.
+
 ## Documentation
 
 - [docs/troubleshooting.md][troubleshooting]: USB and cable problems, Windows

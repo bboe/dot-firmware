@@ -4,8 +4,18 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+### Changed
+
+- `unlock` lets only the computer that runs it into the Echo's adb, over USB
+  and Wi-Fi, on Fire OS 5 and 6. A rooted Fire OS 6 Echo previously gave root
+  adb to anyone on its network.
+
 ### Fixed
 
+- `unlock fireos6` blocks updates on a build with no `otad`, such as the Echo
+  Dot (3rd Generation)'s 1895, where it stopped with the active slot not
+  blocked. There it disables `update_engine` besides blocking the update
+  hosts.
 - `unlock fireos6 --factory-reset` erases an Echo that already runs rooted
   Fire OS 6 and installs both slots, where it said the Echo was rooted and
   did nothing.

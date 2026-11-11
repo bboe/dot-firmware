@@ -456,7 +456,9 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
         f" && printf 'ro.build.version.name={DEVICES[device]['stock']}\\n'"
         " > /sim/stock/system/build.prop"
         " && printf '127.0.0.1 localhost\\n' > /sim/stock/system/etc/hosts"
-        " && printf 'service otad /system/bin/otad\\n    class main\\n'"
+        " && printf 'ro.adb.secure=1\\n' > /sim/stock/default.prop"
+        " && printf 'service otad /system/bin/otad\\n    class main\\n"
+        "service update_engine /system/bin/update_engine\\n    class late_start\\n'"
         " > /sim/stock/init.sim.rc"
         " && i=0 && for p in system_a userdata cache system_b; do i=$((i + 1));"
         " E2FSPROGS_FAKE_TIME=1700000000 mke2fs -q -F -t ext4"
@@ -560,6 +562,10 @@ def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[comp
             "lk": lk,
             "mode": "device",
             "props": {
+                "ro.adb.secure": build_prop(
+                    key="ro.adb.secure", text=facts.get(f"ramdisk_{slot}")
+                )
+                or "0",
                 "ro.boot.lk_build_desc": description,
                 "ro.boot.slot_suffix": f"_{slot}",
                 "ro.build.version.name": version,
@@ -580,6 +586,10 @@ def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[comp
                 "lk": lk,
                 "mode": "device",
                 "props": {
+                    "ro.adb.secure": build_prop(
+                        key="ro.adb.secure", text=system.get("default")
+                    )
+                    or "0",
                     "ro.boot.lk_build_desc": description,
                     "ro.boot.slot_suffix": f"_{slot}",
                     "ro.build.version.name": version,
@@ -647,6 +657,10 @@ def decide_kamakiri(*, facts: dict, into: str, lk: str, state: dict) -> dict:  #
             "lk": lk,
             "mode": "device",
             "props": {
+                "ro.adb.secure": build_prop(
+                    key="ro.adb.secure", text=system.get("default")
+                )
+                or "0",
                 "ro.boot.lk_build_desc": description,
                 "ro.boot.slot_suffix": f"_{slot}",
                 "ro.build.version.name": version,

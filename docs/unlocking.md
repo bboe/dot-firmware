@@ -1638,6 +1638,25 @@ unlock's, not the stock bytes.
   registered. Measured 2026-10-18 on stock 8149 set up in the Alexa app: 78 s
   to rooted 8149, its saved Wi-Fi online 30 s after boot, still taking
   changes from the app. Its voice was not tested.
+- Root adb listens on Wi-Fi port 5555. Amazon's ramdisk sets
+  `service.adb.tcp.port 5555`, and `boot-root.zip` starts adbd with
+  `ro.adb.secure=0`. Measured on a donut on 8349, 2026-11-09: any computer
+  on its network got a root shell.
+- So the run locks adb to this computer's key, with no opt-out. Each Fire OS
+  6 slot gets `ro.adb.secure=1` in `/default.prop` and the key as
+  `/adb_keys`, in the TWRP pass that blocks updates, and must read back
+  `locked-` before the reboot. On 7.1.2, `/` is the slot's `system`, adbd
+  reads `/adb_keys`, and `init.aosp.rc` restorecons it. Outside `/data`, the
+  key survives `--factory-reset`.
+- The key is `~/.android/adbkey.pub`. adb 1.0.41 reads only `$HOME`, or the
+  Windows profile, not `ANDROID_USER_HOME` or `ANDROID_SDK_HOME`. With no key
+  yet, the run starts the adb server, which writes one.
+- TWRP's adbd is not locked, so another computer gets in through the gesture
+  and TWRP, and its install replaces the key.
+- Measured on a donut, 2026-11-11, on 8349 and on 1895: `ro.adb.secure` 1,
+  `/adb_keys` equal to the Mac's key and labelled `adb_keys_file`. The Mac
+  got a root shell over USB and Wi-Fi; a second adb server with a new key
+  got `offline`.
 - Fire OS 6 has no Android framework: `/system` has no `framework` directory
   and no `app_process`, so `pm` cannot run and the updater cannot be hidden
   as on Fire OS 5. The update client is the native `otad` service. It reads
@@ -1651,15 +1670,23 @@ unlock's, not the stock bytes.
   `disabled` to the `otad` stanza, and points the 6 update hosts at
   `127.0.0.1` in `/system/etc/hosts`. The stanza is in `/init.mt8516.rc` on
   donut and `/init.mt8163_amazon.rc` on biscuit, so the run finds it with
-  `grep`. A slot with no `otad` stanza or no hosts file is not Fire OS 6 and
-  is left alone. A slot whose `system` does not mount counts as Fire OS 6
-  that is not edited: every Echo's `system` is ext4, so a failed mount is a
-  fault, not another OS. The run continues only when the active slot and every
-  other Fire OS 6 slot read back both edits: after `--factory-reset` both
-  slots hold Fire OS 6, and a fallback to an unedited one would start
-  `otad`. A second run adds nothing. The stanza is in the root
-  `/init.mt8163_amazon.rc` of biscuit 8149's and radar 8349's stock
-  `/system` too. The edits have run on all three.
+  `grep`. A slot with `/default.prop` and `/system/etc/hosts` is Fire OS 6;
+  Fire OS 5's `system` has neither. A slot whose `system` does
+  not mount counts as Fire OS 6 that is not edited: every Echo's `system` is
+  ext4, so a failed mount is a fault, not another OS. The run continues only
+  when the active slot and every other Fire OS 6 slot read back the edits:
+  after `--factory-reset` both slots hold Fire OS 6, and a fallback to an
+  unedited one would start `otad`. A second run adds nothing. The stanza is
+  in the root `/init.mt8163_amazon.rc` of biscuit 8149's and radar 8349's
+  stock `/system` too. The edits have run on all three.
+- Early builds have no `otad`. donut's 1895 updates through Fire OS 5's
+  `DeviceSoftwareOTA` app, whose check-in is `softwareupdates.amazon.com`,
+  and an `update_engine` that starts with `class late_start`. So the second
+  layer there is `disabled` on the `update_engine` stanza, wherever a slot
+  declares it, as 8349's stock already has it. The check reads the whole
+  stanza, so 8349 is not edited. Measured on 1895, 2026-11-11: no
+  `update_engine` ran after the reboot. Which build first has `otad` was not
+  read.
 - The 6 hosts, each looked for on 2026-11-06 in the stock `/system` of Fire
   OS 5.5.4.9 and donut's 8349, dex inside APKs included, and resolved in
   DNS. The last was added on 2026-11-08, from Amazon's check-in replies:
@@ -2479,6 +2506,11 @@ either amonet v1.1.0 TWRP, and amonet v1.1.0's from v2.0.0's TWRP.
   path change, and the host's build follows 17.3's.
 - The ramdisk loses `verify` from every fstab, and `default.prop` gets
   `ro.secure=0`, `ro.debuggable=1` and `persist.sys.usb.config=adb`.
+- adb is locked as on Fire OS 6: `default.prop` gets `ro.adb.secure=1`, which
+  stock 5.5.5.4 leaves unset, and the key goes in the ramdisk as `/adb_keys`.
+  The boot image's read-back covers both. Measured on a biscuit, 2026-11-11:
+  `ro.adb.secure` 1, `/adb_keys` equal to the key, and a second key
+  `unauthorized` over USB.
 - adb alone, not stock's `mtp`, and not `mtp,adb`. On Ubuntu, GNOME's
   `gvfs-mtp-volume-monitor` reset a booted Dot on `mtp,adb` about every 7 s,
   so the last step's wait for Fire OS 5 timed out; 2 owners hit it. With adb

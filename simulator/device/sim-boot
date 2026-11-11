@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import gzip
 import hashlib
 import json
 import os
@@ -241,6 +242,7 @@ def facts(*, spec: dict) -> dict:
                 path=path,
                 wanted={
                     "build": ("build.prop", "system/build.prop"),
+                    "default": ("default.prop",),
                     "flags": ("etc/init.fosflags.sh",),
                 },
             )
@@ -248,6 +250,7 @@ def facts(*, spec: dict) -> dict:
             else None
         )
         result[f"root_adb_{slot}"] = (RUN / f"root-adb-{slot}").exists()
+        result[f"ramdisk_{slot}"] = ramdisk_default(slot=slot)
     result["magisk"] = False
     MOUNT.mkdir(exist_ok=True)
     if not subprocess.run(
@@ -518,6 +521,34 @@ def processes() -> dict[int, list[str]]:
 
 def quiet(*, arguments: list[str]) -> None:
     subprocess.run(arguments, capture_output=True, check=False)
+
+
+def ramdisk_default(*, slot: str) -> str:
+    for name in (f"boot_{slot}_x", f"boot_{slot}"):
+        path = BY_NAME / name
+        if not path.exists():
+            continue
+        data = path.read_bytes()
+        if not data.startswith(b"ANDROID!"):
+            continue
+        kernel, ramdisk, page = (
+            struct.unpack_from("<I", data, offset)[0] for offset in (8, 16, 36)
+        )
+        start = page + -(-kernel // page) * page
+        try:
+            archive = gzip.decompress(data[start : start + ramdisk])
+        except (EOFError, OSError):
+            continue
+        offset = 0
+        while archive[offset : offset + 6] == b"070701":
+            size = int(archive[offset + 54 : offset + 62], 16)
+            length = int(archive[offset + 94 : offset + 102], 16)
+            entry = archive[offset + 110 : offset + 109 + length]
+            body = (offset + 110 + length + 3) & ~3
+            if entry == b"default.prop":
+                return archive[body : body + size].decode(errors="replace")
+            offset = (body + size + 3) & ~3
+    return ""
 
 
 def release(*, device: str) -> None:

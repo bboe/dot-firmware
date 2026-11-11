@@ -22,7 +22,7 @@ COMMAND_LINE_SIZE = 512
 CPIO_HEADER_SIZE = 110
 
 
-def boot_image(*, fireos: pathlib.Path, magisk: pathlib.Path) -> bytes:
+def boot_image(*, fireos: pathlib.Path, key: bytes, magisk: pathlib.Path) -> bytes:
     with zipfile.ZipFile(file=fireos) as archive:
         stock = archive.read(name="boot.img")
     with zipfile.ZipFile(file=magisk) as archive:
@@ -53,7 +53,9 @@ def boot_image(*, fireos: pathlib.Path, magisk: pathlib.Path) -> bytes:
         repl=b"persist.sys.usb.config=adb",
         string=prop,
     )
-    files[b"default.prop"] = (mode, prop)
+    prop = re.sub(pattern=rb"(?m)^ro\.adb\.secure=.*\n?", repl=b"", string=prop)
+    files[b"default.prop"] = (mode, prop.rstrip(b"\n") + b"\nro.adb.secure=1\n")
+    files[b"adb_keys"] = (0o100644, key)
     for name, (mode, body) in files.items():
         if name.startswith(b"fstab"):
             files[name] = (mode, body.replace(b",verify", b"").replace(b"verify,", b""))

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from firebreak import cache, host, identify, ui
+from firebreak import cache, fireos, host, identify, ui
 from firebreak.devices import BISCUIT, DEFAULTS, TARGETS
 from firebreak.mediatek import gcpu, usbdl
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import pathlib
     from collections.abc import Callable, Iterator
 
+ADB_KEY = b"QAAAAtest firebreak@host\n"
 DEFINED = {(usbdl, "mediatek_ports")}
 REAL_USB_DEVICES = identify.usb_devices
 
@@ -98,6 +99,13 @@ class FakePort:
     def write(self, *, data: bytes) -> int:
         self.written += data
         return len(data)
+
+
+@pytest.fixture(autouse=True)
+def adb_home(*, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    key = tmp_path / "adbkey.pub"
+    key.write_bytes(data=ADB_KEY)
+    monkeypatch.setattr(name="HOST_KEY", target=fireos, value=key)
 
 
 @pytest.fixture(autouse=True)

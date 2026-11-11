@@ -80,7 +80,9 @@ def test_boot_image(*, tmp_path: pathlib.Path) -> None:
     with zipfile.ZipFile(file=fireos, mode="w") as archive:
         archive.writestr(data=stock_boot(), zinfo_or_arcname="boot.img")
     image = bootimg.boot_image(
-        fireos=fireos, magisk=magisk_zip(path=tmp_path / "m.zip")
+        fireos=fireos,
+        key=b"QAAAAkey me@host\n",
+        magisk=magisk_zip(path=tmp_path / "m.zip"),
     )
     header, kernel_image, ramdisk = unpack(image=image)
     assert header[64:576].rstrip(b"\0") == (
@@ -97,8 +99,9 @@ def test_boot_image(*, tmp_path: pathlib.Path) -> None:
     assert files[b".backup"] == (0o40000, b"")
     assert files[b".backup/.magisk"][1].startswith(b"KEEPVERITY=false\n")
     assert files[b"default.prop"][1] == (
-        b"ro.secure=0\nro.debuggable=1\npersist.sys.usb.config=adb\n"
+        b"ro.secure=0\nro.debuggable=1\npersist.sys.usb.config=adb\nro.adb.secure=1\n"
     )
+    assert files[b"adb_keys"] == (0o100644, b"QAAAAkey me@host\n")
     assert files[b"fstab.mt8163"][1] == b"/dev/system /system ext4 ro wait\n"
     assert files[b"fstab.other"][1] == b"/dev/data /data ext4 rw wait\n"
 
@@ -117,9 +120,11 @@ def test_boot_image_needs_room_on_the_command_line(
     magisk = magisk_zip(path=tmp_path / "m.zip")
     if not fits:
         with pytest.raises(expected_exception=FatalError, match="has no room for"):
-            bootimg.boot_image(fireos=fireos, magisk=magisk)
+            bootimg.boot_image(fireos=fireos, key=b"k", magisk=magisk)
         return
-    header, _, _ = unpack(image=bootimg.boot_image(fireos=fireos, magisk=magisk))
+    header, _, _ = unpack(
+        image=bootimg.boot_image(fireos=fireos, key=b"k", magisk=magisk)
+    )
     assert len(header) == PAGE
     assert header[64:576].endswith(b" androidboot.selinux=permissive\0")
 

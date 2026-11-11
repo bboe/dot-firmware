@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
+ADB_KEY = DOT_TEMPORARY_DIRECTORY / "adbkey.pub"
 BOOT_ROOT = Download(
     browser=True,
     mirror=True,
@@ -62,6 +63,7 @@ BUILD_OK = "build-ok"
 ERASED_OK = "erased-ok"
 FASTBOOT_WAIT = 120
 HIDE_WAIT = 60
+HOST_KEY = pathlib.Path.home() / ".android" / "adbkey.pub"
 INSTALL_STEPS = 5
 MOUNT_OK = "mount-ok"
 SLOT_OK = "slot-ok"
@@ -123,22 +125,42 @@ for s in a b; do
   umount $m 2>/dev/null
   mount -t ext4 {by_name}/system_$s $m || {{ echo fos6-$s; continue; }}
   r=$(grep -l '^service otad ' $m/*.rc 2>/dev/null)
+  u=$(grep -l '^service update_engine ' $m/*.rc $m/system/etc/init/*.rc 2>/dev/null)
   h=$m/system/etc/hosts
-  if [ -n "$r" ] && [ -f $h ]; then
+  p=$m/default.prop
+  if [ -f $p ] && [ -f $h ]; then
     echo fos6-$s
-    grep -h -A 1 '^service otad ' $r | grep -q '^ *disabled$' || \
+    if grep -q '^ro.adb.secure=' $p; then
+      sed -i 's|^ro.adb.secure=.*|ro.adb.secure=1|' $p
+    else
+      echo ro.adb.secure=1 >> $p
+    fi
+    cat {key} > $m/adb_keys
+    chmod 0644 $m/adb_keys
+    chcon u:object_r:adb_keys_file:s0 $m/adb_keys 2>/dev/null
+    if [ -n "$r" ]; then
+      grep -h -A 1 '^service otad ' $r | grep -q '^ *disabled$' || \
 sed -i 's|^service otad .*|&\\n    disabled|' $r
+    fi
+    if [ -n "$u" ]; then
+      sed -n '/^service update_engine /,/^[^ ]/p' $u | grep -q '^ *disabled$' || \
+sed -i 's|^service update_engine .*|&\\n    disabled|' $u
+    fi
     for n in {hosts}; do
       grep -q " $n\\$" $h || echo "127.0.0.1 $n" >> $h
     done
     sync
     k=1
     for n in {hosts}; do grep -q " $n\\$" $h || k=; done
-    grep -h -A 1 '^service otad ' $r | grep -q '^ *disabled$' && [ -n "$k" ] && \
-echo off-$s
+    [ -n "$r" ] && ! grep -h -A 1 '^service otad ' $r | grep -q '^ *disabled$' && k=
+    [ -n "$u" ] && ! sed -n '/^service update_engine /,/^[^ ]/p' $u | \
+grep -q '^ *disabled$' && k=
+    [ -n "$k" ] && echo off-$s
+    grep -qx 'ro.adb.secure=1' $p && cmp -s {key} $m/adb_keys && echo locked-$s
   fi
   umount $m
 done
+rm -f {key}
 echo {ok}
 """
     WRITE = (
@@ -161,6 +183,25 @@ def active_slot() -> str:
                 " running, within 10 minutes. Leave it powered. " + again()
             )
         time.sleep(5)
+
+
+def adb_key() -> bytes:
+    path = HOST_KEY
+    if not path.is_file():
+        run(arguments=["adb", "start-server"], timeout=30)
+    try:
+        key = path.read_bytes()
+    except OSError as error:
+        raise FatalError(
+            message=f"{path} cannot be read. The unlock lets only the adb key in"
+            f" it into the {title()}, so nothing was written."
+        ) from error
+    if not key.strip():
+        raise FatalError(
+            message=f"{path} is empty. The unlock lets only the adb key in it into"
+            f" the {title()}, so nothing was written."
+        )
+    return key
 
 
 def boot_root_ended() -> str:
@@ -289,9 +330,13 @@ def install_and_root() -> None:
             message=f"boot-root.zip ended without patching slot {slot}, which holds"
             f" Fire OS 6 {build}. " + again()
         )
+    with tempfile.TemporaryDirectory(dir=CACHE) as temporary:
+        key = pathlib.Path(temporary) / ADB_KEY.name
+        key.write_bytes(data=adb_key())
+        push_checked(local=key, remote=ADB_KEY)
     off = adb_shell(
         command=Shell.UPDATES.value.format(
-            by_name=BY_NAME, hosts=" ".join(UPDATE_HOSTS), ok=UPDATES_OK
+            by_name=BY_NAME, hosts=" ".join(UPDATE_HOSTS), key=ADB_KEY, ok=UPDATES_OK
         ),
         timeout=60,
     ).split(sep="\n")
@@ -299,8 +344,14 @@ def install_and_root() -> None:
     missed = sorted(name for name in found | {slot} if f"off-{name}" not in off)
     if off[-1:] != [UPDATES_OK] or missed:
         raise FatalError(
-            message="otad and the update hosts were not blocked in Fire OS 6's"
+            message="Amazon's updates were not blocked in Fire OS 6's"
             f" slot {' and '.join(missed or [slot])}. " + again()
+        )
+    open_slots = sorted(name for name in found | {slot} if f"locked-{name}" not in off)
+    if open_slots:
+        raise FatalError(
+            message="adb was not locked to this computer's key in Fire OS 6's"
+            f" slot {' and '.join(open_slots)}. " + again()
         )
     PROGRESS.begin(estimate="60 s", label=f"waiting for rooted Fire OS 6 {build}")
     reboot_rooted()
@@ -440,7 +491,7 @@ def stage_install_fireos(*, reboot: bool = True, slot: str = "") -> None:
             raise FatalError(message="patching /system failed")
 
         PROGRESS.begin(estimate="10 s", label="writing the boot image and Magisk")
-        data = boot_image(fireos=fireos, magisk=magisk)
+        data = boot_image(fireos=fireos, key=adb_key(), magisk=magisk)
         image = work / "boot.img"
         image.write_bytes(data=data.ljust(-(-len(data) // 4096) * 4096, b"\0"))
         final = DOT_TEMPORARY_DIRECTORY / "boot.img"
