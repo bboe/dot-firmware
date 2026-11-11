@@ -16,6 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- `twrp`, and a run that starts from rooted Fire OS 6, reach an Echo Dot (3rd
+  Generation)'s TWRP through a `boot-recovery` request in `misc`. `adb reboot
+  recovery` there could start Fire OS instead, and `twrp` then rebooted it
+  again and again.
 - `unlock fireos6` blocks updates on a build with no `otad`, such as the Echo
   Dot (3rd Generation)'s 1895, where it stopped with the active slot not
   blocked. There it disables `update_engine` besides blocking the update

@@ -34,6 +34,7 @@ class Device:
     layouts: tuple[Layout, ...] = ()
     models: frozenset[str] = frozenset()
     named_by_bootloader: bool = True
+    recovery_command: bytes = b""
     short_gesture: str = ""
     twrp_models: frozenset[str] = frozenset()
     unlock_keeps_misc: bool = False

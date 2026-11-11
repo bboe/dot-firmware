@@ -51,7 +51,7 @@ from firebreak.plugin import FireOs5, FireOs6
 from firebreak.probe import state
 from firebreak.states import State, shown
 from firebreak.stock import ends_in_fastboot, stage_restore, stock_steps
-from firebreak.twrp import reboot
+from firebreak.twrp import reboot, restart_into_twrp
 from firebreak.ui import (
     ARGUMENTS,
     MINUTE,
@@ -405,7 +405,11 @@ def reboot_stages() -> dict[State, Stage]:
     to_recovery = functools.partial(reboot, label="restarting into recovery")
     to_twrp = functools.partial(reboot, label="restarting into TWRP")
     return {
-        State.UNLOCKED_BOOTED: Stage(run=to_twrp, steps=1, then=State.UNLOCKED_TWRP),
+        State.UNLOCKED_BOOTED: Stage(
+            run=functools.partial(restart_into_twrp, device=ARGUMENTS.target.device),
+            steps=2 if ARGUMENTS.target.device.recovery_command else 1,
+            then=State.UNLOCKED_TWRP,
+        ),
         State.BOOTED: Stage(run=to_recovery, steps=1, then=None),
         State.ROOTED: Stage(run=to_recovery, steps=1, then=State.AMONET_FIREOS5_TWRP),
         State.AMONET_FIREOS5_BBOE_BOOTED: Stage(

@@ -46,6 +46,8 @@ bootloader command that reaches its fastboot instead, `fastboot_command`, which
 `firebreak fastboot` writes over the first 32 bytes of `misc` before a plain
 reboot. donut is the one that needs it, `bootonce-bootloader`; a device that
 leaves it empty is rebooted into its bootloader the ordinary way.
+`recovery_command` does the same for TWRP from rooted Fire OS, where `adb
+reboot recovery` is not reliable: donut's is `boot-recovery`.
 
 A device gives the two gestures its owner is asked for in words of its own:
 `fastboot_mode`, the button and the ring that follow it, and `short_gesture`,

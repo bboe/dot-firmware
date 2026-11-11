@@ -12,6 +12,7 @@ import pytest
 
 from firebreak import twrp
 from firebreak.android import gpt
+from firebreak.devices import BISCUIT, DONUT
 from firebreak.ui import FatalError, explained
 
 if TYPE_CHECKING:
@@ -207,6 +208,31 @@ def test_a_reboot_waits_where_it_was_sent(
     twrp.reboot(label="waiting", **options)
     assert ran == [{"arguments": arguments, "check": True, "timeout": 60}]
     assert begun == [{"estimate": estimate, "label": "waiting"}]
+
+
+@pytest.mark.parametrize(
+    ("device", "done"),
+    [
+        (BISCUIT, ["reboot recovery"]),
+        (DONUT, ["asked boot-recovery for TWRP", "reboot "]),
+    ],
+)
+def test_a_rooted_echo_restarts_into_twrp_its_own_way(
+    *, device: object, done: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    said: list[str] = []
+    monkeypatch.setattr(
+        name="ask_fastboot",
+        target=twrp,
+        value=lambda **o: said.append(f"asked {o['command'].decode()} for {o['what']}"),
+    )
+    monkeypatch.setattr(
+        name="reboot",
+        target=twrp,
+        value=lambda **o: said.append("reboot " + o.get("into", "recovery")),
+    )
+    twrp.restart_into_twrp(device=device)
+    assert said == done
 
 
 def test_a_sector_read_returns_whole_sectors(*, adb: FakeAdb) -> None:

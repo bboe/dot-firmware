@@ -605,6 +605,15 @@ def test_a_restore_whose_echo_stays_off_usb_ends_once_it_is_written(
     assert "shown nothing on USB for 5 minutes" in said
 
 
+def test_a_rooted_donut_counts_its_bootloader_request_as_a_step(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        name="target", target=route.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
+    )
+    assert route.stages()[route.State.UNLOCKED_BOOTED].steps == 2
+
+
 def test_a_rooted_dot_given_factory_reset_reinstalls_from_twrp(
     *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, run: Run
 ) -> None:
@@ -1179,7 +1188,7 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
     )
     reboots = {
         state.UNLOCKED_BOOTED: (
-            to_twrp,
+            (route.restart_into_twrp, {"device": BISCUIT}),
             1,
             state.UNLOCKED_TWRP,
             frozenset(),

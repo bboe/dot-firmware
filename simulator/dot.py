@@ -611,6 +611,7 @@ def decide_kamakiri(*, facts: dict, into: str, lk: str, state: dict) -> dict:  #
     description = DEVICES[device]["stock_lk"]
     slot = facts["active"] or "a"
     marker = kaeru and facts.get("misc_bootonce")
+    recovering = kaeru and facts.get("misc_recovery")
     if into in FASTBOOT_INTO or marker:
         slots = {"current-slot": slot, "slot-count": "2"} if kaeru else {}
         return {
@@ -625,7 +626,7 @@ def decide_kamakiri(*, facts: dict, into: str, lk: str, state: dict) -> dict:  #
                 **slots,
             },
         }
-    if into == "recovery":
+    if into == "recovery" or recovering:
         if not kaeru:
             return {**none, "why": "a locked LK refuses an unsigned recovery"}
         twrp = identify(
@@ -634,6 +635,8 @@ def decide_kamakiri(*, facts: dict, into: str, lk: str, state: dict) -> dict:  #
         if twrp is None:
             return {**none, "why": "swdl holds no TWRP this simulator knows"}
         return {
+            "consumed": "misc" if recovering else None,
+            "consumed_bytes": BOOTONCE_BYTES,
             "flavour": "twrp-3.7.0",
             "lk": lk,
             "mode": "recovery",

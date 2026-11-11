@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from firebreak import entry
+from firebreak import entry, twrp
 from firebreak.devices import BISCUIT, CROWN, DONUT, RADAR
 from firebreak.states import State
 from firebreak.ui import ARGUMENTS, SESSION, FatalError
@@ -94,13 +94,19 @@ def reads(*, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]) -> list[s
     monkeypatch.setattr(name="device", target=SESSION, value=BISCUIT)
     monkeypatch.setattr(name="sleep", target=entry.time, value=lambda _: None)
     monkeypatch.setattr(name="state", target=entry, value=lambda: next(reported))
-    monkeypatch.setattr(
-        name="reboot",
-        target=entry,
-        value=lambda **options: done.append(
-            "reboot " + options.get("into", "recovery")
-        ),
-    )
+    for module in (entry, twrp):
+        monkeypatch.setattr(
+            name="reboot",
+            target=module,
+            value=lambda **options: done.append(
+                "reboot " + options.get("into", "recovery")
+            ),
+        )
+        monkeypatch.setattr(
+            name="ask_fastboot",
+            target=module,
+            value=lambda **options: done.append("asked " + options["command"].decode()),
+        )
     for name in ("stage_amonet_recovery", "stage_fastbrick", "stage_fireos5_recovery"):
         monkeypatch.setattr(
             name=name,
@@ -542,11 +548,6 @@ def test_a_fastboot_entry_asks_a_donuts_bootloader_through_its_misc(
     )
     monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
     monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
-    monkeypatch.setattr(
-        name="ask_fastboot",
-        target=entry,
-        value=lambda **options: done.append("asked " + options["command"].decode()),
-    )
     entry.fastboot_entry()
     assert done == ["asked bootonce-bootloader", "reboot "]
 
@@ -725,6 +726,19 @@ def test_a_short_refuses_a_donut_that_usb_names(
     with pytest.raises(entry.NotAmonetError, match="unlock fireos6"):
         entry.short_entry()
     assert done == []
+
+
+def test_a_twrp_entry_asks_a_rooted_donuts_bootloader_for_its_recovery(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = reads(
+        monkeypatch=monkeypatch,
+        states=[State.UNLOCKED_BOOTED, State.STARTING, State.UNLOCKED_TWRP],
+    )
+    monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    entry.twrp_entry(force=False)
+    assert done == ["asked boot-recovery", "reboot "]
 
 
 def test_a_twrp_entry_asks_before_it_unlocks_a_locked_echo(

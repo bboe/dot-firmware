@@ -28,7 +28,7 @@ from firebreak.mediatek.usbdl import UsbdlError
 from firebreak.probe import state
 from firebreak.route import TWRPS, password_first
 from firebreak.states import State, shown
-from firebreak.twrp import ask_fastboot, clear_boot0, reboot
+from firebreak.twrp import ask_fastboot, clear_boot0, reboot, restart_into_twrp
 from firebreak.ui import (
     MINUTE,
     PROGRESS,
@@ -487,6 +487,10 @@ def revisited(
     return time.monotonic()
 
 
+def rooted_to_twrp() -> None:
+    restart_into_twrp(device=known_device())
+
+
 def short_entry() -> None:
     PROGRESS.steps = None
     SESSION.short = True
@@ -587,6 +591,7 @@ def twrp_entry(*, force: bool) -> None:  # ruff: ignore[complex-structure]
     walk(
         acts={
             **dict.fromkeys(TO_TWRP, to_twrp),
+            State.UNLOCKED_BOOTED: rooted_to_twrp,
             **dict.fromkeys(LOCKED_FASTBOOTS, unlocking),
             State.BOOTED: to_fastboot,
             State.BOOTROM: bootrom_unlock,

@@ -18,6 +18,7 @@ import time
 
 BOOTONCE = b"bootonce-bootloader"
 BOOT_LAYOUT = b"BRLYT"
+BOOT_RECOVERY = b"boot-recovery"
 BY_NAME = pathlib.Path("/dev/block/platform/mtk-msdc.0/by-name")
 DECOYS = {
     "lk_a": 1048576,
@@ -235,6 +236,7 @@ def facts(*, spec: dict) -> dict:
                 head = file.read(len(BOOTONCE))
             result[f"{name}_fastboot"] = head.startswith(b"FASTBOOT_PLEASE")
             result[f"{name}_bootonce"] = head == BOOTONCE
+            result[f"{name}_recovery"] = head.rstrip(b"\0") == BOOT_RECOVERY
     for slot in ("a", "b"):
         path = BY_NAME / f"system_{slot}"
         result[f"system_{slot}"] = (

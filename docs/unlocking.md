@@ -16,7 +16,7 @@ others, and [Back to stock](#back-to-stock-the-stock-target) the `stock` target.
 | preloader | no adb or fastboot, and USB holds `0e8d:2000` | waits: every boot passes through this for about 0.8 s. One that never leaves it needs the test point |
 | emos | no adb or fastboot, and one serial port with USB ID `1949:2007` | `/init recovery` at emOS's serial console |
 | no-system | adb answers as `device`, and `adb shell` fails with `exec '/system/bin/sh' failed` | `adb reboot recovery`, for every target |
-| unlocked-booted | Fire OS 6, and `id` or `su -c id` answers uid 0 | `adb reboot recovery`, into the device's own TWRP; ends an `unlock fireos6` run |
+| unlocked-booted | Fire OS 6, and `id` or `su -c id` answers uid 0 | `adb reboot recovery`, or on a donut `boot-recovery` in `misc` and a plain reboot, into the device's own TWRP; ends an `unlock fireos6` run |
 | unlocked-twrp | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's, `mtp` in `sys.usb.config` | moves boot in the table to make room for that chain, then reboots so the kernel rereads it |
 | amonet-twrp-boot-moved | unlocked-twrp, and `sgdisk --print` lists `boot_a_x`, the boot moved layout's name | writes the Fire OS 5 chain and Fire OS 5.5.5.4, preloader last |
 | unlocked-fastboot | unlocked, `lk_build_desc` is not the device's Fire OS 5 chain's | starts the device's own TWRP where the bootloader is the one its unlock declares, and downgrades to its Fire OS 5 chain through the bootrom where it is not |
@@ -3094,9 +3094,16 @@ again, and `misc` was still byte-identical to the stock backup afterwards. So
 Amazon's Android on this device never writes the bootloader control block, and
 nothing downstream of it ever sees the request.
 
-**From rooted Fire OS, `adb reboot recovery` reaches a donut's TWRP**: in 19
-seconds on 2026-11-03 and 23 seconds on 2026-11-10, so `firebreak twrp` uses
-it there. **From TWRP it did not, once:** on 2026-11-08, between the two slot
+**From rooted Fire OS, `adb reboot recovery` does not reliably reach a
+donut's TWRP.** It did in 19 to 24 seconds on 2026-11-03, 11-10 and 11-11,
+then on 2026-11-11 started Fire OS three times in a row. So from rooted Fire
+OS, `twrp` and the route's stage write `boot-recovery`, which kaeru also
+holds, over `misc`'s first 32 bytes and send a plain `adb reboot`. Measured
+on 2026-11-11 by hand: TWRP in 17 to 20 seconds, 7 of 7, on 8349 and 1895,
+with the field cleared after; one took 77 seconds. Through firebreak the
+same day, from rooted 1895 and 8349: `twrp` reached TWRP in 19 seconds, and
+the stage in front of a `--factory-reset` and of a `restore` in 19 and 21.
+**From TWRP it did not, once:** on 2026-11-08, between the two slot
 installs of an `unlock fireos6 --factory-reset`, it started the new Fire OS,
 and the run waited for a TWRP that never came. Whether that happens every time
 from TWRP is not read. So the second slot's install takes a donut to fastboot

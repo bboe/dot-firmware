@@ -19,6 +19,7 @@ from firebreak.targets import FIREOS6, STOCK
 from firebreak.updates import cdn_ota
 
 BOOTONCE_BOOTLOADER = b"bootonce-bootloader"
+BOOT_RECOVERY = b"boot-recovery"
 BUILDS = {
     "1895": cdn_ota(
         path="165f17697caca40d912478c045c5e156/update-kindle-donut-NS6529_user_1895_0002315741060.bin",
@@ -174,6 +175,7 @@ DONUT = Device(
     name="donut",
     named_by_bootloader=False,
     product="DONUT",
+    recovery_command=BOOT_RECOVERY,
     short_gesture=BUTTON_GESTURE,
     title="Echo Dot (3rd Generation)",
     unlock_keeps_misc=True,

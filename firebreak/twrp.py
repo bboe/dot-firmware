@@ -37,6 +37,8 @@ from firebreak.ui import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from firebreak.plugin import Device
+
 BCB = "misc"
 BCB_COMMAND_SIZE = 32
 CLEAR_BOOT0 = (
@@ -88,13 +90,13 @@ UNMOUNT = (
 )
 
 
-def ask_fastboot(*, command: bytes) -> None:
+def ask_fastboot(*, command: bytes, what: str = "fastboot") -> None:
     raw = read_sectors(count=TABLE_SECTORS, start=0)
     partition = partition_map(entries=raw[2 * SECTOR_SIZE :][:ENTRIES_SIZE]).get(BCB)
     if partition is None:
         raise FatalError(
             message=f"the {title()}'s partition table has no {BCB}, so nothing here"
-            f" can ask its bootloader for fastboot. Start the {title()}'s fastboot"
+            f" can ask its bootloader for {what}. Start the {title()}'s {what}"
             " by hand."
         )
     held = read_sectors(count=1, start=partition.first)
@@ -105,7 +107,7 @@ def ask_fastboot(*, command: bytes) -> None:
         )
         write(
             estimate="5 s",
-            label="asking the bootloader for fastboot",
+            label=f"asking the bootloader for {what}",
             number=partition.number,
             path=staged,
             sector=partition.first,
@@ -232,6 +234,14 @@ def read_sectors(*, count: int, start: int) -> bytes:
 def reboot(*, estimate: str = "40 s", into: str = "recovery", label: str) -> None:
     run(arguments=["adb", "reboot", *([into] if into else [])], check=True, timeout=60)
     PROGRESS.begin(estimate=estimate, label=label)
+
+
+def restart_into_twrp(*, device: Device) -> None:
+    if not device.recovery_command:
+        reboot(label="restarting into TWRP")
+        return
+    ask_fastboot(command=device.recovery_command, what="TWRP")
+    reboot(into="", label="restarting into TWRP")
 
 
 def sliced_system(*, slices: list[pathlib.Path], system: str) -> str:
