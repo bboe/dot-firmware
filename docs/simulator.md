@@ -15,6 +15,8 @@ DEVICE=radar START=no-light simulator/run.sh OUT short --device radar
 DEVICE=donut START=stock-booted simulator/run.sh OUT unlock fireos6
 FIREBREAK_SIM_ELEVATES=0 DEVICE=donut START=stock-booted simulator/run.sh OUT unlock fireos6
 DEVICE=donut START=twrp simulator/run.sh OUT stock 8349
+DEVICE=radar START=twrp simulator/run.sh OUT backup BACKUP
+DEVICE=radar simulator/run.sh OUT restore --force BACKUP
 python3 simulator/trace.py OUT.jsonl             # one command per line, for diff
 python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per range
 ```
@@ -109,6 +111,19 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   skips: the unlock from stock took 12 steps with the TEE and the bootloader
   skipped, `--factory-reset` took 14, and the restore from TWRP took 15 with
   the same five skips.
+- A donut's `adb reboot recovery` from TWRP starts Fire OS, not TWRP, as it
+  did on hardware once, on 2026-11-08, between the two slot installs of an
+  `unlock --factory-reset`. From Fire OS it starts TWRP, as it did on
+  2026-11-03 and 2026-11-10. kaeru's `fastboot reboot-recovery` starts the
+  TWRP in `swdl` from fastboot.
+- `backup` and `restore` run on all three devices. A backup taken from one
+  simulated Echo restores onto another of the same device, since the CID and
+  serial are fixed. Run on one Echo each on 2026-11-10, `backup` from TWRP,
+  then a change, then `restore` and `reboot`, each finished: a biscuit after
+  `stock 5.5.5.4`, writing 11 areas; a radar after `stock 4315`, through the
+  fastbrick; a donut after `unlock fireos6 --factory-reset`, writing both
+  system slots, cache, userdata and boot0; and a donut after `stock 8344`,
+  which locks it, through its bootrom. Each kept the Echo's own boot count.
 - A donut needs no short. `run.sh` holds its action button when firebreak asks
   for the bootrom: `dot.py plug` restarts it into the bootrom whatever it was
   doing, which is what the hold does on hardware.
@@ -246,7 +261,13 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   in `system_X`, and Magisk in `userdata`.
 - A boot names the LK in `lk_a` by its md5: amonet v1.1.0's, amonet v2's, the
   simulator's own stock blob, or any `stock-<device>-*/lk.img` that a restore
-  has extracted from an OTA. Each of the last two reads as stock, and a stock
+  has extracted from an OTA. An LK that matches both an unlock's image and a
+  stock one reads as the unlock's only while `tee1` holds that unlock's TEE
+  payload, and as stock otherwise, as on hardware, where the payload is what
+  unlocks it: amonet-radar's `lk.bin` is radar 5.5.5.4's own LK, which the
+  OTA pads with zeros to a whole 4 KiB, so an extracted 5.5.5.4 LK matches
+  `lk_a` both after the fastbrick and after `stock 5.5.5.4`. Each of the last
+  two reads as stock, and a stock
   LK reports the one `lk_build_desc` the simulator holds for the device,
   whatever build the image came from. An LK it cannot name does not boot. A
   restore extracts the OTA's LK before it writes it, so the Dot it leaves
@@ -318,6 +339,17 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 - A read gives the loop device's flag. So after a direct `blockdev --setrw`
   it reads 0.
 - Only root can write `force_ro`.
+- `/sys/block/mmcblk0/device/cid` reads one fixed CID, the same on every
+  simulated Echo and every run, so `restore` takes a backup from one
+  simulated Echo onto another of the same device. A real CID is the eMMC's
+  own and differs between Echoes.
+- boot1 opens with an IDME that holds a `bootcount` field, laid out as the
+  hardware's: the name in 16 bytes, then its size, 8, and the value in
+  decimal digits from byte 28. Every boot that ends in fastboot, TWRP or Fire
+  OS raises it by one. A held bootrom, a Dot with no LK, and a boot the LK
+  refuses do not, though on hardware the LK may count that last one too. So
+  a backup's count falls behind the Echo's, and `restore` has a newer count
+  to carry over. A donut's IDME also names its `device_type_id`.
 
 ### TWRP
 
@@ -383,6 +415,12 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   it.
 - adb's own options are read only before the command, as adb's `getopt`
   with `+` does: `adb shell ls -t` runs `ls -t`.
+- `adb pull` copies a file or a block device whole, as the user the session
+  runs as, to the current folder when no local path is given. It writes
+  beside the local path first and moves the copy into place only once it is
+  whole, so a failed pull leaves an existing file alone, as adb does. Any
+  failure to read reads as a missing source. A Dot that restarts during the
+  copy cuts it, as `push` is cut, and leaves no partial file.
 - 3.2.3's `__bionic_open_tzdata` lines are not modelled. Nor is what `-x`
   makes a protocol `adbd` do.
 

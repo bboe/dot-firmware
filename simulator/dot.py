@@ -25,6 +25,7 @@ import select
 import shlex
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -49,9 +50,30 @@ ADB_PAIRED_FLAGS = frozenset({"-H", "-P", "-s", "-t"})
 ADB_FLAGS = frozenset({"-d", "-e"}) | ADB_PAIRED_FLAGS
 ADB_SHELL_MODES = frozenset({"device", "recovery"})
 ADB_SHELL_OPTIONS = frozenset("ntTx")
-ADB_UNAUTHORIZED_VERBS = frozenset({"exec-out", "get-state", "push", "reboot", "shell"})
+ADB_UNAUTHORIZED_VERBS = frozenset({
+    "exec-out",
+    "get-state",
+    "pull",
+    "push",
+    "reboot",
+    "shell",
+})
 BOOT0_SECTORS = 2048
 BOOTONCE_BYTES = 32
+BOOT_COUNTED_MODES = frozenset({"device", "fastboot", "recovery", "unauthorized"})
+BOOT_COUNT_SHELL = """\
+import struct
+node = "/dev/block/mmcblk0boot1"
+with open(node, "r+b") as disk:
+    data = disk.read()
+    at = data.find(b"bootcount\\0")
+    if at >= 0:
+        (size,) = struct.unpack_from("<I", data, at + 16)
+        value = data[at + 28 : at + 28 + size].rstrip(b"\\0")
+        count = str(int(value or b"0") + 1).encode().ljust(size, b"\\0")
+        disk.seek(at + 28)
+        disk.write(count[:size])
+"""
 BOOT_SECONDS = float(os.environ.get("FIREBREAK_SIM_BOOT_SECONDS", "3"))
 BY_NAME = "/dev/block/platform/mtk-msdc.0/by-name"
 DETACH_SHELL = "mkdir -p /sim/run && cat > /sim/run/loops && /sim/bin/sim-boot detach"
@@ -87,6 +109,11 @@ FASTBOOT_SPARSE_UNITS = {"G": 1 << 30, "K": 1 << 10, "M": 1 << 20}
 HALT_SECONDS = 10
 HERE = pathlib.Path(__file__).resolve().parent
 IDME_BLOCKS = 64
+IDME_BOOT_COUNT = (
+    b"bootcount".ljust(16, b"\0")
+    + struct.pack("<III", 8, 1, 0x124)
+    + b"1".ljust(8, b"\0")
+)
 IDME_MAGIC = b"beefdeed"
 IMAGE = "firebreak-sim"
 INSIDE_PATH = "/sim/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -234,8 +261,21 @@ def adb(*, arguments: list[str]) -> int:  # ruff: ignore[complex-structure, too-
         print(state["mode"])
         return 0
     if verb == "reboot":
-        request_reboot(into=rest[0] if rest else "system")
+        into = rest[0] if rest else "system"
+        if (
+            into == "recovery"
+            and state["mode"] == "recovery"
+            and "kit" in DEVICES[state["device"]]
+        ):
+            into = "system"
+        request_reboot(into=into)
         return 0
+    if verb == "pull":
+        return pull(
+            local=pathlib.Path(rest[1] if len(rest) > 1 else "."),
+            remote=rest[0],
+            state=state,
+        )
     if verb == "push":
         return push(local=pathlib.Path(rest[0]), remote=rest[1], state=state)
     if verb in {"exec-out", "shell"}:
@@ -254,11 +294,14 @@ def boot(*, into: str, state: dict) -> None:
         "prefixes": {
             "expdb": sizes(table=known.get("kaeru", {})),
             "lk_a": sizes(table=known["lk"]),
+            "tee1": sizes(table=known.get("tee", {})),
             recovery_part(device=state["device"]): sizes(table=known["recovery"]),
         }
     }
     facts = json.loads(sim_boot(action="facts", spec=spec, state=state))
     outcome = decide(facts=facts, into=into, state=state)
+    if outcome["mode"] in BOOT_COUNTED_MODES:
+        count_boot(state=state)
     if outcome.get("consumed"):
         inside(
             command=f"dd if=/dev/zero of={BY_NAME}/{outcome['consumed']}"
@@ -314,6 +357,15 @@ def clone(*, source: pathlib.Path, target: pathlib.Path) -> None:
     ).returncode:
         target.unlink(missing_ok=True)
         shutil.copyfile(source, target)
+
+
+def count_boot(*, state: dict) -> None:
+    node = "/dev/block/mmcblk0boot1"
+    inside(
+        command=f"blockdev --setrw {node}; python3 -c {shlex.quote(BOOT_COUNT_SHELL)};"
+        f" blockdev --setro {node}",
+        state=state,
+    )
 
 
 def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None:
@@ -386,10 +438,14 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
         with zipfile.ZipFile(cache / spec["kit"]) as kit:
             tee = member(archive=kit, suffix="bin/tee-donut.bin")
         stock[f"{BY_NAME}/tee1"] = stock[f"{BY_NAME}/tee2"] = tee
-    if "device_type" in spec:
-        stock["/dev/block/mmcblk0boot1"] = (
-            IDME_MAGIC + f"\0device_type_id\0{spec['device_type']}\0".encode()
-        ).ljust(IDME_BLOCKS * SECTOR, b"\0")
+    device_type = (
+        f"\0device_type_id\0{spec['device_type']}\0".encode()
+        if "device_type" in spec
+        else b"\0"
+    )
+    stock["/dev/block/mmcblk0boot1"] = (
+        IDME_MAGIC + device_type + IDME_BOOT_COUNT
+    ).ljust(IDME_BLOCKS * SECTOR, b"\0")
     with tempfile.TemporaryDirectory() as folder:
         local = pathlib.Path(folder) / "image"
         for node, data in stock.items():
@@ -441,7 +497,7 @@ def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[comp
     device = state["device"]
     spec = DEVICES[device]
     known = state["known"]
-    lk = identify(prefixes=facts["prefixes"].get("lk_a", {}), table=known["lk"])
+    lk = lk_held(facts=facts, known=known)
     none = {"mode": "none", "why": ""}
     if into == "held":
         return {"mode": "bootrom", "why": "the action button was held at power-on"}
@@ -913,6 +969,7 @@ def known_images(*, cache: pathlib.Path, device: str) -> dict:
     with zipfile.ZipFile(cache / spec["amonet"]) as v2:
         lks = {"v2": [member(archive=v2, suffix="bin/lk.bin")]}
         recoveries = {"v2": [member(archive=v2, suffix="bin/twrp.img")]}
+        tees = {"v2": [member(archive=v2, suffix="bin/tee-payload.bin")]}
     if device == "biscuit":
         with zipfile.ZipFile(cache / "amonet-biscuit-v1.1.0.zip") as v1:
             lks["v1"] = [member(archive=v1, suffix="bin/lk.bin")]
@@ -924,6 +981,7 @@ def known_images(*, cache: pathlib.Path, device: str) -> dict:
         "recovery": {
             name: measured(images=images) for name, images in recoveries.items()
         },
+        "tee": {name: measured(images=images) for name, images in tees.items()},
     }
 
 
@@ -943,6 +1001,27 @@ def link_downloads(*, cache: pathlib.Path) -> None:
         copy.unlink(missing_ok=True)
         clone(source=download, target=copy)
         os.utime(copy, ns=(source.st_atime_ns, source.st_mtime_ns))
+
+
+def lk_held(*, facts: dict, known: dict) -> str | None:
+    prefixes = facts["prefixes"].get("lk_a", {})
+    found = [
+        name
+        for name, images in known["lk"].items()
+        if any(prefixes.get(str(size)) == digest for size, digest in images)
+    ]
+    if "stock" not in found or len(found) == 1:
+        return found[0] if found else None
+    tee = facts["prefixes"].get("tee1", {})
+    return next(
+        (
+            name
+            for name in found
+            if name != "stock"
+            and identify(prefixes=tee, table={name: known.get("tee", {}).get(name, [])})
+        ),
+        "stock",
+    )
 
 
 def load() -> dict:
@@ -1093,6 +1172,50 @@ def protect(*, node: str) -> str:
     if node.removeprefix("/dev/block/mmcblk0") in SIDE_PARTITIONS:
         return f"; blockdev --setro {node}"
     return ""
+
+
+def pull(*, local: pathlib.Path, remote: str, state: dict) -> int:
+    if local.is_dir():
+        local /= pathlib.PurePosixPath(remote).name
+    part = local.with_name(local.name + ".sim-part")
+    started = time.time()
+    with part.open("wb") as target:
+        copied = docker(
+            arguments=[
+                "exec",
+                "-u",
+                user(state=state),
+                state["container"],
+                "/bin/cat",
+                remote,
+            ],
+            check=False,
+            stderr=subprocess.DEVNULL,
+            stdout=target,
+        )
+    if copied.returncode:
+        part.unlink(missing_ok=True)
+        print(
+            f"adb: error: failed to stat remote object '{remote}': No such file or"
+            " directory"
+        )
+        return 1
+    if switched_during(started=started, state=state):
+        part.unlink(missing_ok=True)
+        record(
+            entry={
+                "call": {"argv": ["pull", remote, str(local)], "tool": "adb"},
+                "event": "cut",
+            }
+        )
+        print(
+            f"adb: error: failed to read copy response: EOF\n{remote}: 0 files pulled"
+        )
+        return 1
+    part.replace(local)
+    size = local.stat().st_size
+    print(f"{remote}: 1 file pulled, 0 skipped. 40.0 MB/s ({size} bytes in 0.010s)")
+    return 0
 
 
 def push(*, local: pathlib.Path, remote: str, state: dict) -> int:

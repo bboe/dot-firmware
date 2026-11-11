@@ -9,6 +9,8 @@ import sys
 
 import fusepy as fuse
 
+CID = "150100444f54534d3101cafe5e5e0001"
+DISK = "/mmcblk0"
 FILE_SIZE = 4096
 NUMBER = re.compile(r"0[xX][0-9a-fA-F]+|0[0-7]*|[1-9][0-9]*")
 SIDES = ("boot0", "boot1")
@@ -17,9 +19,12 @@ SIDES = ("boot0", "boot1")
 class Sysfs(fuse.Operations):
     def __init__(self, *, sizes: dict[str, int]) -> None:
         self.files = {f"/mmcblk0{side}/size": f"{sizes[side]}\n" for side in SIDES}
+        self.files[f"{DISK}/device/cid"] = f"{CID}\n"
 
     def getattr(self, path: str, *_: object) -> dict:
-        if path == "/" or path in {f"/mmcblk0{side}" for side in SIDES}:
+        if path in {"/", DISK, f"{DISK}/device"} or path in {
+            f"/mmcblk0{side}" for side in SIDES
+        }:
             return {"st_mode": stat.S_IFDIR | 0o755, "st_nlink": 2}
         if path.endswith("/force_ro") and path.removesuffix("/force_ro") in {
             f"/mmcblk0{side}" for side in SIDES
@@ -47,7 +52,11 @@ class Sysfs(fuse.Operations):
 
     def readdir(self, path: str, *_: object) -> list[str]:  # ruff: ignore[no-self-use]
         if path == "/":
-            return [".", "..", *(f"mmcblk0{side}" for side in SIDES)]
+            return [".", "..", "mmcblk0", *(f"mmcblk0{side}" for side in SIDES)]
+        if path == DISK:
+            return [".", "..", "device"]
+        if path == f"{DISK}/device":
+            return [".", "..", "cid"]
         return [".", "..", "force_ro", "size"]
 
     def truncate(self, path: str, length: int, fh: int | None = None) -> None:
