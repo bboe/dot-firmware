@@ -262,7 +262,7 @@ def fireos6_stages() -> dict[State, Stage]:
     } | {
         state: stage
         for state, stage in reboot_stages().items()
-        if state in FIREOS5_ROOTED
+        if state in FIREOS5_ROOTED or state == State.UNLOCKED_BOOTED
     }
 
 
@@ -458,6 +458,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
         stranded = current == State.STOCK_FASTBOOT and current not in table
         installed = target.goal == State.UNLOCKED_BOOTED and State.UNLOCKED_TWRP in done
         restored = target.unlock is None and bool(done & TWRPS)
+        resetting = ARGUMENTS.factory_reset and not installed
         ahead = AHEAD.get(current)
         if (
             DOWNLOADER.ident is None
@@ -591,7 +592,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
             elif (
                 current == State.UNLOCKED_BOOTED
                 and current not in done
-                and current != target.goal
+                and (current != target.goal or resetting)
             ):
                 say(
                     text=f"This {title()} runs rooted Fire OS 6 on an unlocked"
@@ -605,7 +606,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 guided = True
                 password_first(device=target.device)
                 say(text=usb_ask(device=target.device))
-        if current == State.UNLOCKED_BOOTED == target.goal:
+        if current == State.UNLOCKED_BOOTED == target.goal and not resetting:
             version = adb_shell(command="getprop ro.build.version.name")
             warn(text=f"The {title()} is rooted: {version}, with root adb.")
             cache_note()
@@ -670,7 +671,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 say(text=nothing_to_restore(device=target.device))
             cache_note()
             return
-        if current == target.goal:
+        if current == target.goal and not resetting:
             hide_updater()
             version = adb_shell(command="getprop ro.build.version.name")
             selinux = adb_shell(command="getenforce")
@@ -870,7 +871,7 @@ def waiting_line(*, device: Device) -> str:
 def walked(*, start: State, table: dict[State, Stage]) -> tuple[list[Stage], bool]:
     passing: list[Stage] = []
     for _ in range(len(table) + 1):
-        if start == ARGUMENTS.target.goal:
+        if start == ARGUMENTS.target.goal and (passing or not ARGUMENTS.factory_reset):
             return passing, True
         stage = table.get(start)
         if stage is None:

@@ -588,6 +588,38 @@ def test_a_restore_whose_echo_stays_off_usb_ends_once_it_is_written(
     assert "shown nothing on USB for 5 minutes" in said
 
 
+def test_a_rooted_dot_given_factory_reset_reinstalls_from_twrp(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, run: Run
+) -> None:
+    run.target(name="fireos6")
+    monkeypatch.setattr(name="factory_reset", target=route.ARGUMENTS, value=True)
+    ran: list[str] = []
+    table = {
+        route.State.UNLOCKED_BOOTED: route.Stage(
+            run=lambda: ran.append("reboot"),
+            steps=1,
+            then=route.State.UNLOCKED_TWRP,
+        ),
+        route.State.UNLOCKED_TWRP: route.Stage(
+            run=lambda: ran.append("install"),
+            steps=5,
+            then=route.State.UNLOCKED_BOOTED,
+        ),
+    }
+    monkeypatch.setattr(name="stages", target=route, value=lambda: table)
+    run.said["getprop ro.build.version.name"] = "Fire OS 6.5.7.4"
+    run.states = [
+        route.State.UNLOCKED_BOOTED,
+        route.State.UNLOCKED_TWRP,
+        route.State.UNLOCKED_BOOTED,
+    ]
+    route.root()
+    out = said(capsys=capsys)
+    assert ran == ["reboot", "install"]
+    assert "runs rooted Fire OS 6 on an unlocked bootloader. Rebooting it" in out
+    assert "rooted: Fire OS 6.5.7.4, with root adb" in out
+
+
 def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1181,7 +1213,10 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
                 frozenset(),
             ),
         }
-        | {rooted: reboots[rooted] for rooted in route.FIREOS5_ROOTED},
+        | {
+            rooted: reboots[rooted]
+            for rooted in {*route.FIREOS5_ROOTED, state.UNLOCKED_BOOTED}
+        },
         "stock": shared
         | dict.fromkeys(
             route.TWRPS, (route.stage_restore, 16, state.STOCK_BOOTED, route.TWRPS)
@@ -1268,9 +1303,13 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
 @pytest.mark.parametrize(
     ("name", "factory_reset", "totals"),
     [
-        ("fireos5", False, {"stock": 11, "twrp": 9, "v1.1.0": 7}),
-        ("fireos6", False, {"stock": None, "twrp": None, "v1.1.0": None}),
-        ("fireos6", True, {"stock": 7, "twrp": 5, "v1.1.0": 9}),
+        ("fireos5", False, {"rooted": 10, "stock": 11, "twrp": 9, "v1.1.0": 7}),
+        (
+            "fireos6",
+            False,
+            {"rooted": 0, "stock": None, "twrp": None, "v1.1.0": None},
+        ),
+        ("fireos6", True, {"rooted": 6, "stock": 7, "twrp": 5, "v1.1.0": 9}),
     ],
 )
 def test_fastboot_counts_the_steps_the_route_takes(
@@ -1289,6 +1328,7 @@ def test_fastboot_counts_the_steps_the_route_takes(
     )
     table = route.stages()
     starts = {
+        state.UNLOCKED_BOOTED: totals["rooted"],
         state.UNLOCKED_TWRP: totals["twrp"],
         state.AMONET_TWRP_BOOT_MOVED: totals["v1.1.0"],
         state.STOCK_FASTBOOT: totals["stock"],

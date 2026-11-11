@@ -1536,7 +1536,9 @@ unlock's, not the stock bytes.
 - With `--factory-reset`, the XDA procedure: in the device's amonet TWRP it runs
   `twrp wipe cache`, `twrp wipe data`, and `twrp install` of the OTA twice,
   with a reboot into recovery between, then `twrp install` of
-  `boot-root.zip` and a reboot.
+  `boot-root.zip` and a reboot. A run with `--factory-reset` reboots an Echo
+  already rooted on Fire OS 6 into TWRP for it. Without the flag, that Echo is
+  at the goal and the run changes nothing.
 - It pushes the OTA to `/sdcard` before each install. A `/sdcard` on a
   `/data` that did not mount is TWRP's RAM: the push and its read-back pass,
   and the reboot loses the file.

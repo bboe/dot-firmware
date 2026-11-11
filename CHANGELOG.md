@@ -2,6 +2,14 @@
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Fixed
+
+- `unlock fireos6 --factory-reset` erases an Echo that already runs rooted
+  Fire OS 6 and installs both slots, where it said the Echo was rooted and
+  did nothing.
+
 ## 1.1.1 - 2026-11-10
 
 ### Fixed
