@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org).
 - `unlock` lets only the computer that runs it into the Echo's adb, over USB
   and Wi-Fi, on Fire OS 5 and 6. A rooted Fire OS 6 Echo previously gave root
   adb to anyone on its network.
+- Progress lines right-align each step's estimate against its ✅ and drop the
+  parentheses around the estimate and the total. The label column gains the
+  4 characters that saves, so the longest label no longer pushes its line
+  right.
 
 ### Fixed
 

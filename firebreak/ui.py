@@ -71,8 +71,8 @@ class Progress:
     def begin(self, *, estimate: str = "", label: str) -> None:
         self.end()
         self.step += 1
-        about = f"(~{estimate})" if estimate else ""
-        self.line = f"{self.counter()}{label:<38} {about:<8} "
+        about = f"~{estimate}" if estimate else ""
+        self.line = f"{self.counter()}{label:<42} {about:>6} "
         self.ts = time.monotonic()
         self.open = True
         if ARGUMENTS.verbose:
@@ -95,9 +95,9 @@ class Progress:
         self.open = False
         back = "\r" if self.halt() else ""
         took = "skip" if skipped else self.seconds()
-        total = f"({since(start=self.t0)} total)"
+        total = f"{since(start=self.t0)} total"
         stamp = f"{clock()} " if ARGUMENTS.verbose else ""
-        show(text=f"{back}{stamp}{self.line}{mark()} {took} {total:>15}")
+        show(text=f"{back}{stamp}{self.line}{mark()} {took} {total:>13}")
 
     def halt(self) -> bool:
         if not self.ticker:

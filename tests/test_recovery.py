@@ -836,7 +836,7 @@ def test_writes_that_share_a_label_share_a_line(
     ended = [
         line.split("]", 1)[1].split()
         for line in capsys.readouterr().out.splitlines()
-        if line.endswith("total)")
+        if line.endswith(" total")
     ]
     assert [words[:-4] for words in ended] == [
         ["write", "the", "bootloader"],
