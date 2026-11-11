@@ -86,7 +86,6 @@ NO_WAY="reads as stock-booted, which nothing here"
 GESTURE="Start the Echo Dot (2nd Generation)'s fastboot"
 RUNS="runs its firmware, read as stock-booted."
 NO_CHAIN="has no bootrom chain for the Echo Dot (3rd Generation)"
-NO_BRICK="has no fastbrick for the Echo Dot (3rd Generation)"
 NOT_AMONET="Echo Dot (3rd Generation), which amonet does not unlock"
 D_GESTURE="Start the Echo Dot (3rd Generation)'s fastboot"
 CYCLE="waits in its bootrom, and nothing here restarts it"
@@ -126,8 +125,7 @@ check d-fb-stockfb  donut   fastboot     ""         600 "is in stock fastboot." 
     "is in stock fastboot." -- fastboot
 check d-twrp-twrp   donut   twrp         ""         600 "$T" "$T" -- twrp
 check d-twrp-amonetfb donut twrp         "fastboot" 600 "$T" "$T" -- twrp
-check d-twrp-stockfb donut  fastboot     ""         600 "$NO_BRICK" "$NO_BRICK" \
-    -- twrp --force
+check d-twrp-stockfb donut  fastboot     ""         600 "$T" "$T" -- twrp --force
 check d-brom-twrp   donut   twrp         ""         600 "$NO_CHAIN" "$NO_CHAIN" \
     -- bootrom --force
 check d-short       donut   twrp         ""         600 "$NOT_AMONET" "$NOT_AMONET" \

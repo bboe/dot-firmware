@@ -458,11 +458,11 @@ def create(*, cache: pathlib.Path, device: str, runner: int, start: str) -> None
         " && printf '127.0.0.1 localhost\\n' > /sim/stock/system/etc/hosts"
         " && printf 'service otad /system/bin/otad\\n    class main\\n'"
         " > /sim/stock/init.sim.rc"
-        " && i=0 && for p in system_a userdata cache; do i=$((i + 1));"
+        " && i=0 && for p in system_a userdata cache system_b; do i=$((i + 1));"
         " E2FSPROGS_FAKE_TIME=1700000000 mke2fs -q -F -t ext4"
         " -U 5eed0000-0000-4000-8000-$(printf %012x $i)"
         " -E hash_seed=5eed0000-0000-4000-8000-000000000000"
-        f" $( [ $p = system_a ] && echo -d /sim/stock ) {BY_NAME}/$p; done",
+        f" $( case $p in system_?) echo -d /sim/stock;; esac ) {BY_NAME}/$p; done",
         state=state,
     )
     make_venv()

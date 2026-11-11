@@ -85,10 +85,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   light. The second run of each is the no-op: `fastboot` and `twrp` report the
   state they are in, `bootrom` and `short` report a hold they join, `reboot`
   reports the firmware it finds running, or the bootrom it cannot leave, and
-  `twrp --force` writes no second fastbrick. A donut's 11 add the refusals
-  it alone meets: `twrp --force` from stock fastboot, which has no fastbrick
-  there, `bootrom --force`, which has no bootrom chain, and `short`, which
-  amonet does not unlock. It found the one that did not
+  `twrp --force` writes no second fastbrick. A donut's 11 add `twrp --force`
+  from stock fastboot, which reaches TWRP through its bootrom, and the
+  refusals it alone meets: `bootrom --force`, which has no bootrom chain, and
+  `short`, which amonet does not unlock. It found the one that did not
   hold: `short` asked for the short again on a bootrom already held, with the
   case open and a wire in hand for nothing.
 - `DEVICE=biscuit`, the default, makes an Echo Dot (2nd Generation).
@@ -277,6 +277,10 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 - The build comes from `build.prop` at the root of `system_X`, where Fire
   OS 5 keeps it, or from `system/build.prop`, where Fire OS 6's
   system-as-root image keeps it.
+- A new Echo holds its stock build in both `system_a` and `system_b`, as every
+  Echo backed up here does. The `unlock fireos6` check that `otad` is off
+  reads a slot it cannot mount as one it could not block, so an unformatted
+  `system_b` stops that run.
 
 ## What is modelled
 
