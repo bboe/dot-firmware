@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, BinaryIO
 from firebreak.android.ota import extract
 from firebreak.backup import CHUNK, FORMAT, MANIFEST, READ_OK, identity
 from firebreak.cache import CACHE, Download, digest, fetch
+from firebreak.devices import DEVICES, KAMAKIRI_UNLOCKS
 from firebreak.entry import known_device, twrp_entry
 from firebreak.host import (
     DOT_TEMPORARY_DIRECTORY,
@@ -23,7 +24,9 @@ from firebreak.host import (
     run,
     usb_serial,
 )
+from firebreak.probe import state
 from firebreak.report import whole
+from firebreak.states import State
 from firebreak.stock import Shell
 from firebreak.twrp import (
     DISK,
@@ -253,6 +256,15 @@ def restored(
             message=f"rebuilding the backup takes {needed >> 20} MiB in"
             f" {work.parent}, which has {free >> 20} MiB free, so nothing was"
             " written"
+        )
+    if SESSION.device is None and state() == State.BOOTROM:
+        SESSION.device = next(
+            (
+                device
+                for device in DEVICES
+                if device.name == manifest["device"] and device in KAMAKIRI_UNLOCKS
+            ),
+            None,
         )
     twrp_entry(force=force)
     wait_for_twrp_start()

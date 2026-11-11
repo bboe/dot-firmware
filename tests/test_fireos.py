@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from firebreak import fireos
-from firebreak.devices import BISCUIT, TARGETS, biscuit
+from firebreak.devices import BISCUIT, DONUT, TARGETS, biscuit
 from firebreak.ui import FatalError
 
 if TYPE_CHECKING:
@@ -547,6 +547,37 @@ def test_fire_os_6_refuses_the_boot_moved_table(
 
 
 @pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_restarts_a_donut_into_twrp_through_fastboot(
+    *, adb: FakeAdb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        name="target", target=fireos.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
+    )
+    asked: list[bytes] = []
+    monkeypatch.setattr(
+        name="ask_fastboot",
+        target=fireos,
+        value=lambda **options: asked.append(options["command"]),
+    )
+    answers = iter((False, True))
+    monkeypatch.setattr(name="in_fastboot", target=fireos, value=lambda: next(answers))
+    fireos.install_fireos6()
+    assert asked == [TARGETS[DONUT]["fireos6"].device.fastboot_command]
+    assert ["adb", "reboot", "recovery"] not in adb.asked
+    restart = adb.asked.index(["adb", "reboot"])
+    assert adb.asked[restart + 1][-2:] == ["oem", "reboot-recovery"]
+    monkeypatch.setattr(
+        name="restart_refusals",
+        target=fireos,
+        value=lambda: [("fastboot reboot-recovery", "FAILED")],
+    )
+    answers = iter((True,))
+    with pytest.raises(FatalError, match="took neither command"):
+        fireos.twrp_by_fastboot(command=b"x")
+    assert fireos.install_steps() == fireos.INSTALL_STEPS + 1
+
+
+@pytest.mark.usefixtures("fireos6")
 def test_fire_os_6_says_to_power_cycle_when_the_reboot_never_goes(
     *, adb: FakeAdb, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -556,6 +587,20 @@ def test_fire_os_6_says_to_power_cycle_when_the_reboot_never_goes(
     with pytest.raises(FatalError, match=r"boot-root\.zip is installed"):
         fireos.stage_install_fireos6()
     assert len(adb.commands(holding="reboot")) == fireos.PUSH_TRIES
+
+
+@pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_stops_when_a_donut_never_reaches_fastboot(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        name="target", target=fireos.ARGUMENTS, value=TARGETS[DONUT]["fireos6"]
+    )
+    monkeypatch.setattr(name="ask_fastboot", target=fireos, value=lambda **_: None)
+    monkeypatch.setattr(name="in_fastboot", target=fireos, value=lambda: False)
+    monkeypatch.setattr(name="FASTBOOT_WAIT", target=fireos, value=-1)
+    with pytest.raises(FatalError, match="did not reach fastboot"):
+        fireos.install_fireos6()
 
 
 @pytest.mark.usefixtures("fireos6")

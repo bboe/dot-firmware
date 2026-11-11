@@ -13,6 +13,7 @@ from firebreak.bootrom_step import (
     payload_device,
     unwritten,
 )
+from firebreak.cache import unpack
 from firebreak.devices import (
     BOOTROM_UNLOCKS,
     DEFAULTS,
@@ -22,9 +23,10 @@ from firebreak.devices import (
 )
 from firebreak.host import run
 from firebreak.identify import POLL, identify
+from firebreak.kamakiri_step import kamakiri_step
 from firebreak.mediatek.usbdl import UsbdlError
 from firebreak.probe import state
-from firebreak.route import TWRPS
+from firebreak.route import TWRPS, password_first
 from firebreak.states import State, shown
 from firebreak.twrp import ask_fastboot, clear_boot0, reboot
 from firebreak.ui import (
@@ -47,6 +49,7 @@ from firebreak.unlock import (
     stage_amonet_recovery,
     stage_fastbrick,
     stage_fireos5_recovery,
+    stage_kamakiri_recovery,
 )
 
 if TYPE_CHECKING:
@@ -71,6 +74,7 @@ HARDWARE_CODES = {
     if unlock.device.hardware_code is not None
 }
 LOCKED_FASTBOOTS = frozenset({State.STOCK_FASTBOOT, State.STOCK_FIREOS5_FASTBOOT})
+LOCKED = frozenset({State.STOCK_BOOTED, *LOCKED_FASTBOOTS})
 NAMELESS = frozenset({State.BOOTROM, State.NONE, State.PRELOADER})
 QUIET = 120
 REBOOT = "reboot"
@@ -506,10 +510,57 @@ def to_twrp() -> None:
     reboot(label="restarting into TWRP")
 
 
-def twrp_entry(*, force: bool) -> None:
+def twrp_entry(*, force: bool) -> None:  # ruff: ignore[complex-structure]
+    unlocked_here: list[bool] = []
+
     def amonet_recovery() -> None:
         registered(holding=FASTBRICKS, what="fastbrick")
         stage_amonet_recovery()
+
+    def bootrom_unlock() -> None:
+        device = known_device()
+        if device not in KAMAKIRI_UNLOCKS:
+            raise FatalError(
+                message=f"the {device.title} reads as"
+                f" {shown(current=State.BOOTROM)}, which nothing here can reach a"
+                f" {TWRP} from." + WAYS_OUT[State.BOOTROM]
+            )
+        unlock = KAMAKIRI_UNLOCKS[device]
+        kamakiri_step(source=unpack(download=unlock.source), unlock=unlock)
+        unlocked_here.append(True)
+
+    def kamakiri_locked() -> None:
+        device = known_device()
+        confirm(
+            force=force,
+            what=f"the {device.title} is locked, so reaching a TWRP unlocks it"
+            " first through its bootrom, which rewrites its preloader, its"
+            " bootloaders, its TEE and its recovery",
+        )
+        password_first(device=device)
+        say(
+            text=f"The {device.title} is locked, and only its bootrom can unlock"
+            " it, so start it in its bootrom. A hold that starts after the cable"
+            " goes in reaches fastboot, so start the hold first.\n\n"
+            + device.short_gesture
+        )
+        while state() in LOCKED:
+            time.sleep(POLL)
+
+    def stock_booted() -> None:
+        if known_device() in KAMAKIRI_UNLOCKS:
+            kamakiri_locked()
+            return
+        gesture()
+
+    def unlocked_fastboot() -> None:
+        if known_device() in KAMAKIRI_UNLOCKS and (force or unlocked_here):
+            unlocked_here.clear()
+            stage_kamakiri_recovery()
+        elif force:
+            amonet_recovery()
+        else:
+            restarted()
 
     def fireos5_recovery() -> None:
         registered(holding=FIREOS5_CHAINS, what="Fire OS 5 chain")
@@ -517,6 +568,9 @@ def twrp_entry(*, force: bool) -> None:
 
     def unlocking() -> None:
         device = known_device()
+        if device in KAMAKIRI_UNLOCKS:
+            kamakiri_locked()
+            return
         if device not in FASTBRICKS:
             raise FatalError(
                 message=f"firebreak has no fastbrick for the {device.title}, so"
@@ -535,9 +589,10 @@ def twrp_entry(*, force: bool) -> None:
             **dict.fromkeys(TO_TWRP, to_twrp),
             **dict.fromkeys(LOCKED_FASTBOOTS, unlocking),
             State.BOOTED: to_fastboot,
-            State.UNLOCKED_FASTBOOT: amonet_recovery if force else restarted,
+            State.BOOTROM: bootrom_unlock,
+            State.UNLOCKED_FASTBOOT: unlocked_fastboot,
             State.AMONET_FIREOS5_FASTBOOT: fireos5_recovery if force else restarted,
-            State.STOCK_BOOTED: gesture,
+            State.STOCK_BOOTED: stock_booted,
         },
         goal=TWRPS,
         patient=frozenset({State.STOCK_BOOTED}),

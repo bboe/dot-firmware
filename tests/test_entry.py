@@ -63,6 +63,31 @@ def bootrom(*, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]) -> list
     return done
 
 
+def donut_reads(
+    *, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]
+) -> list[str]:
+    done = reads(monkeypatch=monkeypatch, states=states)
+    monkeypatch.setattr(name="device", target=SESSION, value=DONUT)
+    monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
+    monkeypatch.setattr(
+        name="password_first",
+        target=entry,
+        value=lambda **options: done.append(f"sudo {options['device'].name}"),
+    )
+    monkeypatch.setattr(name="unpack", target=entry, value=lambda **_: "kit")
+    monkeypatch.setattr(
+        name="kamakiri_step",
+        target=entry,
+        value=lambda **options: done.append(f"kamakiri_step {options['source']}"),
+    )
+    monkeypatch.setattr(
+        name="stage_kamakiri_recovery",
+        target=entry,
+        value=lambda: done.append("stage_kamakiri_recovery"),
+    )
+    return done
+
+
 def reads(*, monkeypatch: pytest.MonkeyPatch, states: Iterable[State]) -> list[str]:
     done: list[str] = []
     reported = iter(states)
@@ -735,10 +760,37 @@ def test_a_twrp_entry_from_the_fireos5_fastboot_writes_that_chain_s_twrp(
     assert done == ["stage_fireos5_recovery"]
 
 
+def test_a_twrp_entry_reaches_no_twrp_from_another_echo_s_bootrom(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    with pytest.raises(FatalError, match="which nothing here can reach a twrp from"):
+        entry.twrp_entry(force=False)
+
+
 def test_a_twrp_entry_reboots_a_rooted_echo(*, monkeypatch: pytest.MonkeyPatch) -> None:
     done = reads(monkeypatch=monkeypatch, states=[State.ROOTED, State.UNLOCKED_TWRP])
     entry.twrp_entry(force=False)
     assert done == ["reboot recovery"]
+
+
+def test_a_twrp_entry_restarts_an_unlocked_donut_without_a_write(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = donut_reads(
+        monkeypatch=monkeypatch,
+        states=[State.UNLOCKED_FASTBOOT, State.UNLOCKED_TWRP, State.UNLOCKED_TWRP],
+    )
+    entry.twrp_entry(force=False)
+    assert done == ["restarted"]
+    done.clear()
+    monkeypatch.setattr(
+        name="state",
+        target=entry,
+        value=iter([State.UNLOCKED_FASTBOOT, State.UNLOCKED_TWRP]).__next__,
+    )
+    entry.twrp_entry(force=True)
+    assert done == ["stage_kamakiri_recovery"]
 
 
 def test_a_twrp_entry_restarts_an_unlocked_echo_without_a_write(
@@ -759,6 +811,22 @@ def test_a_twrp_entry_says_what_to_do_where_the_recovery_is_not_a_twrp(
     monkeypatch.setattr(name="RECOVERY_WAIT", target=entry, value=-1)
     with pytest.raises(FatalError, match="what its recovery holds is not one"):
         entry.twrp_entry(force=False)
+
+
+@pytest.mark.parametrize("start", [State.STOCK_BOOTED, State.STOCK_FASTBOOT])
+def test_a_twrp_entry_unlocks_a_locked_donut_through_its_bootrom(
+    *, monkeypatch: pytest.MonkeyPatch, start: State
+) -> None:
+    done = donut_reads(
+        monkeypatch=monkeypatch,
+        states=[start, start, State.NONE, State.BOOTROM, State.UNLOCKED_FASTBOOT],
+    )
+    with pytest.raises(StopIteration):
+        entry.twrp_entry(force=False)
+    assert done[0].startswith("asked: the Echo Dot (3rd Generation) is locked")
+    assert done[1] == "sudo donut"
+    assert "start it in its bootrom" in done[2]
+    assert done[-2:] == ["kamakiri_step kit", "stage_kamakiri_recovery"]
 
 
 def test_a_twrp_entry_unlocks_nothing_it_has_no_fastbrick_for(

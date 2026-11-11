@@ -6,10 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
-- `unlock fireos6` deletes `update.zip` and `boot-root.zip` from `/sdcard`
-  after it installs them, and zeroes them first where it wiped userdata. They
-  were left in userdata, where the OTA took 109 MB that every backup then
-  copied. `update.zip` is pushed once, not once for each slot.
+- `unlock fireos6 --factory-reset` on an Echo Dot (3rd Generation) no longer
+  stops between its two slot installs, where it booted Fire OS instead of
+  TWRP.
+- `twrp`, `backup` and `restore` unlock a locked Echo Dot (3rd Generation)
+  from its bootrom, where they stopped. `restore` also names one already in
+  its bootrom from the backup.
+- `unlock fireos6` deletes the zips it pushes to `/sdcard` once installed,
+  and pushes `update.zip` once rather than once per slot.
 
 ## 1.1.0 - 2026-11-10
 

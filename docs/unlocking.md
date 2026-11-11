@@ -508,8 +508,29 @@ reaching its state by hand first.
   it waits for without a limit as a target run does. Any other state stops the
   run rather than guessing: `twrp` refuses a booted Echo with no root, because
   the recovery a reboot would reach is Amazon's, not a TWRP.
+- A locked donut has no fastbrick, so `twrp`, and `backup` and `restore`
+  through it, unlock it from its bootrom as `unlock` does: the prompt, then
+  sudo before the button hold, then the hold, then kamakiri-donut's chain
+  and kaeru's fastboot, which writes TWRP to `swdl` and starts it. Before
+  this a locked donut asked for the fastboot gesture and then stopped,
+  because its locked fastboot has no way to a TWRP. A donut already unlocked
+  restarts into the TWRP it holds without a write, unless `--force` asks for
+  one. The simulator ran `stock 8344`, which locks a donut, then `restore`,
+  to the end.
+- A donut already in its bootrom when `restore` starts names nothing, since
+  only the bootrom's one handshake reports its hardware code. So `restore`
+  takes the device from `backup.json` there, and the unlock's own check of
+  the hardware code and the CID check in TWRP still guard the Echo.
+  Measured on a donut on 2026-11-10: a `restore` lost USB while it pushed
+  userdata and left the donut in its bootrom, boot0's header cleared. Three
+  runs then stopped with "cannot tell which Echo this is". After the fix, a
+  power cycle and one run took it from the bootrom to TWRP in 56 s, through
+  the kamakiri unlock and TWRP written to `swdl`, and restored it in 4 min
+  46 s. It booted rooted 8349, still signed in to Amazon, with the boot
+  count carried over and slot a back at priority 14.
 - A state that does not move for 10 minutes stops the run, as it does for a
-  target. The gesture is the exception, because it waits on a person.
+  target. The gesture, and a locked fastboot waiting for a person to start
+  its bootrom, are the exceptions, because they wait on a person.
 - Nothing on USB is a wait, because that is what a reboot reads as. In a run
   that erased boot0 itself it is not: that Echo starts nothing but its bootrom,
   so no fastboot and no recovery can ever appear, and `fastboot` and `twrp`
@@ -2866,6 +2887,15 @@ new slot, and one reading cannot separate them. It costs nothing while slot b
 boots, and it means there is no fallback slot if one ever does not, so it is
 worth reading again on the next `--factory-reset` and before.
 
+**A `--factory-reset` on 2026-11-08 stopped at the second slot,** because
+the `adb reboot recovery` between the installs started the new Fire OS, as
+below. A `--factory-reset` now asks for fastboot through `misc` there
+instead. Measured on 2026-11-10 from TWRP: 6 steps in 6 min 11 s, with kaeru's
+fastboot up 8 seconds after the request and `fastboot oem reboot-recovery`
+taken at once, to rooted 8349. `misc` read `00 41 42 42 01 00 8f 00` after
+it, slot a at priority 0 as on 2026-11-04, where it read priority 14 before.
+So the zeroed slot a comes from this route, not from the run that failed.
+
 That run also found the gap in naming a donut. An Echo already sitting in its
 bootrom when the run starts is read by `probe` first, which sees the CDC serial
 port, reads `Generic CDC` as the USB product, cannot reach a bootloader in
@@ -3023,9 +3053,16 @@ which every other device here takes, does nothing on a donut: on 2026-11-03 a
 run of it looped three times, each try rebooting and coming back in the system
 again, and `misc` was still byte-identical to the stock backup afterwards. So
 Amazon's Android on this device never writes the bootloader control block, and
-nothing downstream of it ever sees the request. Only fastboot is affected:
-`adb reboot recovery` reaches a donut's TWRP in 19 seconds, so `firebreak twrp`
-needs none of this.
+nothing downstream of it ever sees the request.
+
+**From rooted Fire OS, `adb reboot recovery` reaches a donut's TWRP**: in 19
+seconds on 2026-11-03 and 23 seconds on 2026-11-10, so `firebreak twrp` uses
+it there. **From TWRP it did not, once:** on 2026-11-08, between the two slot
+installs of an `unlock fireos6 --factory-reset`, it started the new Fire OS,
+and the run waited for a TWRP that never came. Whether that happens every time
+from TWRP is not read. So the second slot's install takes a donut to fastboot
+through `misc`, below, and starts its TWRP from there with `fastboot oem
+reboot-recovery`, then `fastboot reboot-recovery`, which kaeru answers.
 
 kaeru does read that block. It holds `bootonce-bootloader`, `boot-recovery`
 and `%s: Bootloader command pending.`, so `Device.fastboot_command` carries the

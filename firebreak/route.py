@@ -34,6 +34,7 @@ from firebreak.fireos import (
     TWRP,
     UPDATER,
     hide_updater,
+    install_steps,
     stage_install_fireos,
     stage_install_fireos6,
     stage_install_kamakiri,
@@ -246,7 +247,7 @@ def fireos6_stages() -> dict[State, Stage]:
         State.UNLOCKED_TWRP: Stage(
             needs=(unlock.source, ota_build, BOOT_ROOT),
             run=stage_install_fireos6,
-            steps=5 if ARGUMENTS.factory_reset else None,
+            steps=install_steps() if ARGUMENTS.factory_reset else None,
             then=State.UNLOCKED_BOOTED,
         ),
         State.AMONET_TWRP_BOOT_MOVED: Stage(
@@ -293,7 +294,7 @@ def kamakiri_stages() -> dict[State, Stage]:
             State.UNLOCKED_TWRP: Stage(
                 needs=(unlock.source, ota_build, BOOT_ROOT),
                 run=stage_install_kamakiri,
-                steps=5 if ARGUMENTS.factory_reset else None,
+                steps=install_steps() if ARGUMENTS.factory_reset else None,
                 then=State.UNLOCKED_BOOTED,
             )
         }

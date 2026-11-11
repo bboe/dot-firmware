@@ -33,15 +33,16 @@ from firebreak.host import (
     PUSH_TRIES,
     adb_script,
     adb_shell,
+    in_fastboot,
     last_line,
     md5_mismatch,
     push_checked,
     run,
 )
 from firebreak.probe import read_recovery
-from firebreak.twrp import partition_table, wait_for_twrp, write_system
+from firebreak.twrp import ask_fastboot, partition_table, wait_for_twrp, write_system
 from firebreak.ui import ARGUMENTS, PROGRESS, SESSION, FatalError, again, title, warn
-from firebreak.unlock import amonet_chain, kamakiri_chain
+from firebreak.unlock import amonet_chain, kamakiri_chain, restart_refusals
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -59,7 +60,9 @@ BOOT_ROOT_INSTALL = "Installing zip file '/sdcard/boot-root.zip'"
 BUILD_NAME = "ro.build.version.name="
 BUILD_OK = "build-ok"
 ERASED_OK = "erased-ok"
+FASTBOOT_WAIT = 120
 HIDE_WAIT = 60
+INSTALL_STEPS = 5
 MOUNT_OK = "mount-ok"
 SLOT_OK = "slot-ok"
 TWRP = biscuit.BBOE_RECOVERY
@@ -259,7 +262,7 @@ def install_and_root() -> None:
         )
     build = "" if ARGUMENTS.factory_reset else installed_build(slot=active_slot())
     if not ARGUMENTS.factory_reset:
-        PROGRESS.steps = PROGRESS.step + (5 if not build else 2)
+        PROGRESS.steps = PROGRESS.step + (install_steps() if not build else 2)
     wiped = not build
     if wiped:
         install_fireos6()
@@ -310,12 +313,15 @@ def install_fireos6() -> None:
     for part in ("cache", "data"):
         adb_shell(command="twrp wipe " + part, timeout=120)
     update = "/sdcard/update.zip"
+    command = ARGUMENTS.target.device.fastboot_command
     for index, slot in enumerate(iterable=("first", "second")):
+        if index and command:
+            twrp_by_fastboot(command=command)
         PROGRESS.begin(
             estimate="135 s",
             label=f"installing Fire OS 6 {build}, {slot} slot",
         )
-        if index:
+        if index and not command:
             run(arguments=["adb", "reboot", "recovery"], check=True, timeout=60)
             wait_for_twrp()
         if not index or md5_mismatch(
@@ -350,6 +356,10 @@ def install_magisk(*, magisk: pathlib.Path, work: pathlib.Path) -> None:
     paths = " ".join(name.decode() for name in names)
     if md5_mismatch(command=f"cd /; cat {paths} | md5sum", want=want):
         raise FatalError(message=f"Magisk 17.3's files did not verify on the {title()}")
+
+
+def install_steps() -> int:
+    return INSTALL_STEPS + bool(ARGUMENTS.target.device.fastboot_command)
 
 
 def installed_build(*, slot: str) -> str:
@@ -553,3 +563,27 @@ def system_image(*, package: Download) -> tuple[list[pathlib.Path], str, int]:
         want,
         int(blocks),
     )
+
+
+def twrp_by_fastboot(*, command: bytes) -> None:
+    ask_fastboot(command=command)
+    run(arguments=["adb", "reboot"], check=True, timeout=60)
+    deadline = time.monotonic() + FASTBOOT_WAIT
+    while not in_fastboot():
+        if time.monotonic() > deadline:
+            raise FatalError(
+                message=f"the {title()} did not reach fastboot within"
+                f" {FASTBOOT_WAIT} seconds of asking for it, between the two"
+                " slot installs. " + again()
+            )
+        time.sleep(2)
+    refused = restart_refusals()
+    if refused:
+        raise FatalError(
+            message=f"the {title()}'s fastboot took neither command that starts"
+            " its TWRP between the two slot installs: "
+            + "; ".join(f"{words}: {said}" for words, said in refused)
+            + ". "
+            + again()
+        )
+    wait_for_twrp()
