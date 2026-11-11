@@ -1987,8 +1987,8 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   so with `unlock_keeps_misc`. donut is the one: its `misc` read back
   byte-identical to a stock backup after the whole unlock, so there is nothing
   to put back, and the block above is biscuit's rather than a universal one.
-  At `0x360` a donut keeps `00 41 42 42 01 8E 8F 00`, which is slot state and
-  not a command, so writing biscuit's seven bytes there would change a slot
+  At `0x360` a donut keeps slot state such as `00 41 42 42 01 00 8F 00`, not a
+  command, so writing biscuit's seven bytes there would change a slot
   rather than restore one.
 - A zeroed `misc` is not safe. Stock's first boot starts slot a with a few
   tries and `success 0`, and each boot cut short spends one. On a Dot, a
@@ -2879,13 +2879,18 @@ stored state that picks the next one is `bootloader_control` at `0x360` of
 byte per slot, where `0x8f` is priority 15 with a successful boot and zero
 tries, and `0x00` is priority 0, which is a slot marked unbootable.
 
-**So slot a holds 8349 and cannot be booted, and nothing here knows what
-zeroed it.** The same offset read `00 41 42 42 01 8e 8f 00` on 2026-11-03,
-with slot a at priority 14, so it was zeroed somewhere in the day's runs. The
-candidates are the second OTA install, boot-root, and the first boot of the
-new slot, and one reading cannot separate them. It costs nothing while slot b
-boots, and it means there is no fallback slot if one ever does not, so it is
-worth reading again on the next `--factory-reset` and before.
+**So slot a holds 8349 and cannot be booted, which is how Amazon leaves an
+Echo.** Every biscuit and radar backup that holds the block reads the
+inactive slot at priority 0; one biscuit's `misc` is all zeros.
+Two radars read on 2026-10-21 show `8f 00`: one at stock 6436 before any
+`firebreak stock`, one on Fire OS 5.5.5.1 just after its first unlock. A donut
+freshly restored to stock reads `00 8f`, as above. The `8e 8f` this donut held
+on 2026-11-03, with both slots bootable, is the exception. It most likely came
+from the 2026-11-02 dump of this one Echo, which its 11-08 backup carried.
+Neither radar was read straight from the factory, and nothing measured says
+which step of an install sets the old slot to 0. No Echo here has a fallback
+slot, and it is not known whether these LKs would fall back to one, so the run
+leaves the stock pattern alone.
 
 **A `--factory-reset` on 2026-11-08 stopped at the second slot,** because
 the `adb reboot recovery` between the installs started the new Fire OS, as
@@ -2893,8 +2898,8 @@ below. A `--factory-reset` now asks for fastboot through `misc` there
 instead. Measured on 2026-11-10 from TWRP: 6 steps in 6 min 11 s, with kaeru's
 fastboot up 8 seconds after the request and `fastboot oem reboot-recovery`
 taken at once, to rooted 8349. `misc` read `00 41 42 42 01 00 8f 00` after
-it, slot a at priority 0 as on 2026-11-04, where it read priority 14 before.
-So the zeroed slot a comes from this route, not from the run that failed.
+it, slot a at priority 0 as on 2026-11-04, where it read priority 14 before:
+the stock pattern again.
 
 That run also found the gap in naming a donut. An Echo already sitting in its
 bootrom when the run starts is read by `probe` first, which sees the CDC serial
