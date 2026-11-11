@@ -44,8 +44,14 @@ def install(*, path: str) -> int:
             (prop.parent / "etc" / "hosts").write_text(
                 "127.0.0.1 localhost\n", encoding="utf-8"
             )
+            (pathlib.Path(folder) / "default.prop").write_text(
+                "ro.adb.secure=1\n", encoding="utf-8"
+            )
             (pathlib.Path(folder) / "init.sim.rc").write_text(
-                "service otad /system/bin/otad\n    class main\n", encoding="utf-8"
+                "service otad /system/bin/otad\n    class main\n"
+                "service update_engine /system/bin/update_engine\n"
+                "    class late_start\n",
+                encoding="utf-8",
             )
             subprocess.run(
                 [
