@@ -21,6 +21,14 @@ This project adheres to [Semantic Versioning](https://semver.org).
   offers stock 8149 an update to 8349, so a stock Echo left on 8149
   downloads and writes it again by itself.
 
+### Fixed
+
+- `restore` of an Echo Dot (3rd Generation) backup takes the backup's
+  device for an unnamed bootrom it reaches at any point in the run. A donut
+  whose boot0 a stopped restore cleared cycles through its bootrom, and a
+  run that started between two cycles stopped with "firebreak cannot tell
+  which Echo this is".
+
 ## 1.2.0 - 2026-11-11
 
 ### Changed

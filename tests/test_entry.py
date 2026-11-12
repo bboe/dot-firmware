@@ -774,6 +774,30 @@ def test_a_twrp_entry_from_the_fireos5_fastboot_writes_that_chain_s_twrp(
     assert done == ["stage_fireos5_recovery"]
 
 
+def test_a_twrp_entry_keeps_the_name_an_echo_gave_over_the_one_it_was_told(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    with pytest.raises(FatalError, match="which nothing here can reach a twrp from"):
+        entry.twrp_entry(force=False, named=DONUT)
+    assert SESSION.device is BISCUIT
+
+
+def test_a_twrp_entry_names_an_unnamed_bootrom_as_it_was_told(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = donut_reads(
+        monkeypatch=monkeypatch,
+        states=[State.NONE, State.BOOTROM, State.UNLOCKED_FASTBOOT],
+    )
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    with pytest.raises(StopIteration):
+        entry.twrp_entry(force=False, named=DONUT)
+    assert SESSION.device is DONUT
+    assert any(line.startswith("asked: this Echo, in its bootrom") for line in done)
+    assert done[-2:] == ["kamakiri_step kit", "stage_kamakiri_recovery"]
+
+
 def test_a_twrp_entry_reaches_no_twrp_from_another_echo_s_bootrom(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -825,6 +849,20 @@ def test_a_twrp_entry_says_what_to_do_where_the_recovery_is_not_a_twrp(
     monkeypatch.setattr(name="RECOVERY_WAIT", target=entry, value=-1)
     with pytest.raises(FatalError, match="what its recovery holds is not one"):
         entry.twrp_entry(force=False)
+
+
+def test_a_twrp_entry_takes_no_told_name_its_bootrom_cannot_unlock(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = reads(monkeypatch=monkeypatch, states=[State.BOOTROM])
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+    monkeypatch.setattr(name="target", target=ARGUMENTS, value="")
+    monkeypatch.setattr(
+        name="identify", target=entry, value=lambda: types.SimpleNamespace(device=None)
+    )
+    with pytest.raises(FatalError, match="cannot tell which Echo this is"):
+        entry.twrp_entry(force=False, named=RADAR)
+    assert not [line for line in done if line.startswith("asked:")]
 
 
 @pytest.mark.parametrize("start", [State.STOCK_BOOTED, State.STOCK_FASTBOOT])

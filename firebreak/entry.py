@@ -514,7 +514,7 @@ def to_twrp() -> None:
     reboot(label="restarting into TWRP")
 
 
-def twrp_entry(*, force: bool) -> None:  # ruff: ignore[complex-structure]
+def twrp_entry(*, force: bool, named: Device | None = None) -> None:  # ruff: ignore[complex-structure]
     unlocked_here: list[bool] = []
 
     def amonet_recovery() -> None:
@@ -522,6 +522,14 @@ def twrp_entry(*, force: bool) -> None:  # ruff: ignore[complex-structure]
         stage_amonet_recovery()
 
     def bootrom_unlock() -> None:
+        if SESSION.device is None and named in KAMAKIRI_UNLOCKS:
+            SESSION.device = named
+            confirm(
+                force=force,
+                what=f"this Echo, in its bootrom, is taken to be the backup's"
+                f" {named.title}, and reaching its TWRP unlocks it first, which"
+                " rewrites its preloader, its bootloaders, its TEE and its recovery",
+            )
         device = known_device()
         if device not in KAMAKIRI_UNLOCKS:
             raise FatalError(

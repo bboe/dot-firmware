@@ -12,7 +12,6 @@ import pytest
 
 from firebreak import restore, twrp
 from firebreak.devices import BISCUIT, RADAR
-from firebreak.states import State
 from firebreak.ui import SESSION, FatalError
 
 if TYPE_CHECKING:
@@ -37,7 +36,6 @@ def reached(*, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
         ("identity", lambda: ("G0SERIAL", "cafe")),
         ("attached_serial", lambda: None),
         ("known_device", lambda: RADAR),
-        ("state", lambda: State.UNLOCKED_TWRP),
         ("twrp_entry", lambda **_: None),
         ("unmount", lambda **_: None),
         ("wait_for_twrp_start", lambda: None),
@@ -309,34 +307,6 @@ def test_restore_counts_the_ota_images_it_has_yet_to_extract(
         restore.restore(directory=str(folder), force=True)
 
 
-@pytest.mark.parametrize(("device", "named"), [("donut", "donut"), ("radar", "None")])
-def test_restore_names_a_donut_in_its_bootrom_after_the_backup(
-    *,
-    device: str,
-    monkeypatch: pytest.MonkeyPatch,
-    named: str,
-    reached: list[dict],
-    tmp_path: pathlib.Path,
-) -> None:
-    folder = tmp_path / "backup"
-    manifest = made(cache=restore.CACHE, folder=folder)
-    (folder / restore.MANIFEST).write_text(
-        data=json.dumps({**manifest, "device": device})
-    )
-    monkeypatch.setattr(name="device", target=SESSION, value=None)
-    monkeypatch.setattr(name="state", target=restore, value=lambda: State.BOOTROM)
-
-    def entered(**_: object) -> None:
-        raise FatalError(
-            message=f"entered TWRP as {getattr(SESSION.device, 'name', None)}"
-        )
-
-    monkeypatch.setattr(name="twrp_entry", target=restore, value=entered)
-    with pytest.raises(FatalError, match=f"entered TWRP as {named}"):
-        restore.restore(directory=str(folder), force=True)
-    assert not reached
-
-
 def test_restore_needs_room_to_rebuild_the_backup(
     *, monkeypatch: pytest.MonkeyPatch, reached: list[dict], tmp_path: pathlib.Path
 ) -> None:
@@ -390,6 +360,33 @@ def test_restore_refuses_another_echo_before_twrp(
     with pytest.raises(
         FatalError, match="backup is of the Echo G0SERIAL, and this is G1"
     ):
+        restore.restore(directory=str(folder), force=True)
+    assert not reached
+
+
+@pytest.mark.parametrize(("device", "named"), [("donut", "donut"), ("radar", "radar")])
+def test_restore_tells_the_entry_a_donut_backup_s_device(
+    *,
+    device: str,
+    monkeypatch: pytest.MonkeyPatch,
+    named: str,
+    reached: list[dict],
+    tmp_path: pathlib.Path,
+) -> None:
+    folder = tmp_path / "backup"
+    manifest = made(cache=restore.CACHE, folder=folder)
+    (folder / restore.MANIFEST).write_text(
+        data=json.dumps({**manifest, "device": device})
+    )
+    monkeypatch.setattr(name="device", target=SESSION, value=None)
+
+    def entered(**options: object) -> None:
+        raise FatalError(
+            message=f"entered TWRP as {getattr(options['named'], 'name', None)}"
+        )
+
+    monkeypatch.setattr(name="twrp_entry", target=restore, value=entered)
+    with pytest.raises(FatalError, match=f"entered TWRP as {named}"):
         restore.restore(directory=str(folder), force=True)
     assert not reached
 

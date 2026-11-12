@@ -528,6 +528,18 @@ reaching its state by hand first.
   the kamakiri unlock and TWRP written to `swdl`, and restored it in 4 min
   46 s. It booted rooted 8349, still signed in to Amazon, with the boot
   count carried over and slot a back at priority 14.
+- That fix took the device from `backup.json` only if the donut read as its
+  bootrom when `restore` started. A donut with boot0's header cleared does
+  not stay there: on 2026-11-12 one read as nothing on USB for 39 s, then as
+  its bootrom, over and over, and three runs that started in the gap stopped
+  the same way. So `restore` now hands the backup's device to the TWRP
+  entry, which uses it only when it reaches the bootrom with the Echo still
+  unnamed, and asks first unless `--force` answers. An Echo that names
+  itself first, in a fastboot or a recovery, keeps its own name. An
+  unnamed bootrom is taken to be the backup's donut until the unlock's
+  hardware-code check, which stops a biscuit or radar before it writes.
+  With it the same donut was restored from its bootrom, every area
+  already written reading back as `skip`, and booted its backup's 8349.
 - A state that does not move for 10 minutes stops the run, as it does for a
   target. The gesture, and a locked fastboot waiting for a person to start
   its bootrom, are the exceptions, because they wait on a person.
