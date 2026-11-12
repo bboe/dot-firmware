@@ -2079,7 +2079,7 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
 - That check reads sysfs's `start` and ends with a marker of its own. On
   Windows 11, 2026-11-05, an Echo that dropped off USB mid-restore turned the
   unmarked read into adb's own error, and the run blamed the partition table:
-  `/dev/block/mmcblk0p13 starts at adb.ex: device 'G090LF0964230U8T' not found,
+  `/dev/block/mmcblk0p13 starts at adb.ex: device 'SERIAL' not found,
   not 294912`. So an answer without the marker, or without a number before it,
   waits for the Echo to reconnect and is read again, up to 3 times, as the
   table and block-device reads are. Only a whole answer that differs is a
