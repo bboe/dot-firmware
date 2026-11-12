@@ -54,3 +54,21 @@ how a target run starts on a Dot that cannot reach fastboot.
 5. Take the wire off when firebreak prints "The short may come off now".
 6. Leave the Dot plugged in, and run the target you want, such as
    `uvx firebreak@latest unlock`. A power cycle loses the hold.
+
+## An Echo rooted by an older firebreak
+
+An Echo rooted on Fire OS 6 by firebreak 1.1.x or earlier lets anyone on its
+network into its root adb. One rooted by 1.0.0 or earlier also has only a
+raised build number against Amazon's updates. Amazon's update server offered
+nothing to that number on 2026-11-11, but `otad` still runs and the hosts file
+blocks nothing. A plain `unlock` on either says the Echo is rooted and stops.
+To add what is missing and keep the Echo's setup, start in its TWRP:
+
+```sh
+uvx firebreak@latest twrp
+uvx firebreak@latest unlock
+```
+
+The unlock installs `boot-root.zip` again, blocks updates and locks adb in
+each Fire OS 6 slot, and starts Fire OS. `unlock --factory-reset` also adds
+them, but installs Fire OS 6 again and erases the Echo.

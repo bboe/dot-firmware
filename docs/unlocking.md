@@ -1665,7 +1665,13 @@ unlock's, not the stock bytes.
   init declares `disabled`. While an install applies, init clears
   `mmcblk0boot0`'s `force_ro`, so an update writes the preloader too. Read
   from the stock `/system` of biscuit 8149, radar 8349 and donut 8349.
-- The version number alone was never tested against an offered update. So
+- `boot-root.zip` sets the number to 2^52 plus the stock number's low 20
+  bits. Asked on 2026-11-11, Amazon's update server offered nothing to that
+  number from donut 1895, 6176, 8344 and 8349 or from biscuit and radar 8149.
+  It offered 8349 to each of those stock numbers below 8349, so it compares
+  the whole number. That check-in carries no fingerprint or incremental.
+  1895's `DeviceSoftwareOTA` posts to another endpoint, which was not asked,
+  and `otad`'s own compare on the Echo was not read. So
   after `boot-root.zip` the run mounts each slot's `system` in TWRP, adds
   `disabled` to the `otad` stanza, and points the 6 update hosts at
   `127.0.0.1` in `/system/etc/hosts`. The stanza is in `/init.mt8516.rc` on
