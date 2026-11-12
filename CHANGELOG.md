@@ -2,6 +2,17 @@
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Changed
+
+- `stock` and `unlock fireos6 --factory-reset` install Fire OS 6 8349 on an
+  Echo Dot (2nd Generation) and an Echo (2nd Generation) when no build is
+  named, where they installed 8149. So does `unlock fireos6` on an Echo with
+  no Fire OS 6 installed, such as one on Fire OS 5. Amazon's update server
+  offers stock 8149 an update to 8349, so a stock Echo left on 8149
+  downloads and writes it again by itself.
+
 ## 1.2.0 - 2026-11-11
 
 ### Changed

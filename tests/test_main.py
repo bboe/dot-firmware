@@ -537,10 +537,10 @@ def test_stock_takes_no_wait_as_force(
 @pytest.mark.parametrize(
     argnames=("arguments", "device", "build"),
     argvalues=[
-        (["stock"], BISCUIT, "8149"),
+        (["stock"], BISCUIT, "8349"),
         (["stock", "4315"], BISCUIT, "4315"),
         (["unlock", "fireos6"], BISCUIT, ""),
-        (["stock"], RADAR, "8149"),
+        (["stock"], RADAR, "8349"),
     ],
     ids=["stock-alone", "stock-with-a-build", "another-target", "radar-stock"],
 )
@@ -561,9 +561,9 @@ def test_the_build_each_target_gets(
 def test_the_builds_list_gives_each_device_a_block_newest_first() -> None:
     blocks = main.builds_list().split("\n\n")
     assert [block.partition("\n")[0] for block in blocks] == [
-        "Echo Dot (2nd Generation), 8149 when left out:",
+        "Echo Dot (2nd Generation), 8349 when left out:",
         "Echo Dot (3rd Generation), 8349 when left out:",
-        "Echo (2nd Generation), 8149 when left out:",
+        "Echo (2nd Generation), 8349 when left out:",
     ]
     donut = blocks[1].split("\n")[1:]
     assert donut[0] == "  8349          Fire OS 6.5.7.5"

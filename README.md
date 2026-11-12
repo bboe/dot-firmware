@@ -149,12 +149,12 @@ options:
 
 commands for the Echo Dot (2nd Generation):
   stock [BUILD]
-      Amazon's Fire OS BUILD, 8149 when left out, which erases the whole
+      Amazon's Fire OS BUILD, 8349 when left out, which erases the whole
       Dot.
   unlock [TARGET], where TARGET is one of:
     fireos6, the default
         boot-root.zip's root adb on the Fire OS 6 already installed, which
-        keeps the Dot's setup; with --factory-reset, Fire OS 6 8149 with
+        keeps the Dot's setup; with --factory-reset, Fire OS 6 8349 with
         TWRP 3.7.0, with the Dot erased.
     fireos5
         rooted Fire OS 5.5.5.4 on amonet v1.1.0, with TWRP 3.7.0_9-bboe2.
@@ -171,12 +171,12 @@ commands for the Echo Dot (3rd Generation):
 
 commands for the Echo (2nd Generation):
   stock [BUILD]
-      Amazon's Fire OS BUILD, 8149 when left out, which erases the whole
+      Amazon's Fire OS BUILD, 8349 when left out, which erases the whole
       Echo.
   unlock [TARGET], where TARGET is one of:
     fireos6, the default
         boot-root.zip's root adb on the Fire OS 6 already installed, which
-        keeps the Echo's setup; with --factory-reset, Fire OS 6 8149, with
+        keeps the Echo's setup; with --factory-reset, Fire OS 6 8349, with
         the Echo erased.
 
 Run it again with another of these to move the Echo there.

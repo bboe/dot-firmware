@@ -481,7 +481,7 @@ def test_a_fire_os_5_route_fetches_what_it_needs_and_builds_the_system(
 @pytest.mark.parametrize(
     ("name", "build", "downloaded"),
     [
-        ("fireos6", "", "8149"),
+        ("fireos6", "", "8349"),
         ("stock", "4315", "4315"),
     ],
 )

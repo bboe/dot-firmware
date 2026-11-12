@@ -295,7 +295,7 @@ BUILDS = {
         verified=True,
     ),
 }
-DEFAULT_BUILD = "8149"
+DEFAULT_BUILD = "8349"
 FASTBOOT_MODE = (
     "Unplug the USB cable, press and hold the action button (the one with a dot),"
     " plug the cable back in, and let go when the light ring turns green. A"

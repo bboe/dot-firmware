@@ -1,7 +1,7 @@
 # Devices
 
 The firmware each supported device's OTAs ship. radar has a `stock` target and
-an unlock, both on 8149. donut declares an unlock and a `fireos6` target, and
+an unlock, both on 8349. donut declares an unlock and a `fireos6` target, and
 is named by the hardware code its bootrom reports rather than by a bootloader;
 the whole route has run on a donut, three times, including with
 `--factory-reset`. crown declares

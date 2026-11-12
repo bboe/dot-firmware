@@ -1507,8 +1507,8 @@ unlock's, not the stock bytes.
 | target | ends in | stops at |
 | --- | --- | --- |
 | `unlock fireos5` | amonet v1.1.0, TWRP 3.7.0_9-bboe2, rooted Fire OS 5.5.5.4 | amonet-fireos5-bboe-booted |
-| `unlock fireos6 [--factory-reset]`, the default | amonet v2.0.1's TWRP, `boot-root.zip` on the Fire OS 6 installed; with `--factory-reset`, or no Fire OS 6 installed, on 8149 in both slots | unlocked-booted |
-| `stock [BUILD]` | Amazon's Fire OS 6 `BUILD`, 8149 when left out, the whole Echo erased | stock-booted |
+| `unlock fireos6 [--factory-reset]`, the default | amonet v2.0.1's TWRP, `boot-root.zip` on the Fire OS 6 installed; with `--factory-reset`, or no Fire OS 6 installed, on 8349 in both slots | unlocked-booted |
+| `stock [BUILD]` | Amazon's Fire OS 6 `BUILD`, 8349 when left out, the whole Echo erased | stock-booted |
 
 - Each poll picks the stage for the state found and the target, so a run
   goes from any state to any target, a rooted Echo included. Every state has
@@ -1784,7 +1784,7 @@ like the others, so every state has a route to it: a rooted Echo goes to
 recovery, amonet v1.1.0's fastboot gets amonet v1.1.0's TWRP, Fire OS 5's
 locked fastboot gets the fastbrick, and in any TWRP the restore runs.
 
-- Only `stock` takes a `BUILD`, and without one it installs 8149. The run
+- Only `stock` takes a `BUILD`, and without one it installs 8349. The run
   downloads the build before it touches the Echo.
 - `stock` takes every OTA ftvdb lists for the device, so an Echo can go back to
   whatever it ran before. A build is **verified** on a device once it has been
@@ -1796,19 +1796,20 @@ locked fastboot gets the fastbrick, and in any TWRP the restore runs.
   2026-11-07 and 25 of donut's on 2026-11-07 and 11-08, each in one run of
   `stock BUILD` then `unlock`, which
   [measurements.md](measurements.md#whole-run-timings) records. For a Fire OS
-  5 build that unlock installs 8149, so the run shows the restore and the
-  unlock from its LK, not that its own Fire OS 5 starts. radar's 6436 had
-  been unlocked from with amonet-radar v1.0.0 only, and the radar run
-  verified it on v1.0.1. `firebreak builds` lists every build `stock` takes,
-  newest first, with the Fire OS version named in its OTA's `NS` code, and
-  marks any not verified. `stock --help` names only each device's default,
-  because the verified list grew to every build, and it buried the options.
+  5 build that unlock installed 8149, then the default, so the run shows the
+  restore and the unlock from its LK, not that its own Fire OS 5 starts.
+  radar's 6436 had been unlocked from with amonet-radar v1.0.0 only, and the
+  radar run verified it on v1.0.1. `firebreak builds` lists every build
+  `stock` takes, newest first, with the Fire OS version named in its OTA's
+  `NS` code, and marks any not verified. `stock --help` names only each
+  device's default, because the verified list grew to every build, and it
+  buried the options.
 - `--no-wait` was the flag that started the writes without the 10-second
   countdown. `--force` does that now, and `--no-wait` is a hidden alias for it
   until 2.0, with a warning.
 - Each device has its own builds. biscuit's and radar's OTAs share build
   numbers but not firmware, so the run picks the build only after it knows
-  the device. radar has 21, and 8149, Fire OS 6574.1, is what both of its
+  the device. radar has 21, and 8349, Fire OS 6.5.7.5, is what both of its
   targets install when no build is named.
 - Before it writes anything, the restore checks that the OTA's
   `ro.product.device`, without `_puffin`, names the device. A wrong entry in
