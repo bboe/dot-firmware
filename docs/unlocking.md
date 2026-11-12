@@ -1621,13 +1621,23 @@ unlock's, not the stock bytes.
 - `RC=0` alone does not show that the zip patched anything: it skips a slot
   with no `default.prop` and still ends with 0. The run also needs the zip's
   `slot _a: neutering ota updates` line, for the active slot, in TWRP's log.
-- Without `--factory-reset` the run skips the wipes and both OTA installs. It
-  mounts the active slot's `system` read-only, reads `ro.build.version.name`,
-  then installs `boot-root.zip` over what is there. The zip finds its targets
-  in any build: the adbd site by a byte pattern, the SELinux policy through
-  `magiskpolicy`. A build with no OTA in firebreak's list stops the run with
-  nothing written. The fastbrick takes only the LKs the listed builds ship, so
-  the kernel boots under the amonet LK it was built beside.
+- Without `--factory-reset` the run skips the wipes. It mounts the active
+  slot's `system` read-only and reads `ro.build.version.name`. The target's
+  build, or a newer one, gets `boot-root.zip` over what is there. The zip
+  finds its targets in any build: the adbd site by a byte pattern, the
+  SELinux policy through `magiskpolicy`. A build with no OTA in firebreak's
+  list stops the run with nothing written. The fastbrick takes only the LKs
+  the listed builds ship, so the kernel boots under the amonet LK it was
+  built beside.
+- An older build gets the target's OTA in both slots, over userdata, then
+  `boot-root.zip`. Amazon's own update installs over userdata, and its server
+  offered donut 8349 straight to 1895, 6176 and 8344, so a jump of many
+  builds is the path it takes. A rooted Echo on an older build goes to TWRP
+  for this; on the target's build it stays as it is. Measured 2026-11-12 on
+  a radar and a biscuit, each restored to rooted 8149 with saved Wi-Fi, then
+  given 8349 over it in 6 steps: 3 min 16 s and 4 min 16 s. On each, a
+  marker file and `wpa_supplicant.conf`'s md5 survived, it was online after
+  the boot, and `/sdcard` held no zip.
 - A slot with no Fire OS 6, as after the route from amonet v1.1.0, leaves
   nothing to keep, so the run installs the target's build as
   `--factory-reset` does. The OTA downloads in the background either way. A

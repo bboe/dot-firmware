@@ -511,8 +511,9 @@ CONFIG = DeviceConfig(
             goal=State.UNLOCKED_BOOTED,
             installs=FireOs6(build=DEFAULT_BUILD),
             name=FIREOS6,
-            summary="boot-root.zip's root adb on the Fire OS 6 already installed,"
-            " which keeps the Dot's setup; with --factory-reset, Fire OS 6"
+            summary=f"boot-root.zip's root adb on Fire OS 6 {DEFAULT_BUILD}, installed"
+            " over an older Fire OS 6 if need be, which keeps the Dot's setup;"
+            " with --factory-reset, Fire OS 6"
             f" {DEFAULT_BUILD} with TWRP {V2_0_1_TWRP_VERSION}, with the Dot"
             " erased.",
             unlock=UNLOCK_TO_FIREOS6,

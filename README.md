@@ -153,9 +153,10 @@ commands for the Echo Dot (2nd Generation):
       Dot.
   unlock [TARGET], where TARGET is one of:
     fireos6, the default
-        boot-root.zip's root adb on the Fire OS 6 already installed, which
-        keeps the Dot's setup; with --factory-reset, Fire OS 6 8349 with
-        TWRP 3.7.0, with the Dot erased.
+        boot-root.zip's root adb on Fire OS 6 8349, installed over an older
+        Fire OS 6 if need be, which keeps the Dot's setup; with
+        --factory-reset, Fire OS 6 8349 with TWRP 3.7.0, with the Dot
+        erased.
     fireos5
         rooted Fire OS 5.5.5.4 on amonet v1.1.0, with TWRP 3.7.0_9-bboe2.
 
@@ -165,9 +166,9 @@ commands for the Echo Dot (3rd Generation):
       Echo and locks it again.
   unlock [TARGET], where TARGET is one of:
     fireos6, the default
-        boot-root.zip's root adb on the Fire OS 6 already installed, which
-        keeps the Echo's setup; with --factory-reset, Fire OS 6 8349, with
-        the Echo erased.
+        boot-root.zip's root adb on Fire OS 6 8349, installed over an older
+        Fire OS 6 if need be, which keeps the Echo's setup; with
+        --factory-reset, Fire OS 6 8349, with the Echo erased.
 
 commands for the Echo (2nd Generation):
   stock [BUILD]
@@ -175,9 +176,9 @@ commands for the Echo (2nd Generation):
       Echo.
   unlock [TARGET], where TARGET is one of:
     fireos6, the default
-        boot-root.zip's root adb on the Fire OS 6 already installed, which
-        keeps the Echo's setup; with --factory-reset, Fire OS 6 8349, with
-        the Echo erased.
+        boot-root.zip's root adb on Fire OS 6 8349, installed over an older
+        Fire OS 6 if need be, which keeps the Echo's setup; with
+        --factory-reset, Fire OS 6 8349, with the Echo erased.
 
 Run it again with another of these to move the Echo there.
 

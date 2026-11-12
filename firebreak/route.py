@@ -34,8 +34,10 @@ from firebreak.fireos import (
     TWRP,
     UPDATER,
     adb_key,
+    build_number,
     hide_updater,
     install_steps,
+    outdated,
     stage_install_fireos,
     stage_install_fireos6,
     stage_install_kamakiri,
@@ -464,12 +466,13 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
     prompted = False
     restarts = 0
     since = 0.0
+    upgrading = False
     while True:
         current = state()
         stranded = current == State.STOCK_FASTBOOT and current not in table
         installed = target.goal == State.UNLOCKED_BOOTED and State.UNLOCKED_TWRP in done
         restored = target.unlock is None and bool(done & TWRPS)
-        resetting = ARGUMENTS.factory_reset and not installed
+        resetting = (ARGUMENTS.factory_reset or upgrading) and not installed
         ahead = AHEAD.get(current)
         if (
             DOWNLOADER.ident is None
@@ -604,6 +607,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 current == State.UNLOCKED_BOOTED
                 and current not in done
                 and (current != target.goal or resetting)
+                and not upgrading
             ):
                 say(
                     text=f"This {title()} runs rooted Fire OS 6 on an unlocked"
@@ -619,6 +623,21 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                 say(text=usb_ask(device=target.device))
         if current == State.UNLOCKED_BOOTED == target.goal and not resetting:
             version = adb_shell(command="getprop ro.build.version.name")
+            build = build_number(name=version)
+            if (
+                not installed
+                and build in BUILDS[target.device]
+                and outdated(build=build)
+            ):
+                say(
+                    text=f"This {title()} runs rooted Fire OS 6 {build}. Rebooting it"
+                    f" into TWRP to install {target.installs.build} over it, keeping"
+                    " its setup."
+                )
+                prefetch(needs=needed(start=State.UNLOCKED_TWRP, table=table))
+                upgrading = True
+                seen = None
+                continue
             warn(text=f"The {title()} is rooted: {version}, with root adb{locked()}.")
             cache_note()
             return

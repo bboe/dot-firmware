@@ -475,8 +475,8 @@ def option_parents(*, hidden: bool = False) -> dict[str, argparse.ArgumentParser
             "--factory-reset",
             (
                 "erase userdata and install the target's Fire OS 6 build in both"
-                " slots, where the target otherwise roots the Fire OS 6 already"
-                " installed and keeps the Echo's Wi-Fi and Alexa setup"
+                " slots, where the target otherwise keeps the Echo's Wi-Fi and"
+                " Alexa setup"
             ),
         ),
         ("--no-update-check", "do not ask PyPI whether a newer firebreak exists"),

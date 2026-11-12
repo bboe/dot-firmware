@@ -225,6 +225,10 @@ def boot_root_ended() -> str:
         time.sleep(5)
 
 
+def build_number(*, name: str) -> str:
+    return name.rpartition("/")[2].rstrip(")")
+
+
 def build_system(*, package: Download, target: pathlib.Path) -> None:
     part = CACHE / "system.part"
     shutil.rmtree(ignore_errors=True, path=part)
@@ -302,11 +306,14 @@ def install_and_root() -> None:
             message="this TWRP runs on a boot moved partition table. " + again()
         )
     build = "" if ARGUMENTS.factory_reset else installed_build(slot=active_slot())
-    if not ARGUMENTS.factory_reset:
-        PROGRESS.steps = PROGRESS.step + (install_steps() if not build else 2)
     wiped = not build
-    if wiped:
-        install_fireos6()
+    upgraded = not wiped and outdated(build=build)
+    if not ARGUMENTS.factory_reset:
+        PROGRESS.steps = PROGRESS.step + (
+            install_steps() - upgraded if wiped or upgraded else 2
+        )
+    if wiped or upgraded:
+        install_fireos6(wipe=wiped)
         build = ARGUMENTS.target.installs.build
     PROGRESS.begin(estimate=10, label="installing boot-root")
     push_checked(local=zip_path, remote="/sdcard/boot-root.zip")
@@ -357,12 +364,13 @@ def install_and_root() -> None:
     reboot_rooted()
 
 
-def install_fireos6() -> None:
+def install_fireos6(*, wipe: bool) -> None:
     build = ARGUMENTS.target.installs.build
     update_file = updates.download(build=build, builds=BUILDS[ARGUMENTS.target.device])
-    PROGRESS.begin(estimate=10, label="wiping cache and data")
-    for part in ("cache", "data"):
-        adb_shell(command="twrp wipe " + part, timeout=120)
+    if wipe:
+        PROGRESS.begin(estimate=10, label="wiping cache and data")
+        for part in ("cache", "data"):
+            adb_shell(command="twrp wipe " + part, timeout=120)
     update = "/sdcard/update.zip"
     command = ARGUMENTS.target.device.fastboot_command
     for index, slot in enumerate(iterable=("first", "second")):
@@ -440,7 +448,7 @@ def installed_build(*, slot: str) -> str:
     )
     if not name.startswith("Fire OS 6"):
         return ""
-    build = name.rpartition("/")[2].rstrip(")")
+    build = build_number(name=name)
     if build not in BUILDS[ARGUMENTS.target.device]:
         raise FatalError(
             message=f"slot {slot} holds {name}, a Fire OS 6 build firebreak does not"
@@ -449,6 +457,10 @@ def installed_build(*, slot: str) -> str:
             f" {ARGUMENTS.target.installs.build}."
         )
     return build
+
+
+def outdated(*, build: str) -> bool:
+    return build.isdigit() and int(build) < int(ARGUMENTS.target.installs.build)
 
 
 def polled(*, command: str) -> list[str]:

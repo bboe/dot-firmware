@@ -6,6 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- `unlock fireos6` installs the target's Fire OS 6 build, 8349 on every
+  device, over an older Fire OS 6 and keeps the Echo's userdata, where it
+  rooted the build already installed. A rooted Echo on an older build now
+  goes to TWRP for it, where `unlock` said it was rooted and stopped. An Echo
+  on 8349 is rooted in place as before.
 - Progress lines write each step's estimate as `~40s`, with no space, as its
   elapsed time and the total already are. The label column is one character
   wider.

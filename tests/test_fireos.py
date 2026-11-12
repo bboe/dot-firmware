@@ -428,6 +428,31 @@ def test_fire_os_6_goes_into_both_slots_then_boot_root(
     assert adb.asked[-1] == ["adb", "reboot"]
 
 
+@pytest.mark.usefixtures("fireos6")
+def test_fire_os_6_installs_the_default_over_an_older_build_and_keeps_data(
+    *,
+    adb: FakeAdb,
+    monkeypatch: pytest.MonkeyPatch,
+    pushed: list[tuple[pathlib.Path, str]],
+) -> None:
+    monkeypatch.setattr(name="factory_reset", target=fireos.ARGUMENTS, value=False)
+    adb.answers["bcbtool get_active"] = [
+        f"0\n{slot}\nslot-ok" for slot in ("a", "a", "b", "b", "a")
+    ]
+    adb.answers["build-ok"] = [
+        "mount-ok\nro.build.version.name=Fire OS 6574.1 (NS65741/8146)\nbuild-ok"
+    ]
+    fireos.stage_install_fireos6()
+    assert [remote for _, remote in pushed][0::2] == [
+        "/sdcard/update.zip",
+        "/sdcard/boot-root.zip",
+    ]
+    assert adb.commands(holding="twrp wipe") == []
+    assert len(adb.commands(holding="twrp install /sdcard/update.zip")) == 2
+    assert fireos.PROGRESS.steps == fireos.PROGRESS.step
+    assert adb.asked[-1] == ["adb", "reboot"]
+
+
 @pytest.mark.parametrize(
     "said",
     [
@@ -533,7 +558,7 @@ def test_fire_os_6_patches_the_installed_build_unless_reset(
     monkeypatch.setattr(name="factory_reset", target=fireos.ARGUMENTS, value=False)
     adb.answers["bcbtool get_active"] = ["0\nb\nslot-ok"]
     adb.answers["build-ok"] = [
-        "mount-ok\nro.build.version.name=Fire OS 6574.1 (NS65741/8146)\nbuild-ok"
+        "mount-ok\nro.build.version.name=Fire OS 6.5.7.5 (NS6575/8349)\nbuild-ok"
     ]
     fireos.stage_install_fireos6()
     assert [remote for _, remote in pushed] == [
@@ -621,7 +646,7 @@ def test_fire_os_6_restarts_a_donut_into_twrp_through_fastboot(
     )
     answers = iter((False, True))
     monkeypatch.setattr(name="in_fastboot", target=fireos, value=lambda: next(answers))
-    fireos.install_fireos6()
+    fireos.install_fireos6(wipe=True)
     assert asked == [TARGETS[DONUT]["fireos6"].device.fastboot_command]
     assert ["adb", "reboot", "recovery"] not in adb.asked
     restart = adb.asked.index(["adb", "reboot"])
@@ -660,7 +685,7 @@ def test_fire_os_6_stops_when_a_donut_never_reaches_fastboot(
     monkeypatch.setattr(name="in_fastboot", target=fireos, value=lambda: False)
     monkeypatch.setattr(name="FASTBOOT_WAIT", target=fireos, value=-1)
     with pytest.raises(FatalError, match="did not reach fastboot"):
-        fireos.install_fireos6()
+        fireos.install_fireos6(wipe=True)
 
 
 @pytest.mark.parametrize(

@@ -646,6 +646,59 @@ def test_a_rooted_dot_given_factory_reset_reinstalls_from_twrp(
     assert "rooted: Fire OS 6.5.7.4, with root adb" in out
 
 
+def test_a_rooted_dot_on_an_older_build_installs_the_default_from_twrp(
+    *, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, run: Run
+) -> None:
+    run.target(name="fireos6")
+    ran: list[str] = []
+    table = {
+        route.State.UNLOCKED_BOOTED: route.Stage(
+            run=lambda: ran.append("reboot"),
+            steps=1,
+            then=route.State.UNLOCKED_TWRP,
+        ),
+        route.State.UNLOCKED_TWRP: route.Stage(
+            needs=(route.BOOT_ROOT,),
+            run=lambda: ran.append("install"),
+            steps=None,
+            then=route.State.UNLOCKED_BOOTED,
+        ),
+    }
+    monkeypatch.setattr(name="stages", target=route, value=lambda: table)
+    run.said["getprop ro.build.version.name"] = "Fire OS 6574.1 (NS65741/8149)"
+    run.states = [
+        route.State.UNLOCKED_BOOTED,
+        route.State.UNLOCKED_BOOTED,
+        route.State.UNLOCKED_TWRP,
+        route.State.UNLOCKED_BOOTED,
+    ]
+    route.root()
+    out = said(capsys=capsys)
+    assert ran == ["reboot", "install"]
+    assert run.prefetched[0] == [route.BOOT_ROOT]
+    assert (
+        "runs rooted Fire OS 6 8149. Rebooting it into TWRP to install 8349 over it"
+        in out
+    )
+    assert "on an unlocked bootloader" not in out
+    assert "rooted: Fire OS 6574.1 (NS65741/8149), with root adb" in out
+
+
+@pytest.mark.parametrize(
+    "version", ["Fire OS 6.5.7.5 (NS6575/8349)", "Fire OS 6.5.7.4"]
+)
+def test_a_rooted_dot_on_the_default_or_an_unknown_build_stays(
+    *, capsys: pytest.CaptureFixture[str], run: Run, version: str
+) -> None:
+    run.target(name="fireos6")
+    run.said["getprop ro.build.version.name"] = version
+    run.states = [route.State.UNLOCKED_BOOTED]
+    route.root()
+    out = said(capsys=capsys)
+    assert f"rooted: {version}, with root adb" in out
+    assert "install 8349 over it" not in out
+
+
 def test_a_route_leaves_a_payload_archive_out_of_its_downloads(
     *, monkeypatch: pytest.MonkeyPatch
 ) -> None:
