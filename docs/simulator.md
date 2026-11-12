@@ -127,6 +127,16 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
 - A donut needs no short. `run.sh` holds its action button when firebreak asks
   for the bootrom: `dot.py plug` restarts it into the bootrom whatever it was
   doing, which is what the hold does on hardware.
+- `dot.py unplug` takes the Echo's power away and leaves it dark, and
+  `dot.py cycle` gives it back with no button held. A `restore` that starts
+  with nothing on USB, cycled once it says it waits for the Echo, reaches a
+  donut with boot0's header cleared in its bootrom with nothing named: before
+  the backup named the bootrom's Echo, that run stopped with "cannot tell
+  which Echo this is", as it did on hardware on 2026-11-12, and after it the
+  run restores. Zero boot0's first 4096 bytes from TWRP first, as
+  `twrp.CLEAR_BOOT0` does: `EMMC_BOOT` and zeros still boots. Run firebreak
+  from its own checkout: `python -m firebreak` finds the working directory's
+  `firebreak` before `PYTHONPATH`.
 - `FIREBREAK_SIM_ELEVATES` picks the attack. `1` takes mtkclient's trigger,
   which firebreak sends on macOS, and `0` takes the kit's overflow, which it
   sends on Linux and Windows. Unset, firebreak picks by the host, as it does on
@@ -513,6 +523,11 @@ python3 simulator/trace.py --commands OUT.jsonl  # with the payload commands per
   firebreak's donut client sends.
 - `0x6000` sets the fastboot flag, in the payload and not in flash, as on
   hardware. The `0x3000` after it restarts into fastboot.
+- A donut's bootrom that no handshake reaches in 40 seconds is taken by its
+  watchdog. The donut then shows nothing for 39 seconds and boots again, which
+  with boot0's header cleared is the bootrom again, over and over, as one did
+  on 2026-11-12. The handshake stops the watchdog. Both times run on the
+  simulator's clock.
 
 ### The payload
 

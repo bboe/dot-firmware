@@ -17,6 +17,7 @@ import signal
 import struct
 import subprocess
 import sys
+import threading
 import time
 import tty
 import zipfile
@@ -47,6 +48,7 @@ DECRYPT_FUNCTION = 126
 EMMC_HEADER = struct.Struct(">cBQI")
 EXTENDED = 0xC8
 FAST_SEND_PATTERN = bytes((index * 7) & 0xFF for index in range(0x200))
+FED = threading.Event()
 FINISHED = 0x1
 FLUSH_ADDRESS = 0x201000
 FLUSH_LENGTH = 4
@@ -111,7 +113,9 @@ START_STAGE2 = 0x4001
 START_WAIT = 10
 TRIGGER = (0xA1, 0x00, 0xCC)
 V1_COMMANDS = frozenset({0x1000, 0x1001, 0x1002, 0x2000, 0x2001, 0x3000})
+WATCHDOG_DARK_SECONDS = 39
 WATCHDOG_RESTART = 0x10007050
+WATCHDOG_SECONDS = 40
 WRITE_STATUS = b"\x00\x01"
 WRITE_WORDS = 0xD4
 ZERO_DECRYPTION = bytes.fromhex("4dd12bdf0ec7d26c482490b3482a1b1f")
@@ -244,6 +248,7 @@ class Bootrom:
             else:
                 self.port.write(data=bytes([(got + 1) & 0xFF]))
                 step = 0
+        FED.set()
         self.recorder.say(tool="bootrom", words=["handshake"])
 
     def hardware_code(self) -> None:
@@ -698,6 +703,15 @@ class Run:
         self.operation = operation
 
 
+class Watchdog(Exception):  # ruff: ignore[error-suffix-on-exception-name]
+    pass
+
+
+def bite(*_: object) -> None:
+    if not FED.is_set():
+        raise Watchdog
+
+
 def claim(*, port: Port) -> dict | None:
     deadline = REAL_MONOTONIC() + START_WAIT * NANOSECONDS
     mode = "gone"
@@ -717,6 +731,16 @@ def claim(*, port: Port) -> dict | None:
         file=sys.stderr,
     )
     return None
+
+
+def driven(*, bootrom: Bootrom, container: str) -> str:
+    version = bootrom.serve()
+    if version == "stage1":
+        version = stage1(bootrom=bootrom)
+    bootrom.recorder.say(tool="payload", words=["ready", version])
+    payload = Payload(bootrom=bootrom, emmc=Emmc(container=container), version=version)
+    payload.serve()
+    return "bootloader" if payload.fastboot else "system"
 
 
 def known_payloads(*, cache: str) -> dict[str, bytes]:
@@ -748,7 +772,7 @@ def main() -> int:
     state = claim(port=port)
     if state is None:
         return 1
-    into = None
+    delay, into = dot.BOOT_SECONDS, None
     try:
         spec = dot.DEVICES[state["device"]]
         bootrom = Bootrom(
@@ -757,26 +781,23 @@ def main() -> int:
             port=port,
             stages=known_stages(cache=state["cache"], spec=spec),
         )
+        if "kit" in spec:
+            signal.signal(signal.SIGALRM, bite)
+            threading.Thread(daemon=True, target=watch).start()
         try:
-            version = bootrom.serve()
-            if version == "stage1":
-                version = stage1(bootrom=bootrom)
-            bootrom.recorder.say(tool="payload", words=["ready", version])
-            payload = Payload(
-                bootrom=bootrom,
-                emmc=Emmc(container=state["container"]),
-                version=version,
-            )
-            payload.serve()
-            into = "bootloader" if payload.fastboot else "system"
+            into = driven(bootrom=bootrom, container=state["container"])
+        except Watchdog:
+            bootrom.recorder.say(tool="bootrom", words=["watchdog"])
+            delay, into = WATCHDOG_DARK_SECONDS, "system"
         finally:
             bootrom.recorder.flush()
     finally:
-        release(into=into)
+        release(delay=delay, into=into)
     return 0
 
 
-def release(*, into: str | None) -> None:
+def release(*, delay: float, into: str | None) -> None:
+    FED.set()
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     with dot.locked():
         if not dot.STATE.exists():
@@ -788,7 +809,7 @@ def release(*, into: str | None) -> None:
         state.pop("control", None)
         state.pop("port", None)
         if into is not None:
-            dot.reboot(into=into, state=state)
+            dot.reboot(delay=delay, into=into, state=state)
         dot.save(state=state)
 
 
@@ -825,6 +846,14 @@ def stage1(*, bootrom: Bootrom) -> str:
 
 def stop(*_: object) -> None:
     raise SystemExit(1)
+
+
+def watch() -> None:
+    deadline = time.monotonic() + WATCHDOG_SECONDS
+    while time.monotonic() < deadline and not FED.is_set():
+        time.sleep(0.1)
+    if not FED.is_set():
+        signal.pthread_kill(threading.main_thread().ident, signal.SIGALRM)
 
 
 if __name__ == "__main__":

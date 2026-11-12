@@ -5,6 +5,8 @@ python3 simulator/dot.py create [--cache DIR] [--device biscuit|donut|radar]
     [--runner PID]
     [--start fastboot|no-light|stock-booted|twrp]
 python3 simulator/dot.py plug
+python3 simulator/dot.py cycle
+python3 simulator/dot.py unplug
 python3 simulator/dot.py status
 python3 simulator/dot.py snapshot
 python3 simulator/dot.py table FILE
@@ -493,6 +495,11 @@ def current() -> dict:
         state = load()
         settle(state=state)
         return state
+
+
+def cycle() -> None:
+    halt()
+    request_reboot(into="system")
 
 
 def decide(*, facts: dict, into: str, state: dict) -> dict:  # ruff: ignore[complex-structure, too-many-return-statements, too-many-branches]
@@ -1073,9 +1080,11 @@ def main() -> int:
         choices=("fastboot", "no-light", "stock-booted", "twrp"),
         default="fastboot",
     )
+    commands.add_parser("cycle")
     commands.add_parser("destroy")
     commands.add_parser("halt")
     commands.add_parser("plug")
+    commands.add_parser("unplug")
     commands.add_parser("snapshot")
     commands.add_parser("status")
     table = commands.add_parser("table")
@@ -1088,12 +1097,8 @@ def main() -> int:
             runner=options.runner,
             start=options.start,
         )
-    elif options.action == "destroy":
-        destroy()
-    elif options.action == "halt":
-        halt()
-    elif options.action == "plug":
-        plug()
+    elif options.action in POWER:
+        POWER[options.action]()
     elif options.action == "snapshot":
         print(sim_boot(action="snapshot", state=current()), end="")
     elif options.action == "status":
@@ -1613,6 +1618,24 @@ def stream(
 def switched_during(*, started: float, state: dict) -> bool:
     usb = state.get("usb")
     return bool(usb) and started < usb["at"] <= time.time()
+
+
+def unplug() -> None:
+    halt()
+    with locked():
+        state = load()
+        record(entry={"event": "unplugged"})
+        state.update(booting=None, mode="none", usb=None)
+        save(state=state)
+
+
+POWER = {
+    "cycle": cycle,
+    "destroy": destroy,
+    "halt": halt,
+    "plug": plug,
+    "unplug": unplug,
+}
 
 
 def user(*, state: dict) -> str:
