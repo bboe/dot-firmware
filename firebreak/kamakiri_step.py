@@ -86,7 +86,7 @@ def authorized(*, explained: bool = False) -> None:
 
 
 def await_fastboot() -> None:
-    PROGRESS.begin(estimate="30 s", label="waiting for kamakiri's fastboot")
+    PROGRESS.begin(estimate=30, label="waiting for kamakiri's fastboot")
     for _ in range(FASTBOOT_TRIES):
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             if in_fastboot() and getvar(name="unlock_status").lower() == "true":
@@ -188,7 +188,7 @@ def exploited(*, client: Bootrom, source: pathlib.Path) -> Client:
 
 def kamakiri_step(*, source: pathlib.Path, unlock: Unlock) -> bool:
     authorized()
-    PROGRESS.begin(estimate="40 s", label="waiting for the bootrom")
+    PROGRESS.begin(estimate=40, label="waiting for the bootrom")
     client = waited(device_code=unlock.device.hardware_code)
     authorized(explained=True)
     live = exploited(client=client, source=source)

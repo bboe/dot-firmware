@@ -161,7 +161,7 @@ def into_recovery(*, line: Callable[[str, object], None]) -> bool:  # ruff: igno
                         " what it asks."
                     )
                     return False
-                PROGRESS.begin(estimate="40 s", label="restarting into recovery")
+                PROGRESS.begin(estimate=40, label="restarting into recovery")
                 restarting = run(arguments=["adb", "reboot", "recovery"], timeout=60)
                 if restarting.returncode != 0:
                     line(
@@ -255,7 +255,7 @@ def report() -> None:
 
 
 def restart_in_recovery(*, line: Callable[[str, object], None]) -> bool:
-    PROGRESS.begin(estimate="40 s", label="restarting into recovery")
+    PROGRESS.begin(estimate=40, label="restarting into recovery")
     refused = restart_refusals()
     if not refused:
         return True

@@ -315,11 +315,11 @@ def fastboot_entry() -> None:
 
 def firmware_from_fastboot() -> None:
     run(arguments=["fastboot", "reboot"], check=True, timeout=60)
-    PROGRESS.begin(estimate="60 s", label="starting its firmware")
+    PROGRESS.begin(estimate=60, label="starting its firmware")
 
 
 def firmware_from_twrp() -> None:
-    reboot(estimate="60 s", into="", label="starting its firmware")
+    reboot(estimate=60, into="", label="starting its firmware")
 
 
 def gesture() -> None:
@@ -404,7 +404,7 @@ def reached(*, erase: Callable[[], str] | None) -> Client:
         if failure:
             raise FatalError(message=failure)
     if not SESSION.short:
-        PROGRESS.begin(estimate="40 s", label="waiting for the bootrom")
+        PROGRESS.begin(estimate=40, label="waiting for the bootrom")
     client, live = bootrom_client(
         deadline=time.monotonic() + waiting(erase=erase), erase=erase
     )
@@ -420,7 +420,7 @@ def reached(*, erase: Callable[[], str] | None) -> Client:
     if payload is None:
         payload = held_payload(client=client)
     if not SESSION.short:
-        PROGRESS.begin(estimate="15 s", label="starting amonet's payload")
+        PROGRESS.begin(estimate=15, label="starting amonet's payload")
     return exploit(client=client, payload=payload)
 
 
@@ -454,7 +454,7 @@ def registered(*, holding: dict[Device, object], what: str) -> Device:
 
 
 def restarted() -> None:
-    PROGRESS.begin(estimate="40 s", label="restarting into TWRP")
+    PROGRESS.begin(estimate=40, label="restarting into TWRP")
     if restart_refusals():
         PROGRESS.end(skipped=True)
         raise FatalError(

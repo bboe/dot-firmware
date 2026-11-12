@@ -179,7 +179,7 @@ def fireos5_stages() -> dict[State, Stage]:
         recovery.carry_out,
         after=functools.partial(
             reboot,
-            estimate="345 s",
+            estimate=345,
             into="",
             label="waiting for rooted Fire OS 5",
         ),

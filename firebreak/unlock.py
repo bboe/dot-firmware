@@ -218,7 +218,7 @@ def stage_amonet_recovery(*, carries_twrp: bool = True) -> bool:
         unlock.little_kernel
         and getvar(name="lk_build_desc", strict=True) == unlock.little_kernel
     ):
-        PROGRESS.begin(estimate="40 s", label="writing TWRP and waiting for it")
+        PROGRESS.begin(estimate=40, label="writing TWRP and waiting for it")
         run(
             arguments=["fastboot", "-S", "256M", "flash", "recovery", "bin/twrp.img"],
             check=True,
@@ -226,7 +226,7 @@ def stage_amonet_recovery(*, carries_twrp: bool = True) -> bool:
             timeout=120,
         )
     else:
-        PROGRESS.begin(estimate="40 s", label="waiting for TWRP")
+        PROGRESS.begin(estimate=40, label="waiting for TWRP")
     if restart_refusals():
         PROGRESS.end(skipped=True)
         say(
@@ -260,7 +260,7 @@ def stage_downgrade() -> bool:
     if little_kernel == FASTBRICKS[current_device()].little_kernel:
         stage_amonet_recovery()
         return False
-    PROGRESS.begin(estimate="5 s", label="erasing boot0 to reach the bootrom")
+    PROGRESS.begin(estimate=5, label="erasing boot0 to reach the bootrom")
     bootrom_step(
         amonet=amonet,
         erase=erase_by_fastboot,
@@ -285,7 +285,7 @@ def stage_fastbrick() -> None:
     amonet, image, release = fastbrick_payload(
         little_kernel=little_kernel, unlock=fastbrick
     )
-    PROGRESS.begin(estimate="10 s", label=f"unlocking with {release}")
+    PROGRESS.begin(estimate=10, label=f"unlocking with {release}")
     for attempt in range(10):
         if attempt:
             time.sleep(2)
@@ -305,7 +305,7 @@ def stage_fastbrick() -> None:
                 message="the unlock refused this device; it was not modified"
             )
         if started:
-            PROGRESS.begin(estimate="40 s", label="waiting for TWRP")
+            PROGRESS.begin(estimate=40, label="waiting for TWRP")
             return
     raise FatalError(
         message=f"the unlock did not start after 10 attempts, with {image} for"
@@ -320,7 +320,7 @@ def stage_fireos5_recovery() -> bool:
     amonet = unpack(download=chain.unlock.source)
     twrp = fetch(download=chain.recovery)
     PROGRESS.begin(
-        estimate="30 s",
+        estimate=30,
         label=f"waiting for TWRP {chain.twrp_version}",
     )
     run(
@@ -355,7 +355,7 @@ def stage_kamakiri_recovery() -> bool:
             message=f"{unlock.name} declares no recovery to flash over fastboot. "
             + again()
         )
-    PROGRESS.begin(estimate="40 s", label="writing TWRP and waiting for it")
+    PROGRESS.begin(estimate=40, label="writing TWRP and waiting for it")
     run(
         arguments=["fastboot", "-S", "256M", "flash", flashed.target, flashed.image],
         check=True,

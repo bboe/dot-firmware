@@ -299,7 +299,7 @@ def restored(
     )
     unmount()
     PROGRESS.step, PROGRESS.steps = 0, len(areas) + 1
-    PROGRESS.begin(estimate="5 s", label="clear the preloader header (boot0)")
+    PROGRESS.begin(estimate=5, label="clear the preloader header (boot0)")
     SESSION.boot0_erased = True
     clear_boot0()
     order = sorted(
@@ -331,7 +331,7 @@ def restored(
 
 def written(*, area: dict, path: pathlib.Path) -> None:
     label = f"write {area['name']}"
-    estimate = f"{max(1, area['size'] >> 24)} s"
+    estimate = max(1, area["size"] >> 24)
     node = area["node"]
     if node == DISK:
         write(estimate=estimate, label=label, path=path, sector=area["first"])

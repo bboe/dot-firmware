@@ -162,7 +162,7 @@ def carry_out(
             f" against itself, so the {title()} is restarting into TWRP. " + again()
         )
     checked = check(actions=(*table, *writes))
-    PROGRESS.begin(estimate="10 s", label=f"write {unlock.family} v{unlock.version}")
+    PROGRESS.begin(estimate=10, label=f"write {unlock.family} v{unlock.version}")
     SESSION.boot0_erased = True
     answer = adb_shell(command=CLEAR_BOOT0, timeout=60).split()
     if answer[-2:] != ["4096", "0"]:

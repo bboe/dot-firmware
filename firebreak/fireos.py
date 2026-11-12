@@ -308,7 +308,7 @@ def install_and_root() -> None:
     if wiped:
         install_fireos6()
         build = ARGUMENTS.target.installs.build
-    PROGRESS.begin(estimate="10 s", label="installing boot-root")
+    PROGRESS.begin(estimate=10, label="installing boot-root")
     push_checked(local=zip_path, remote="/sdcard/boot-root.zip")
     output = adb_shell(command="twrp install /sdcard/boot-root.zip", timeout=300)
     errors = [line for line in output.split(sep="\n") if "(!) Error" in line]
@@ -353,14 +353,14 @@ def install_and_root() -> None:
             message="adb was not locked to this computer's key in Fire OS 6's"
             f" slot {' and '.join(open_slots)}. " + again()
         )
-    PROGRESS.begin(estimate="60 s", label=f"waiting for rooted Fire OS 6 {build}")
+    PROGRESS.begin(estimate=60, label=f"waiting for rooted Fire OS 6 {build}")
     reboot_rooted()
 
 
 def install_fireos6() -> None:
     build = ARGUMENTS.target.installs.build
     update_file = updates.download(build=build, builds=BUILDS[ARGUMENTS.target.device])
-    PROGRESS.begin(estimate="10 s", label="wiping cache and data")
+    PROGRESS.begin(estimate=10, label="wiping cache and data")
     for part in ("cache", "data"):
         adb_shell(command="twrp wipe " + part, timeout=120)
     update = "/sdcard/update.zip"
@@ -369,7 +369,7 @@ def install_fireos6() -> None:
         if index and command:
             twrp_by_fastboot(command=command)
         PROGRESS.begin(
-            estimate="135 s",
+            estimate=135,
             label=f"installing Fire OS 6 {build}, {slot} slot",
         )
         if index and not command:
@@ -414,7 +414,7 @@ def install_steps() -> int:
 
 
 def installed_build(*, slot: str) -> str:
-    PROGRESS.begin(estimate="5 s", label="reading the installed Fire OS 6 build")
+    PROGRESS.begin(estimate=5, label="reading the installed Fire OS 6 build")
     said = adb_shell(
         command=f"m=/tmp/installed-system; mkdir -p $m; umount $m 2>/dev/null;"
         f" mount -o ro {BY_NAME}/system_{slot} $m && echo {MOUNT_OK};"
@@ -480,17 +480,17 @@ def stage_install_fireos(*, reboot: bool = True, slot: str = "") -> None:
     boot, system = f"{BY_NAME}/boot{slot}_x", f"{BY_NAME}/system{slot}"
     with tempfile.TemporaryDirectory(dir=CACHE) as temporary:
         work = pathlib.Path(temporary)
-        PROGRESS.begin(estimate="5 s", label="formatting userdata")
+        PROGRESS.begin(estimate=5, label="formatting userdata")
         if not adb_script(body=Shell.DATA.value, name="data.sh", work=work):
             raise FatalError(message="userdata did not format and mount")
-        PROGRESS.begin(estimate="120 s", label="writing Fire OS 5.5.5.4's /system")
+        PROGRESS.begin(estimate=120, label="writing Fire OS 5.5.5.4's /system")
         slices, want, blocks = system_image(package=ARGUMENTS.target.installs.package)
         write_system(blocks=blocks, slices=slices, system=system, want=want)
         body = Shell.SYSTEM.value.format(hosts=" ".join(UPDATE_HOSTS), system=system)
         if not adb_script(body=body, name="system.sh", work=work):
             raise FatalError(message="patching /system failed")
 
-        PROGRESS.begin(estimate="10 s", label="writing the boot image and Magisk")
+        PROGRESS.begin(estimate=10, label="writing the boot image and Magisk")
         data = boot_image(fireos=fireos, key=adb_key(), magisk=magisk)
         image = work / "boot.img"
         image.write_bytes(data=data.ljust(-(-len(data) // 4096) * 4096, b"\0"))
@@ -515,7 +515,7 @@ def stage_install_fireos(*, reboot: bool = True, slot: str = "") -> None:
 
         install_magisk(magisk=magisk, work=work)
     if reboot:
-        PROGRESS.begin(estimate="345 s", label="waiting for rooted Fire OS 5")
+        PROGRESS.begin(estimate=345, label="waiting for rooted Fire OS 5")
         run(arguments=["adb", "reboot"])
 
 
@@ -532,7 +532,7 @@ def stage_install_kamakiri() -> None:
 def stage_replace_twrp() -> None:
     twrp = fetch(download=TWRP)
     PROGRESS.begin(
-        estimate="40 s",
+        estimate=40,
         label=f"waiting for TWRP {biscuit.BBOE_TWRP_VERSION}",
     )
     remote = DOT_TEMPORARY_DIRECTORY / TWRP.name
@@ -558,7 +558,7 @@ def stage_replace_twrp() -> None:
 def stage_swap_twrp() -> None:
     image = fetch(download=TWRP)
     PROGRESS.begin(
-        estimate="10 s", label=f"writing TWRP {biscuit.BBOE_TWRP_VERSION} to recovery"
+        estimate=10, label=f"writing TWRP {biscuit.BBOE_TWRP_VERSION} to recovery"
     )
     remote = "/data/local/tmp/recovery.img"
     run(arguments=["adb", "push", image, remote], check=True, timeout=120)

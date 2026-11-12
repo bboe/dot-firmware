@@ -89,7 +89,7 @@ def ask_for_short() -> None:
 
 
 def await_amonet_fastboot(*, little_kernel: str) -> None:
-    PROGRESS.begin(estimate="30 s", label="waiting for amonet's fastboot")
+    PROGRESS.begin(estimate=30, label="waiting for amonet's fastboot")
     for _ in range(30):
         try:
             if in_fastboot() and (
@@ -405,7 +405,7 @@ def open_serial_port(*, name: str, write_timeout: float) -> serial.Serial:
 
 
 def payload_device(*, live: Emmc) -> Device | None:
-    PROGRESS.begin(estimate="5 s", label="reading which Echo this is")
+    PROGRESS.begin(estimate=5, label="reading which Echo this is")
     try:
         named = table_products(live=live)
     except (FatalError, OSError, UsbdlError):
@@ -444,7 +444,7 @@ def started_payload(
         if failure:
             raise FatalError(message=failure)
     else:
-        PROGRESS.begin(estimate="40 s", label="waiting for the bootrom")
+        PROGRESS.begin(estimate=40, label="waiting for the bootrom")
     client, live = bootrom_client(
         deadline=time.monotonic() + (60 if erase else 600), erase=erase
     )
@@ -461,7 +461,7 @@ def started_payload(
 
 
 def stock_preloader(*, build: str, payload: pathlib.Path, preloader: bytes) -> None:
-    PROGRESS.begin(estimate="10 s", label="waiting for the bootrom")
+    PROGRESS.begin(estimate=10, label="waiting for the bootrom")
     client, joined = bootrom_client(deadline=time.monotonic() + MINUTE, erase=None)
     if client is None and joined is None:
         raise FatalError(

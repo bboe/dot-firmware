@@ -87,7 +87,7 @@ class Shell(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class Step:
-    estimate: str
+    estimate: int
     image: str
     label: str
     partition: str
@@ -95,31 +95,31 @@ class Step:
 
 WRITES = (
     Step(
-        estimate="240 s",
+        estimate=240,
         image="system",
         label="write the system image to system_a",
         partition="system_a",
     ),
     Step(
-        estimate="240 s",
+        estimate=240,
         image="system",
         label="write the system image to system_b",
         partition="system_b",
     ),
     Step(
-        estimate="10 s",
+        estimate=10,
         image="boot",
         label="write boot image to boot_a",
         partition="boot_a",
     ),
     Step(
-        estimate="10 s",
+        estimate=10,
         image="boot",
         label="write boot image to boot_b",
         partition="boot_b",
     ),
     Step(
-        estimate="5 s",
+        estimate=5,
         image="misc",
         label="write misc, slot a marked good",
         partition="misc",
@@ -175,31 +175,31 @@ def chain_writes() -> tuple[Step, ...]:
     first, last = CHAIN_TEE
     return (
         Step(
-            estimate="5 s",
+            estimate=5,
             image="lk",
             label=f"write LK image to {spare} (spare slot)",
             partition=spare,
         ),
         Step(
-            estimate="5 s",
+            estimate=5,
             image="tee",
             label=f"write TEE image to {first} (backup)",
             partition=first,
         ),
         Step(
-            estimate="5 s",
+            estimate=5,
             image="expdb",
             label="zero expdb (amonet kaeru payload)",
             partition="expdb",
         ),
         Step(
-            estimate="5 s",
+            estimate=5,
             image="lk",
             label=f"write LK image to {live} (live slot)",
             partition=live,
         ),
         Step(
-            estimate="5 s",
+            estimate=5,
             image="tee",
             label=f"write TEE image to {last} (primary)",
             partition=last,
@@ -303,7 +303,7 @@ def ota_images(*, build: str, device: Device, work: pathlib.Path) -> None:
 
 
 def reboot_into_fastboot() -> None:
-    PROGRESS.begin(estimate="20 s", label="restarting into fastboot")
+    PROGRESS.begin(estimate=20, label="restarting into fastboot")
     with contextlib.suppress(subprocess.TimeoutExpired):
         run(arguments=["adb", "reboot", "bootloader"], timeout=60)
     wait_for_fastboot()
@@ -319,7 +319,7 @@ def restore(  # ruff: ignore[complex-structure]
 ) -> None:
     unmount()
 
-    PROGRESS.begin(estimate="5 s", label="clear the preloader header (boot0)")
+    PROGRESS.begin(estimate=5, label="clear the preloader header (boot0)")
     SESSION.boot0_erased = True
     clear_boot0()
     PROGRESS.end()
@@ -333,19 +333,19 @@ def restore(  # ruff: ignore[complex-structure]
             sector=parts[step.partition].first,
         )
     write(
-        estimate="5 s",
+        estimate=5,
         label="write the stock table (backup)",
         path=files["gpt-backup.bin"],
         sector=backup_sector,
     )
     write(
-        estimate="5 s",
+        estimate=5,
         label="write the stock table (primary)",
         path=files["gpt-primary.bin"],
         sector=0,
     )
 
-    PROGRESS.begin(estimate="30 s", label="format cache and userdata")
+    PROGRESS.begin(estimate=30, label="format cache and userdata")
     if "No problems found" not in adb_shell(command="sgdisk --verify " + DISK):
         raise FatalError(message="sgdisk does not accept the new table; do not reboot")
     unmount(started=True)
@@ -379,7 +379,7 @@ def restore(  # ruff: ignore[complex-structure]
         )
 
     if build in biscuit.BOOTROM_BUILDS:
-        PROGRESS.begin(estimate="5 s", label="restarting into the bootrom")
+        PROGRESS.begin(estimate=5, label="restarting into the bootrom")
         with contextlib.suppress(subprocess.TimeoutExpired):
             run(arguments=["adb", "shell", "-n", "reboot"], timeout=60)
         stock_preloader(
@@ -389,7 +389,7 @@ def restore(  # ruff: ignore[complex-structure]
         )
         return
 
-    PROGRESS.begin(estimate="5 s", label="write preloader to boot0")
+    PROGRESS.begin(estimate=5, label="write preloader to boot0")
     preloader = work / "boot0.img"
     staged = DOT_TEMPORARY_DIRECTORY / "pl.img"
     if run(arguments=["adb", "push", preloader, staged], timeout=120).returncode != 0:
@@ -413,9 +413,9 @@ def restore(  # ruff: ignore[complex-structure]
         return
     device = ARGUMENTS.target.device
     if build in FIREOS5_BUILDS[device] | ADB_OFF_BUILDS[device]:
-        PROGRESS.begin(estimate="5 s", label=f"restarting into stock {build}")
+        PROGRESS.begin(estimate=5, label=f"restarting into stock {build}")
     else:
-        PROGRESS.begin(estimate="90 s", label=f"waiting for stock {build}")
+        PROGRESS.begin(estimate=90, label=f"waiting for stock {build}")
     with contextlib.suppress(subprocess.TimeoutExpired):
         run(arguments=["adb", "shell", "-n", "reboot"], timeout=60)
 

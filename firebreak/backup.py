@@ -327,7 +327,7 @@ def scanned(*, images: list[Image], path: pathlib.Path) -> tuple[list[Image], st
 def stored(
     *, area: Area, folder: pathlib.Path, images: list[Image]
 ) -> tuple[dict, list[Image]]:
-    estimate = f"{max(1, (area.size or 0) // PULL_RATE)} s" if area.size else ""
+    estimate = max(1, area.size // PULL_RATE) if area.size else 0
     PROGRESS.begin(estimate=estimate, label=f"record {area.name}")
     local = folder / f"{area.name}.img.part"
     size, md5, sha256, matches = checked_read(area=area, images=images, local=local)

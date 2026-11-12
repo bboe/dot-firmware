@@ -103,4 +103,4 @@ def emos_recovery() -> None:
 
 def stage_emos() -> None:
     emos_recovery()
-    PROGRESS.begin(estimate="40 s", label="waiting for recovery")
+    PROGRESS.begin(estimate=40, label="waiting for recovery")

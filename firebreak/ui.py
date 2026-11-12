@@ -68,11 +68,11 @@ class Progress:
         self.stopped = threading.Event()
         self.ticker = None
 
-    def begin(self, *, estimate: str = "", label: str) -> None:
+    def begin(self, *, estimate: int = 0, label: str) -> None:
         self.end()
         self.step += 1
-        about = f"~{estimate}" if estimate else ""
-        self.line = f"{self.counter()}{label:<42} {about:>6} "
+        about = f"~{estimate}s" if estimate else ""
+        self.line = f"{self.counter()}{label:<43} {about:>5} "
         self.ts = time.monotonic()
         self.open = True
         if ARGUMENTS.verbose:

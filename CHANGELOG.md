@@ -6,6 +6,9 @@ This project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- Progress lines write each step's estimate as `~40s`, with no space, as its
+  elapsed time and the total already are. The label column is one character
+  wider.
 - `stock` and `unlock fireos6 --factory-reset` install Fire OS 6 8349 on an
   Echo Dot (2nd Generation) and an Echo (2nd Generation) when no build is
   named, where they installed 8149. So does `unlock fireos6` on an Echo with

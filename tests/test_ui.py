@@ -30,7 +30,7 @@ def test_a_write_is_asked_about_below_the_step_it_interrupts(
     monkeypatch.setattr(name="isatty", target=sys.stdin, value=lambda: True)
     monkeypatch.setattr(name="isatty", target=sys.stdout, value=lambda: True)
     monkeypatch.setattr(name="input", target=builtins, value=lambda _: "yes")
-    ui.PROGRESS.begin(estimate="40 s", label="restarting into fastboot")
+    ui.PROGRESS.begin(estimate=40, label="restarting into fastboot")
     ui.confirm(force=False, what="this writes")
     assert ui.PROGRESS.open is False
     said = capsys.readouterr().out
@@ -56,7 +56,7 @@ def test_a_write_is_asked_about_with_the_ticker_stopped(
     monkeypatch.setattr(name="isatty", target=sys.stdin, value=lambda: True)
     monkeypatch.setattr(name="isatty", target=sys.stdout, value=lambda: True)
     monkeypatch.setattr(name="input", target=builtins, value=lambda _: "yes")
-    ui.PROGRESS.begin(estimate="40 s", label="waiting for fastboot")
+    ui.PROGRESS.begin(estimate=40, label="waiting for fastboot")
     assert ui.PROGRESS.ticker is not None
     ui.confirm(force=False, what="this writes")
     assert ui.PROGRESS.ticker is None
@@ -244,11 +244,23 @@ def test_progress_aligns_two_digit_counts(
     assert lines[-2].startswith("[10/16] step")
 
 
+def test_progress_ends_every_estimate_in_the_same_column(
+    *, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ui.PROGRESS.steps = 2
+    ui.PROGRESS.begin(estimate=345, label="x" * 43)
+    ui.PROGRESS.begin(estimate=5, label="short")
+    ui.PROGRESS.end()
+    first, _, second, _ = capsys.readouterr().out.splitlines()
+    assert first == "[ 1/ 2] " + "x" * 43 + " ~345s"
+    assert second == "[ 2/ 2] short" + " " * 38 + "   ~5s"
+
+
 def test_progress_leaves_out_a_count_it_cannot_know(
     *, capsys: pytest.CaptureFixture[str]
 ) -> None:
     ui.PROGRESS.steps = None
-    ui.PROGRESS.begin(estimate="1 s", label="writing and reading cache")
+    ui.PROGRESS.begin(estimate=1, label="writing and reading cache")
     ui.PROGRESS.end()
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].startswith("writing and reading cache")
@@ -258,13 +270,13 @@ def test_progress_leaves_out_a_count_it_cannot_know(
 
 def test_progress_not_a_tty(*, capsys: pytest.CaptureFixture[str]) -> None:
     ui.PROGRESS.steps = 2
-    ui.PROGRESS.begin(estimate="1 s", label="first")
+    ui.PROGRESS.begin(estimate=1, label="first")
     ui.PROGRESS.begin(label="second")
     ui.PROGRESS.end(skipped=True)
     ui.PROGRESS.end()
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].startswith("[ 1/ 2] first")
-    assert lines[0].endswith("first" + " " * 37 + "   ~1 s")
+    assert lines[0].endswith("first" + " " * 38 + "   ~1s")
     assert "✅   0s" in lines[1]
     assert lines[2].startswith("[ 2/ 2] second")
     assert "✅ skip" in lines[3]

@@ -106,7 +106,7 @@ def ask_fastboot(*, command: bytes, what: str = "fastboot") -> None:
             command.ljust(BCB_COMMAND_SIZE, b"\0") + held[BCB_COMMAND_SIZE:]
         )
         write(
-            estimate="5 s",
+            estimate=5,
             label=f"asking the bootloader for {what}",
             number=partition.number,
             path=staged,
@@ -231,7 +231,7 @@ def read_sectors(*, count: int, start: int) -> bytes:
     return raw
 
 
-def reboot(*, estimate: str = "40 s", into: str = "recovery", label: str) -> None:
+def reboot(*, estimate: int = 40, into: str = "recovery", label: str) -> None:
     run(arguments=["adb", "reboot", *([into] if into else [])], check=True, timeout=60)
     PROGRESS.begin(estimate=estimate, label=label)
 
@@ -392,7 +392,7 @@ def wait_for_twrp_start(
 
 def write(
     *,
-    estimate: str,
+    estimate: int,
     label: str,
     number: int | None = None,
     path: pathlib.Path,

@@ -82,7 +82,7 @@ def emmc_leg(
     )
     started = time.monotonic()
     PROGRESS.begin(
-        estimate=f"{written // 3} s", label=f"writing and reading {EMMC_TARGET}"
+        estimate=max(1, written // 3), label=f"writing and reading {EMMC_TARGET}"
     )
     said = asked(
         command=EMMC.format(

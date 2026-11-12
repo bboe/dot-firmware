@@ -1257,7 +1257,7 @@ def test_each_target_has_its_route_s_stages(*, monkeypatch: pytest.MonkeyPatch) 
                 "after": (
                     route.reboot,
                     {
-                        "estimate": "345 s",
+                        "estimate": 345,
                         "into": "",
                         "label": "waiting for rooted Fire OS 5",
                     },

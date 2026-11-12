@@ -187,17 +187,17 @@ def test_a_partition_table_without_userdata_is_read_again(*, adb: FakeAdb) -> No
 @pytest.mark.parametrize(
     argnames=("options", "arguments", "estimate"),
     argvalues=[
-        ({}, ["adb", "reboot", "recovery"], "40 s"),
-        ({"estimate": "345 s", "into": ""}, ["adb", "reboot"], "345 s"),
+        ({}, ["adb", "reboot", "recovery"], 40),
+        ({"estimate": 345, "into": ""}, ["adb", "reboot"], 345),
     ],
     ids=["recovery", "system"],
 )
 def test_a_reboot_waits_where_it_was_sent(
     *,
     arguments: list[str],
-    estimate: str,
+    estimate: int,
     monkeypatch: pytest.MonkeyPatch,
-    options: dict[str, str],
+    options: dict[str, object],
 ) -> None:
     ran: list[dict[str, object]] = []
     begun: list[dict[str, object]] = []
@@ -315,7 +315,7 @@ def test_a_staged_write_lands_through_dd(*, adb: FakeAdb, image: pathlib.Path) -
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
     adb.answers["of=" + twrp.DISK] = ["written"]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="table", path=image, sector=8)
+    twrp.write(estimate=5, label="table", path=image, sector=8)
     (written,) = adb.commands(holding="of=" + twrp.DISK)
     assert written.startswith(
         f"dd if={twrp.DOT_TEMPORARY_DIRECTORY / image.name} of={twrp.DISK} bs=4096"
@@ -329,7 +329,7 @@ def test_a_staged_write_that_dd_does_not_finish_stops_it(
     adb.answers["md5sum"] = [md5(data=b"old")]
     adb.answers["of=" + twrp.DISK] = ["dd: write error"]
     with pytest.raises(FatalError, match="table failed"):
-        twrp.write(estimate="5 s", label="table", path=image, sector=1)
+        twrp.write(estimate=5, label="table", path=image, sector=1)
     assert "bs=512 seek=1" in adb.commands(holding="of=" + twrp.DISK)[0]
 
 
@@ -341,7 +341,7 @@ def test_a_staged_write_that_does_not_reach_the_dot_stops_it(
     with pytest.raises(
         FatalError, match=r"did not reach the Echo Dot \(2nd Generation\)"
     ):
-        twrp.write(estimate="5 s", label="table", path=image, sector=8)
+        twrp.write(estimate=5, label="table", path=image, sector=8)
 
 
 def test_a_stdin_probe_that_does_not_finish_takes_the_pieces_and_says_so(
@@ -468,7 +468,7 @@ def test_a_write_already_in_place_is_skipped(
     *, adb: FakeAdb, image: pathlib.Path
 ) -> None:
     adb.answers["md5sum"] = [md5(data=image.read_bytes())]
-    twrp.write(estimate="5 s", label="table", number=7, path=image, sector=8)
+    twrp.write(estimate=5, label="table", number=7, path=image, sector=8)
     assert [words for words in adb.asked if words[1] == "push"] == []
     assert len(adb.commands(holding="md5sum")) == 1
 
@@ -479,7 +479,7 @@ def test_a_write_by_partition_checks_where_it_starts(
     adb.answers["md5sum"] = [md5(data=b"old")]
     adb.answers["/start"] = [f"9 {twrp.START_OK}"]
     with pytest.raises(FatalError, match="starts at 9, not 8"):
-        twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+        twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     assert [words for words in adb.asked if words[1] == "push"] == []
 
 
@@ -489,7 +489,7 @@ def test_a_write_by_partition_is_pushed_to_its_node(
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
     adb.answers["/start"] = [f"8 {twrp.START_OK}"]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     assert ["adb", "push", str(image), f"{twrp.DISK}p7"] in adb.asked
 
 
@@ -503,7 +503,7 @@ def test_a_write_by_partition_pushes_again_after_a_lost_reply(
         (0, "1 file pushed"),
     ]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     pushes = [words for words in adb.asked if words[1] == "push"]
     assert len(pushes) == 2
     assert len(adb.commands(holding="wait-for-recovery")) == 1
@@ -515,7 +515,7 @@ def test_a_write_by_partition_reads_a_lost_start_again(
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
     adb.answers["/start"] = ["adb.exe: device 'G090' not found", f"8 {twrp.START_OK}"]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+    twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     assert len(adb.commands(holding="wait-for-recovery")) == 1
     assert ["adb", "push", str(image), f"{twrp.DISK}p7"] in adb.asked
 
@@ -527,7 +527,7 @@ def test_a_write_by_partition_that_push_refuses_stops_it(
     adb.answers["/start"] = [f"8 {twrp.START_OK}"]
     adb.answers[f"{twrp.DISK}p7"] = [(1, "remote write failed")]
     with pytest.raises(FatalError, match=r"(?s)failed 3 times.*remote write failed"):
-        twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+        twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     pushes = [words for words in adb.asked if words[1] == "push"]
     assert len(pushes) == twrp.PUSH_TRIES
 
@@ -538,7 +538,7 @@ def test_a_write_by_partition_whose_start_never_answers_stops_it(
     adb.answers["md5sum"] = [md5(data=b"old")]
     adb.answers["/start"] = ["adb.exe: device 'G090' not found"]
     with pytest.raises(FatalError) as stopped:
-        twrp.write(estimate="5 s", label="boot", number=7, path=image, sector=8)
+        twrp.write(estimate=5, label="boot", number=7, path=image, sector=8)
     message = " ".join(explained(error=stopped.value).split())
     assert f"did not answer where {twrp.DISK}p7 starts" in message
     assert "partition table" not in message
@@ -552,7 +552,7 @@ def test_a_write_that_does_not_flush_stops_it(
     adb.answers["md5sum"] = [md5(data=b"old")]
     adb.answers["of=" + twrp.DISK] = ["written"]
     with pytest.raises(FatalError, match="could not be flushed"):
-        twrp.write(estimate="5 s", label="table", path=image, sector=8)
+        twrp.write(estimate=5, label="table", path=image, sector=8)
 
 
 def test_a_write_that_does_not_verify_stops_it(
@@ -563,7 +563,7 @@ def test_a_write_that_does_not_verify_stops_it(
     adb.answers["of=" + twrp.DISK] = ["written"]
     adb.answers["flushed"] = ["flushed"]
     with pytest.raises(FatalError, match="did not verify") as stopped:
-        twrp.write(estimate="5 s", label="table", path=image, sector=8)
+        twrp.write(estimate=5, label="table", path=image, sector=8)
     assert "boot0 may hold no preloader" in " ".join(
         explained(error=stopped.value).split()
     )
@@ -577,7 +577,7 @@ def test_a_write_with_a_matching_head_still_checks_the_whole(
     adb.answers["md5sum"] = [head, md5(data=b"old"), md5(data=image.read_bytes())]
     adb.answers["of=" + twrp.DISK] = ["written"]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="table", path=image, sector=8)
+    twrp.write(estimate=5, label="table", path=image, sector=8)
     reads = adb.commands(holding="md5sum")
     assert "count=1 " in reads[0]
     assert "count=2 " in reads[1]
@@ -705,7 +705,7 @@ def test_toybox_writes_a_staged_image_without_truncating(
     adb.answers["md5sum"] = [md5(data=b"old"), md5(data=image.read_bytes())]
     adb.answers["of=" + twrp.DISK] = ["written"]
     adb.answers["flushed"] = ["flushed"]
-    twrp.write(estimate="5 s", label="table", path=image, sector=8)
+    twrp.write(estimate=5, label="table", path=image, sector=8)
     (written,) = adb.commands(holding="of=" + twrp.DISK)
     assert written.startswith("toybox dd if=")
     assert "bs=4096 seek=1 conv=notrunc && rm -f" in written
