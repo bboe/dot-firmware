@@ -101,6 +101,13 @@ FIREOS5_ROOTED = {
     State.ROOTED,
     State.AMONET_FIREOS5_BBOE_BOOTED,
 }
+INSTALLED_FROM = {
+    State.AMONET_FIREOS5_BBOE_BOOTED: frozenset({
+        State.AMONET_FIREOS5_BBOE_TWRP,
+        State.AMONET_TWRP_BOOT_MOVED,
+    }),
+    State.UNLOCKED_BOOTED: frozenset({State.UNLOCKED_TWRP}),
+}
 KAMAKIRI_REBOOTS = frozenset({State.UNLOCKED_BOOTED, State.BOOTED})
 NO_FASTBOOT_DRIVER = (
     "Windows sees an Echo in fastboot mode, but fastboot does not, so its driver"
@@ -470,7 +477,7 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
     while True:
         current = state()
         stranded = current == State.STOCK_FASTBOOT and current not in table
-        installed = target.goal == State.UNLOCKED_BOOTED and State.UNLOCKED_TWRP in done
+        installed = bool(done & INSTALLED_FROM.get(target.goal, frozenset()))
         restored = target.unlock is None and bool(done & TWRPS)
         resetting = (ARGUMENTS.factory_reset or upgrading) and not installed
         ahead = AHEAD.get(current)
@@ -749,6 +756,15 @@ def root() -> None:  # ruff: ignore[complex-structure, too-many-branches, too-ma
                     raise FatalError(
                         message=f"stock {ARGUMENTS.build} has not started"
                         f" {WAIT // 60} minutes after the restore"
+                    )
+                if (
+                    current == State.STOCK_BOOTED
+                    and target.goal == State.AMONET_FIREOS5_BBOE_BOOTED
+                ):
+                    raise FatalError(
+                        message="Fire OS 5 started, and its adb refuses this"
+                        " computer: adb uses a key other than the one the unlock"
+                        " let in. " + again()
                     )
                 if current == State.STOCK_BOOTED:
                     raise FatalError(

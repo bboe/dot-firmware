@@ -2,6 +2,14 @@
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Fixed
+
+- `unlock fireos5` asked for the fastboot gesture when the rooted Fire OS 5 it
+  just installed refused this computer's adb key. It now stops with a message,
+  as `unlock fireos6` does.
+
 ## 1.3.0 - 2026-11-12
 
 ### Changed

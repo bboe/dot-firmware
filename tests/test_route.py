@@ -366,6 +366,18 @@ def test_a_dot_that_stays_dark_after_boot_root_asks_for_a_power_cycle(
             [route.State.UNLOCKED_TWRP],
             "boot-root.zip did not take",
         ),
+        (
+            "fireos5",
+            [route.State.STOCK_BOOTED],
+            [route.State.AMONET_FIREOS5_BBOE_TWRP],
+            "Fire OS 5 started, and its adb refuses this computer",
+        ),
+        (
+            "fireos5",
+            [route.State.STOCK_BOOTED],
+            [route.State.AMONET_TWRP_BOOT_MOVED],
+            "Fire OS 5 started, and its adb refuses this computer",
+        ),
         ("fireos5", [route.State.BOOTED], [], "has not finished"),
         (
             "fireos5",

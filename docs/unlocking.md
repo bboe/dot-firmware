@@ -2540,6 +2540,12 @@ either amonet v1.1.0 TWRP, and amonet v1.1.0's from v2.0.0's TWRP.
   The boot image's read-back covers both. Measured on a biscuit, 2026-11-11:
   `ro.adb.secure` 1, `/adb_keys` equal to the key, and a second key
   `unauthorized` over USB.
+- A Fire OS 5 that answers `unauthorized` after the install reads as
+  stock-booted, which on its own asks for the fastboot gesture. After an
+  install it means adb holds a key other than the one written, so the run
+  waits a minute for root and then stops, as it does on Fire OS 6.
+- Rooted Fire OS 5 listens on no Wi-Fi port: nothing answered on 5555 on the
+  white biscuit, 2026-11-11. So it has no network adb to lock.
 - adb alone, not stock's `mtp`, and not `mtp,adb`. On Ubuntu, GNOME's
   `gvfs-mtp-volume-monitor` reset a booted Dot on `mtp,adb` about every 7 s,
   so the last step's wait for Fire OS 5 timed out; 2 owners hit it. With adb
