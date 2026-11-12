@@ -61,14 +61,21 @@ An Echo rooted on Fire OS 6 by firebreak 1.1.x or earlier lets anyone on its
 network into its root adb. One rooted by 1.0.0 or earlier also has only a
 raised build number against Amazon's updates. Amazon's update server offered
 nothing to that number on 2026-11-11, but `otad` still runs and the hosts file
-blocks nothing. A plain `unlock` on either says the Echo is rooted and stops.
-To add what is missing and keep the Echo's setup, start in its TWRP:
+blocks nothing.
+
+On a Fire OS 6 build older than 8349, run a plain `unlock`. It downloads
+8349, reboots the Echo into TWRP and installs 8349 over the old build. It
+adds what is missing, and the Echo keeps its setup.
+
+On 8349, a plain `unlock` says the Echo is rooted and stops. To add what is
+missing there and keep the setup, start in its TWRP:
 
 ```sh
 uvx firebreak@latest twrp
 uvx firebreak@latest unlock
 ```
 
-The unlock installs `boot-root.zip` again, blocks updates and locks adb in
-each Fire OS 6 slot, and starts Fire OS. `unlock --factory-reset` also adds
-them, but installs Fire OS 6 again and erases the Echo.
+From TWRP, the unlock installs `boot-root.zip` again, blocks updates and
+locks adb in each Fire OS 6 slot, and starts Fire OS.
+`unlock --factory-reset` also adds them, but installs Fire OS 6 again and
+erases the Echo.
